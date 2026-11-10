@@ -13,7 +13,13 @@ from urllib.parse import urlsplit
 import httpx
 
 class EngineError(RuntimeError):
-    pass
+    """Controlled engine failure. `code` is a stable, translatable identifier."""
+    def __init__(self, message, code="engine_unavailable"):
+        super().__init__(message)
+        self.code = code
+
+RIGHTS = ("written_permission", "open_license", "public_domain")
+LANGUAGES = ("uz", "ru", "en")
 
 def configured() -> bool:
     return bool(os.environ.get("ENGINE_URL", "").strip()) and len(os.environ.get("ENGINE_API_KEY", "")) >= 32
@@ -52,9 +58,14 @@ async def run_check(text: str, language: str) -> dict:
         raise EngineError("Invalid engine timeout configuration.") from exc
     timeout=max(15,min(timeout,180))
     try:
-        async with httpx.AsyncClient(base_url=base, timeout=httpx.Timeout(15.0), trust_env=False,
+        # The engine fingerprints synchronously inside POST, so the request
+        # itself needs the configured scan timeout, not a fixed 15 seconds.
+        async with httpx.AsyncClient(base_url=base, timeout=httpx.Timeout(timeout, connect=10.0), trust_env=False,
+                                     follow_redirects=False,
                                      headers={"Authorization": "Bearer " + os.environ["ENGINE_API_KEY"]}) as client:
             response=await client.post("/v1/checks",json={"query_text":text,"language":segmentation})
+            if response.status_code == 429:
+                raise EngineError("Private corpus engine is busy. Try again shortly.", "engine_busy")
             if response.status_code != 202:
                 raise EngineError("Engine rejected document ("+str(response.status_code)+").")
             urls=response.json()
@@ -75,18 +86,32 @@ async def run_check(text: str, language: str) -> dict:
                 if state.get("status")=="failed":
                     raise EngineError("Corpus engine could not finish the scan.")
                 await asyncio.sleep(1.5)
-            raise EngineError("Corpus search timed out.")
+            raise EngineError("Corpus search timed out.", "engine_timeout")
     except httpx.HTTPError as exc:
         raise EngineError("Private corpus engine is unavailable.") from exc
     except (ValueError,KeyError,TypeError,AttributeError) as exc:
         raise EngineError("Unexpected corpus engine response.") from exc
 
+def _int(value, low, high):
+    if type(value) is not int or not low <= value <= high:
+        raise ValueError()
+    return value
+
+
 def summarize(report: dict, max_sources=25) -> dict:
+    """Recompute overlap from validated spans; never trust engine totals.
+
+    Every field passed on to the browser or PDF is type-checked, bounded and
+    rebuilt from an allowlist, so a faulty or compromised engine cannot inject
+    unexpected keys, oversized strings or out-of-range offsets.
+    """
     try:
-        document_length = report["query_text_length"]
-        if type(document_length) is not int or not 0 < document_length <= 300000:
+        if not isinstance(report, dict):
             raise ValueError()
+        document_length = _int(report["query_text_length"], 1, 300000)
         intervals = report["unique_passages"]
+        if not isinstance(intervals, list) or len(intervals) > 300000:
+            raise ValueError()
         for pair in intervals:
             if (not isinstance(pair, (list, tuple)) or len(pair) != 2
                     or any(type(x) is not int for x in pair)
@@ -94,41 +119,56 @@ def summarize(report: dict, max_sources=25) -> dict:
                 raise ValueError()
         intervals = merge(intervals)
         matched = sum(e-s for s, e in intervals)
-        counts = report.get('language_counts', {})
-        if not isinstance(counts, dict) or any(type(counts.get(lang, 0)) is not int or counts.get(lang, 0) < 0 for lang in ('uz','ru','en')):
+        raw_counts = report.get('language_counts', {})
+        if not isinstance(raw_counts, dict):
             raise ValueError()
-        if report.get('corpus_sources') is not None and (type(report['corpus_sources']) is not int or report['corpus_sources'] != sum(counts.values())):
+        counts = {lang: _int(raw_counts.get(lang, 0), 0, 10**9) for lang in LANGUAGES}
+        corpus_size = report.get('corpus_sources')
+        if corpus_size is not None and (type(corpus_size) is not int or corpus_size != sum(counts.values())):
+            raise ValueError()
+        raw_sources = report.get("sources", [])
+        if not isinstance(raw_sources, list):
             raise ValueError()
         sources = []
-        for src in report.get("sources", [])[:max_sources]:
-            url = str(src.get("source_url") or "")[:500]
-            if type(src.get('matched_chars')) is not int or not 0 <= src['matched_chars'] <= document_length:
+        for src in raw_sources[:max_sources]:
+            if not isinstance(src, dict):
                 raise ValueError()
-            passages = src.get('passages', [])[:5]
-            for passage in passages:
+            url = str(src.get("source_url") or "")[:500]
+            matched_chars = _int(src.get('matched_chars'), 0, document_length)
+            raw_passages = src.get('passages', [])
+            if not isinstance(raw_passages, list):
+                raise ValueError()
+            passages = []
+            for passage in raw_passages[:5]:
                 if (not isinstance(passage, dict) or
                     any(type(passage.get(k)) is not int for k in ('query_start','query_end','source_start','source_end')) or
                     not 0 <= passage['query_start'] < passage['query_end'] <= document_length or
                     not 0 <= passage['source_start'] < passage['source_end']):
                     raise ValueError()
-                passage['source_excerpt'] = str(passage.get('source_excerpt', ''))[:500]
+                passages.append({k: passage[k] for k in ('query_start','query_end','source_start','source_end')}
+                                | {'source_excerpt': str(passage.get('source_excerpt', ''))[:501]})
+            year = src.get("year")
+            passage_count = src.get("passage_count", len(passages))
             sources.append({
                 "title": str(src.get("source_filename") or "Indexed document")[:250],
                 "url": url if urlsplit(url).scheme == "https" else "",
                 "coverage": "indexed full-text source",
-                "matched_chars": int(src.get("matched_chars") or 0),
-                "authors": str(src.get("authors") or ""),
-                "year": src.get("year"),
-                "rights_basis": str(src.get("rights_basis") or "unknown"),
+                "matched_chars": matched_chars,
+                "authors": str(src.get("authors") or "")[:300],
+                "year": year if type(year) is int and 1000 <= year <= 2200 else None,
+                "language": src.get("language") if src.get("language") in LANGUAGES else None,
+                "rights_basis": src.get("rights_basis") if src.get("rights_basis") in RIGHTS else "unknown",
+                "passage_count": passage_count if type(passage_count) is int and passage_count >= len(passages) else len(passages),
                 "passages": passages,
             })
         return {"percent": round(100 * matched / document_length, 2),
                 "matched_chars": matched, "total_chars": document_length,
-                "coverage": str(report.get("coverage") or "unknown"),
-                "corpus_size": report.get("corpus_sources"),
+                "coverage": str(report.get("coverage") or "unknown")[:500],
+                "corpus_size": sum(counts.values()),
                 "intervals": intervals, "sources": sources,
-                "language_counts": report.get("language_counts", {}),
-                "sources_truncated": len(report.get("sources", [])) > max_sources}
+                "language_counts": counts,
+                "matched_source_count": len(raw_sources),
+                "sources_truncated": len(raw_sources) > max_sources}
     except (ValueError, TypeError, KeyError, AttributeError) as exc:
         raise EngineError("Invalid corpus evidence response.") from exc
 

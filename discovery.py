@@ -11,6 +11,7 @@ from urllib.request import urlopen, Request
 from urllib.error import HTTPError, URLError
 
 API = "https://api.openalex.org/works"
+MAX_RESPONSE = 5 * 1024 * 1024
 
 def reconstruct_abstract(inverted):
     """Reassemble an OpenAlex inverted abstract index into readable text."""
@@ -48,7 +49,10 @@ def discover(text, max_results=8):
                                "Accept":"application/json"})
     try:
         with urlopen(request, timeout=9) as response:
-            payload = json.load(response)
+            body = response.read(MAX_RESPONSE + 1)
+        if len(body) > MAX_RESPONSE:
+            raise ValueError("response too large")
+        payload = json.loads(body)
     except (TimeoutError, HTTPError, URLError, OSError, ValueError) as exc:
         return {"status":"unavailable","sources":[],"queries":1,
                 "message":"OpenAlex unavailable or rate limited (" + type(exc).__name__ + ")"}
@@ -63,7 +67,8 @@ def discover(text, max_results=8):
         if not isinstance(url,str) or not url.startswith("https://"):
             continue
         abstract = reconstruct_abstract(work.get("abstract_inverted_index"))
-        sources.append({"title":title[:300],"url":url,"year":work.get("publication_year"),
+        year = work.get("publication_year")
+        sources.append({"title":title[:300],"url":url[:500],"year":year if type(year) is int else None,
                         "abstract":abstract[:20000],"coverage":"abstract" if abstract else "metadata_only"})
     return {"status":"searched","sources":sources,"queries":1,
             "message":"OpenAlex metadata searched; only returned abstracts can be text-compared"}

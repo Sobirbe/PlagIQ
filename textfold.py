@@ -4,6 +4,7 @@ Adapted for PlagIQ from the user-supplied noplag integration bundle.
 For source matching only; not a substitute for translation detection.
 """
 from dataclasses import replace
+import unicodedata
 
 APOSTROPHES = frozenset("'ʻʼ‘’\u0060´ʹ′")
 O_CANON = "\ue000"
@@ -19,11 +20,38 @@ CYR = {
     "ғ":G_CANON,"ŏ":O_CANON,"ğ":G_CANON,
 }
 
+# Invisible format characters that commonly appear inside words in PDF/DOCX
+# extraction (soft hyphen, zero-width space/joiners, word joiner, BOM).
+IGNORABLE = frozenset("\u00ad\u200b\u200c\u200d\u2060\ufeff")
+CYR["\u020f"] = O_CANON  # o with inverted breve (NFC of o + U+0311)
+
+
+def normalized_chars(text: str, keep_marks=frozenset()):
+    """Lower-cased NFC characters, each mapped to its original [start, end).
+
+    Each base character and its following combining marks are composed with
+    NFC, so decomposed input (common in PDF text) tokenizes like composed
+    input. Marks that do not compose are dropped unless listed in keep_marks;
+    invisible format characters are dropped. Offsets always refer to the
+    caller's original string.
+    """
+    out = []
+    i, n = 0, len(text)
+    while i < n:
+        j = i + 1
+        while j < n and unicodedata.combining(text[j]):
+            j += 1
+        for ch in unicodedata.normalize("NFC", text[i:j]):
+            for lower in ch.lower():
+                if lower in IGNORABLE or (unicodedata.combining(lower) and lower not in keep_marks):
+                    continue
+                out.append((lower, i, j))
+        i = j
+    return out
+
+
 def fold_with_map(text: str):
-    lowered = []
-    for i,ch in enumerate(text):
-        for lower in ch.lower():
-            lowered.append((lower,i,i+1))
+    lowered = normalized_chars(text, keep_marks=BREVES)
     transliterated = []
     for i,(c,start,end) in enumerate(lowered):
         prev = lowered[i-1][0] if i else ""
@@ -47,7 +75,8 @@ def fold_with_map(text: str):
                 collapsed.append((O_CANON if c=="o" else G_CANON,start,next_end))
                 i += 2
                 continue
-        collapsed.append((c,start,end))
+        if c not in BREVES:
+            collapsed.append((c,start,end))
         i += 1
     return ("".join(c for c,_,_ in collapsed),
             [start for _,start,_ in collapsed],

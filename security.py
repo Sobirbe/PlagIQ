@@ -20,16 +20,16 @@ class SecurityMiddleware:
             expected = b'Basic ' + base64.b64encode((pilot_user + ':' + pilot_password).encode())
             if (not pilot_user or len(pilot_password) < 16 or
                     not secrets.compare_digest(headers.get(b'authorization', b''), expected)):
-                return await JSONResponse({'detail': 'Private pilot access required'}, 401,
+                return await JSONResponse({'detail': 'Private pilot access required', 'code': 'auth_required'}, 401,
                     headers={'WWW-Authenticate': 'Basic realm="PlagIQ private pilot"', 'Cache-Control':'no-store'})(scope, receive, send)
         if scope['method'] in ('POST', 'DELETE'):
             origin = headers.get(b'origin')
             host = headers.get(b'host', b'')
             allowed = os.environ.get('PUBLIC_ORIGIN', '').encode()
             if origin and origin not in (allowed, b'http://' + host, b'https://' + host):
-                return await JSONResponse({'detail': 'Foreign origin rejected'}, 403)(scope, receive, send)
+                return await JSONResponse({'detail': 'Foreign origin rejected', 'code': 'origin_rejected'}, 403)(scope, receive, send)
             if headers.get(b'sec-fetch-site') == b'cross-site':
-                return await JSONResponse({'detail': 'Cross-site request rejected'}, 403)(scope, receive, send)
+                return await JSONResponse({'detail': 'Cross-site request rejected', 'code': 'origin_rejected'}, 403)(scope, receive, send)
         # Buffer only the bounded raw body, before FastAPI parses files/fields.
         if scope['method'] == 'POST':
             chunks, size = [], 0
@@ -39,7 +39,7 @@ class SecurityMiddleware:
                     return
                 size += len(message.get('body', b''))
                 if size > MAX_REQUEST:
-                    return await JSONResponse({'detail': 'Request exceeds 5 MB'}, 413)(scope, receive, send)
+                    return await JSONResponse({'detail': 'Request exceeds 5 MB', 'code': 'request_too_large'}, 413)(scope, receive, send)
                 chunks.append(message)
                 if not message.get('more_body', False):
                     break

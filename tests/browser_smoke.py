@@ -2,14 +2,13 @@
 import os
 from pathlib import Path
 import secrets
-import subprocess
 import sys
 import tempfile
-import time
-from urllib.request import urlopen
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(Path(__file__).parent))
+from browser_smoke_lib import start
 from corpus import connect, ingest
 from playwright.sync_api import sync_playwright
 
@@ -18,21 +17,6 @@ SAMPLES = {
  'uz':"Oliy ta'lim muassasalarida sifat muhim va dolzarb masala",
  'ru':'Научный текст содержит семь слов для проверки совпадений',
 }
-
-
-def start(module, port, env):
-    proc = subprocess.Popen([sys.executable, '-m', 'uvicorn', module+':app', '--host','127.0.0.1',
-                             '--port',str(port)], cwd=ROOT, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
-    for _ in range(100):
-        try:
-            urlopen(f'http://127.0.0.1:{port}/health',timeout=1).close()
-            return proc
-        except OSError:
-            if proc.poll() is not None:
-                raise RuntimeError(proc.stderr.read().decode())
-            time.sleep(.1)
-    proc.terminate()
-    raise RuntimeError('Test server did not start')
 
 
 with tempfile.TemporaryDirectory() as tmp:

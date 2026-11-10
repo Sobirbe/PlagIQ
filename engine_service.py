@@ -11,6 +11,7 @@ import time
 import uuid
 from fastapi import Depends, FastAPI, Header, HTTPException
 from pydantic import BaseModel, Field
+from contextlib import closing
 from corpus import connect, search
 from security import SecurityMiddleware
 
@@ -73,7 +74,7 @@ def check(query: Query):
                 del reports[key]
         if len(reports) >= 10:
             raise HTTPException(429, 'Transient report capacity reached')
-        with connect() as db:
+        with closing(connect()) as db:
             report = search(db, query.query_text, query.language)
         identifier = uuid.uuid4().hex
         reports[identifier] = (time.monotonic() + 180, report)
