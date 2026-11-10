@@ -86,6 +86,31 @@ Many Uzbek and Russian journals run Open Journal Systems (OJS). OJS has a public
 
 This was tested against a simulated journal only. Try one journal and a small `--max-records 20` first, and check a few PDFs by hand.
 
+## Part 3c — Collect open-licence full texts through OpenAlex and CORE (optional)
+
+**Get the keys (free registration):**
+- OpenAlex: create a free account at openalex.org and copy your API key. OpenAlex now bills per call against a free daily allowance (reported as $1/day per key in 2026); check help.openalex.org for current prices.
+- CORE: register at core.ac.uk/services/api for a free API key.
+- **Also set `OPENALEX_API_KEY` on the website service.** The "Find academic publications" mode calls OpenAlex. Without a key it may run out of allowance or be refused, and then shows **Not evaluated**.
+
+Put the keys in Railway Variables on the engine service as `OPENALEX_API_KEY` and `CORE_API_KEY`, never in GitHub.
+
+**What the tool does:** `oa_import.py` asks OpenAlex for open-access works in your chosen language or country that carry a CC BY, CC BY-SA, CC0 or public-domain licence. It downloads their PDFs and stages them for your review, like the journal harvester. OpenAlex itself grants no rights to full texts, so the tool checks each work's own licence. Non-commercial or no-derivatives licences go to `review.csv` for your decision. For CORE, a text is kept only if its DOI shows an accepted licence in OpenAlex.
+
+**Commands** (run inside the engine service, like the importer):
+1. See what is available, downloading nothing:
+   `python oa_import.py openalex --language uz --out /data/staging/openalex-uz --max-records 50`
+2. Download the accepted PDFs (free, from the publisher's own link):
+   `python oa_import.py openalex --language uz --out /data/staging/openalex-uz --download`
+   Other filters: `--country UZ` (authors at Uzbek institutions), `--since 2020`, `--query "oliy ta'lim"`, `--source-id S...` (one journal). Add `--unpaywall-email you@example.org` to double-check every licence with Unpaywall; disagreements go to review.
+3. If a publisher link fails, `--pdf-from openalex` uses OpenAlex's cached copy instead (reported price about $0.01 per PDF).
+4. CORE: `python oa_import.py core --query "language.code:ru" --out /data/staging/core-ru`
+5. Import as usual: `python corpus.py /data/staging/openalex-uz/manifest.json --check`, then without `--check`.
+
+**Spending limit:** every run stops before its estimated OpenAlex cost passes `--max-cost-usd` (default $0.50) and keeps what it already staged. `cost.json` shows the estimate and the number of calls by type.
+
+**Not yet tried with the real services.** This was built from the providers' published documentation and tested against simulated OpenAlex, CORE, Unpaywall and publisher servers. The network used during development could not reach the real APIs. Start with `--max-records 20` and check `review.csv` and a few PDFs by hand.
+
 ## Part 4 — Checks before you approve the pull request
 
 Use only harmless sample text. Tick each item:

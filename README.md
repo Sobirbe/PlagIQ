@@ -29,6 +29,8 @@ Every matched word is located by fixed, tested rules (`citations.py`): inside qu
 
 `harvest.py` collects open-licence articles from journals that publish an OAI-PMH feed (standard in Open Journal Systems, used by many Uzbek and Russian journals). It accepts only CC BY, CC BY-SA, CC0 or Public Domain Mark, sends NC/ND licences to human review, confirms the licence on the article page, downloads only the PDF the journal declares on its own host over HTTPS, respects robots.txt, and writes a manifest plus `review.csv`. It never indexes anything; the owner imports with `corpus.py`. Tested against a simulated journal only — no live journal was harvested during development.
 
+`oa_import.py` stages open-licence full texts found through **OpenAlex** (filtered by `best_oa_location.license`, language, country, year or journal; PDFs from the publisher link, or OpenAlex's billed cache) or **CORE** (full text kept only if the DOI's licence is confirmed in OpenAlex), with an optional **Unpaywall** licence cross-check and a per-run OpenAlex cost cap. Like the harvester, it never indexes anything itself. It was tested against simulated services only, because the development network could not reach the real APIs.
+
 ## Accuracy evidence
 
 `python evaluation/run_eval.py` regenerates [evaluation/RESULTS.md](evaluation/RESULTS.md): seeded synthetic cases with known copied locations in Uzbek Latin, Uzbek Cyrillic, Russian and English, covering script changes, Unicode forms, PDF hyphenation and deliberately unsupported edits. `pytest` runs a small version of it. These are algorithm checks on synthetic text, not accuracy claims for real manuscripts; real-world false-positive rates need licensed real test collections.
@@ -70,6 +72,7 @@ See [DEPLOYMENT.md](DEPLOYMENT.md) for owner-friendly Railway instructions, priv
 - `discovery.py`: bounded OpenAlex metadata/abstract discovery.
 - `citations.py`: quotation, reference-marker and bibliography detection; optional exclusions.
 - `harvest.py`: owner-run OAI-PMH harvester for open-licence journal articles (staging only).
+- `oa_import.py`: owner-run OpenAlex/CORE open-licence full-text staging with cost cap.
 - `extract.py`: bounded TXT/DOCX/PDF text extraction shared by website and importer.
 - `evaluation/`: ground-truth evaluations and the corpus scaling benchmark.
 - `test_app.py`, `test_security_corpus.py`, `test_followup.py`, `tests/browser_smoke.py`, `tests/browser_followup.py`: regression checks.

@@ -19,8 +19,10 @@ entity processing in XML.
 import argparse
 import csv
 import html.parser
+import ipaddress
 import json
 import re
+import socket
 import sys
 import time
 import urllib.error
@@ -57,11 +59,28 @@ class HarvestError(RuntimeError):
     pass
 
 
-class _SameHostRedirect(urllib.request.HTTPRedirectHandler):
+def public_host(host):
+    """True if every address of host is a public internet address (no internal/loopback targets)."""
+    try:
+        infos = socket.getaddrinfo(host, None)
+    except OSError:
+        return False
+    return bool(infos) and all(ipaddress.ip_address(info[4][0].split("%")[0]).is_global for info in infos)
+
+
+class _Redirect(urllib.request.HTTPRedirectHandler):
+    """Same-host redirects only, unless cross-host is allowed: then HTTPS public hosts only."""
+
+    def __init__(self, cross_host, allow_http_hosts):
+        super().__init__()
+        self.cross_host, self.allow_http_hosts = cross_host, allow_http_hosts
+
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         old, new = urlsplit(req.full_url), urlsplit(newurl)
         if new.hostname != old.hostname or new.scheme != old.scheme:
-            raise HarvestError(f"refused redirect to another host: {newurl}")
+            local_test = new.hostname in self.allow_http_hosts
+            if not self.cross_host or not (local_test or (new.scheme == "https" and public_host(new.hostname))):
+                raise HarvestError(f"refused redirect to another host: {newurl}")
         return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
@@ -71,7 +90,7 @@ class Fetcher:
     def __init__(self, delay=2.0, allow_http_hosts=()):
         self.delay, self.allow_http_hosts = delay, set(allow_http_hosts)
         self.robots, self.last = {}, {}
-        self.opener = urllib.request.build_opener(_SameHostRedirect())
+        self.openers = {flag: urllib.request.build_opener(_Redirect(flag, self.allow_http_hosts)) for flag in (False, True)}
 
     def _check_url(self, url):
         parts = urlsplit(url)
@@ -81,9 +100,9 @@ class Fetcher:
             raise HarvestError(f"invalid URL: {url}")
         return parts
 
-    def _raw(self, url, limit):
-        request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-        with self.opener.open(request, timeout=30) as response:
+    def _raw(self, url, limit, cross_host=False, headers=None):
+        request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT, **(headers or {})})
+        with self.openers[cross_host].open(request, timeout=30) as response:
             body = response.read(limit + 1)
             if len(body) > limit:
                 raise HarvestError(f"response over {limit // (1024 * 1024)} MB: {url}")
@@ -103,17 +122,22 @@ class Fetcher:
             self.robots[origin] = rp
         return self.robots[origin]
 
-    def get(self, url, limit):
+    def get(self, url, limit, robots=True, cross_host=False, headers=None):
+        """robots=False only for documented APIs; cross_host=True for publisher links found via an API."""
         parts = self._check_url(url)
-        rp = self._robots(parts)
-        if not rp.can_fetch(USER_AGENT, url):
-            raise HarvestError(f"robots.txt disallows {url}")
-        wait = max(self.delay, float(rp.crawl_delay(USER_AGENT) or 0))
+        if cross_host and parts.hostname not in self.allow_http_hosts and not public_host(parts.hostname):
+            raise HarvestError(f"refused non-public host: {parts.hostname}")
+        wait = self.delay
+        if robots:
+            rp = self._robots(parts)
+            if not rp.can_fetch(USER_AGENT, url):
+                raise HarvestError(f"robots.txt disallows {url}")
+            wait = max(wait, float(rp.crawl_delay(USER_AGENT) or 0))
         elapsed = time.monotonic() - self.last.get(parts.netloc, -1e9)
         if elapsed < wait:
             time.sleep(wait - elapsed)
         try:
-            return self._raw(url, limit)
+            return self._raw(url, limit, cross_host, headers)
         finally:
             self.last[parts.netloc] = time.monotonic()
 
