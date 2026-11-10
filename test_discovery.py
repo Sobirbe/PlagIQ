@@ -74,3 +74,13 @@ def test_language_filter_and_key_header(monkeypatch):
     monkeypatch.setenv('OPENALEX_API_KEY', 'k')
     discovery._search('query words', 'uz', 8)
     assert 'filter=language%3Auz%7Cru' in seen['url'] and 'api_key' not in seen['url'] and seen['auth'] == 'Bearer k'
+
+
+def test_short_titles_and_headers():
+    q = discovery._first_line_query
+    assert q('HOUSEHOLD FINANCIAL VULNERABILITY IN UZBEKISTAN\nShukurov S.\nAbstract\nThis paper studies households.') \
+        == 'HOUSEHOLD FINANCIAL VULNERABILITY IN UZBEKISTAN'
+    assert q('УДК 336.7\nЦифровизация высшего образования в Узбекистане\nАннотация. Текст статьи.') \
+        == 'Цифровизация высшего образования в Узбекистане'
+    assert q("Vol. 5 No. 2 (2025)\nISSN 2181-1234\nOliy ta'lim sifatini baholash usullari\nKalit so'zlar: ta'lim") \
+        == "Oliy ta'lim sifatini baholash usullari"
