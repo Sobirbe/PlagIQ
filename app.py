@@ -21,6 +21,8 @@ from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 
 from discovery import discover
+from engine_client import EngineError, configured as corpus_configured, run_check, summarize, highlight_html
+from textfold import fold
 
 app = FastAPI(title="PlagIQ Pilot", version="0.2")
 results = {}
@@ -32,9 +34,8 @@ CYR = dict(zip("абвгдежзийклмнопрстуфхчшэюяқғўҳ",
 def tokens(value, language):
     value = value.lower().replace("ʻ", "'").replace("‘", "'").replace("’", "'")
     if language == "uz":
-        value = "".join({"ъ":"'", "ь":"", "ё":"yo", "ы":"i", "ц":"ts", "щ":"shch"}.get(ch, CYR.get(ch, ch)) for ch in value)
-        value = value.replace("o'", "o").replace("g'", "g")
-    return re.findall(r"[^\W_]+", value, re.UNICODE)
+        value = fold(value)
+    return re.findall(r"(?:[^\W_]|[\ue000\ue001])+", value, re.UNICODE)
 
 def compare(text, source, language):
     a, b = tokens(text, language), tokens(source, language)
@@ -113,7 +114,7 @@ def rate_limit(request):
 
 @app.get("/health")
 def health():
-    return {"status":"ok","version":"0.2"}
+    return {"status":"ok","version":"0.3","corpus_engine_configured":corpus_configured()}
 
 @app.get("/", response_class=HTMLResponse)
 def home():
@@ -126,7 +127,7 @@ async def check(request:Request, submission:UploadFile=File(...),
     rate_limit(request)
     if language not in ("uz","ru","en"):
         raise HTTPException(400, "Invalid language")
-    if mode not in ("reference","academic"):
+    if mode not in ("reference","academic","corpus"):
         raise HTTPException(400, "Invalid mode")
     original = await read_file(submission)
     if not original.strip() or not tokens(original, language):
@@ -145,7 +146,7 @@ async def check(request:Request, submission:UploadFile=File(...),
                        "sources":[],"database_status":"Not searched","source_count":1,
                        "scope":"One user-provided reference; no public academic databases searched.",
                        "self_comparison":same})
-    else:
+    elif mode == "academic":
         if not consent:
             raise HTTPException(400, "Explicit consent is required before sending a short query excerpt to OpenAlex")
         discovery = await run_in_threadpool(discover, original)
@@ -154,6 +155,29 @@ async def check(request:Request, submission:UploadFile=File(...),
                        "database_status":discovery["status"],"database_message":discovery["message"],
                        "queries":discovery["queries"],"self_comparison":False,
                        "scope":"OpenAlex metadata discovery, and exact token matching against returned abstracts only. NO full-text publisher corpus or web-wide plagiarism check."})
+    else:
+        if not corpus_configured():
+            raise HTTPException(503, "Private PlagIQ corpus engine is not configured.")
+        if not consent:
+            raise HTTPException(400, "Explicit consent is required for private corpus processing.")
+        try:
+            engine_report = await run_check(original, language)
+            summary = summarize(engine_report)
+        except EngineError as exc:
+            raise HTTPException(503, str(exc))
+        result = {
+            "mode":"corpus", "reference":"PlagIQ licensed internal corpus",
+            "percent":summary["percent"],"matched_tokens":None,
+            "matched_chars":summary["matched_chars"],"total_chars":summary["total_chars"],
+            "total_tokens":len(tokens(original,language)),"language":language,
+            "method":"Fingerprint retrieval and passage alignment in indexed corpus",
+            "database_status":"searched","database_message":"Matched against ingested corpus only, not the whole web.",
+            "source_count":summary["corpus_size"],"sources":summary["sources"],
+            "ai_detection":"Not performed","self_comparison":False,
+            "scope":"Internal indexed corpus only. Coverage depends on lawfully ingested documents; search may be partial.",
+            "corpus_coverage":summary["coverage"],
+            "highlight_html":highlight_html(original,summary["intervals"]),
+        }
     result.update({"document":(submission.filename or "Document")[:180],
                    "date":datetime.now(timezone.utc).isoformat(),
                    "sha256":hashlib.sha256(original.encode()).hexdigest()})
@@ -188,8 +212,10 @@ def report(identifier:str):
         ("Document", result["document"]), ("Date (UTC)",result["date"]),
         ("Language mode",result["language"].upper()),("Analysis method",result["method"]),
         ("Coverage",result["scope"]),("Database status",result["database_status"]),
-        ("Sources discovered",result["source_count"]),("Normalized document tokens",result["total_tokens"]),
-        ("Matching tokens",result["matched_tokens"]),
+        ("Sources discovered / corpus size",result.get("source_count","N/A")),("Normalized document tokens",result["total_tokens"]),
+        ("Matching tokens",result.get("matched_tokens","N/A — character-based corpus matching")),
+        ("Matching characters",result.get("matched_chars","N/A")),
+        ("Corpus coverage",result.get("corpus_coverage","N/A")),
         ("Matched portion in stated scope",str(result["percent"]) + "%"),
         ("Self-comparison",str(result["self_comparison"])),
         ("AI writing detector","Not performed"),("SHA-256",result["sha256"])
@@ -209,7 +235,7 @@ def report(identifier:str):
         url = esc(source["url"])
         story.append(Paragraph(title,styles["Normal"]))
         story.append(Paragraph(url,styles["SmallDetails"]))
-        story.append(Paragraph("Coverage: "+esc(source["coverage"])+"; matching tokens: "+esc(source["matched_tokens"]),styles["SmallDetails"]))
+        story.append(Paragraph("Coverage: "+esc(source.get("coverage","unknown"))+"; matching tokens: "+esc(source.get("matched_tokens","N/A"))+"; matching characters: "+esc(source.get("matched_chars","N/A")),styles["SmallDetails"]))
     story += [Spacer(1,12),Paragraph("Important: A metadata-only discovery is not an evaluated full-text source. "
         "A zero match does not demonstrate originality. This report does not evaluate AI-generated writing. "
         "Findings are limited to the stated search coverage.",styles["SmallDetails"])]
