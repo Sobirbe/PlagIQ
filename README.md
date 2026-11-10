@@ -21,6 +21,14 @@ Every mode (own reference, OpenAlex abstracts, private corpus) uses the same cod
 
 The result is exact-copy evidence with character positions in both texts. It does not detect paraphrase, translation or edited copying (measured below).
 
+## Citation-aware results (optional exclusions)
+
+Every matched word is located by fixed, tested rules (`citations.py`): inside quotation marks («», “”, „“, "") with or without a reference marker within 80 characters ([3], [3, b. 45], (Karimov, 2019), (Иванов, 2018, с. 5)), inside the bibliography (last references heading in UZ Latin/Cyrillic, RU or EN after the first 30% of the text, ending at an appendix heading), or elsewhere. Nothing is excluded by default. Users may exclude quotations, the bibliography and/or matches shorter than 10–30 words; the page and PDF then show the percentage before and after and how many words each exclusion removed. The denominator never changes. The rules do not judge whether a citation is correct or adequate. Results: [evaluation/CITATIONS.md](evaluation/CITATIONS.md).
+
+## Growing lawful full-text coverage
+
+`harvest.py` collects open-licence articles from journals that publish an OAI-PMH feed (standard in Open Journal Systems, used by many Uzbek and Russian journals). It accepts only CC BY, CC BY-SA, CC0 or Public Domain Mark, sends NC/ND licences to human review, confirms the licence on the article page, downloads only the PDF the journal declares on its own host over HTTPS, respects robots.txt, and writes a manifest plus `review.csv`. It never indexes anything; the owner imports with `corpus.py`. Tested against a simulated journal only — no live journal was harvested during development.
+
 ## Accuracy evidence
 
 `python evaluation/run_eval.py` regenerates [evaluation/RESULTS.md](evaluation/RESULTS.md): seeded synthetic cases with known copied locations in Uzbek Latin, Uzbek Cyrillic, Russian and English, covering script changes, Unicode forms, PDF hyphenation and deliberately unsupported edits. `pytest` runs a small version of it. These are algorithm checks on synthetic text, not accuracy claims for real manuscripts; real-world false-positive rates need licensed real test collections.
@@ -60,5 +68,9 @@ See [DEPLOYMENT.md](DEPLOYMENT.md) for owner-friendly Railway instructions, priv
 - `corpus.py`: owner-run local importer and SQLite fingerprint index.
 - `textfold.py`: Uzbek script folding with original offsets.
 - `discovery.py`: bounded OpenAlex metadata/abstract discovery.
+- `citations.py`: quotation, reference-marker and bibliography detection; optional exclusions.
+- `harvest.py`: owner-run OAI-PMH harvester for open-licence journal articles (staging only).
+- `extract.py`: bounded TXT/DOCX/PDF text extraction shared by website and importer.
+- `evaluation/`: ground-truth evaluations and the corpus scaling benchmark.
 - `test_app.py`, `test_security_corpus.py`, `test_followup.py`, `tests/browser_smoke.py`, `tests/browser_followup.py`: regression checks.
 - `.env.example`: every configuration variable, explained (no secrets).

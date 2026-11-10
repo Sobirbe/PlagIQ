@@ -16,10 +16,12 @@ from fastapi.responses import HTMLResponse, JSONResponse, Response
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.formparsers import MultiPartParser
 
+import citations
 import corpus
 import extract
 from discovery import discover
-from engine_client import EngineError, configured as corpus_configured, run_check, summarize, highlight_html
+import html
+from engine_client import EngineError, configured as corpus_configured, run_check, summarize
 from report_pdf import build_pdf
 from security import SecurityMiddleware, MAX_REQUEST
 
@@ -224,13 +226,17 @@ def home():
 @app.post("/api/check")
 async def check(request:Request, submission:UploadFile=File(...),
                 reference:UploadFile|None=File(None),reference_text:str=Form(""),
-                language:str=Form("uz"),mode:str=Form("reference"),consent:bool=Form(False)):
+                language:str=Form("uz"),mode:str=Form("reference"),consent:bool=Form(False),
+                exclude_quotes:bool=Form(False),exclude_bibliography:bool=Form(False),min_words:int=Form(7)):
     global active_scans
     purge_reports()
     if language not in ("uz","ru","en"):
         raise ApiError(400, "invalid_language", "Invalid language")
     if mode not in ("reference","academic","corpus"):
         raise ApiError(400, "invalid_mode", "Invalid mode")
+    if min_words not in citations.MIN_WORD_OPTIONS:
+        raise ApiError(400, "invalid_option", "Unsupported minimum match length")
+    options = dict(exclude_quotes=exclude_quotes, exclude_bibliography=exclude_bibliography, min_words=min_words)
     if mode == "academic" and not consent:
         raise ApiError(400, "consent_required", "Explicit consent is required before sending a short query excerpt to OpenAlex")
     if mode == "corpus":
@@ -243,13 +249,13 @@ async def check(request:Request, submission:UploadFile=File(...),
     rate_limit(request)
     active_scans += 1
     try:
-        result = await analyse(submission, reference, reference_text, language, mode)
+        result = await analyse(submission, reference, reference_text, language, mode, options)
     finally:
         active_scans -= 1
     return finish(request, result)
 
 
-async def analyse(submission, reference, reference_text, language, mode):
+async def analyse(submission, reference, reference_text, language, mode, options=None):
     original = await read_file(submission)
     require_tokens(original, language, "too_short",
                    "At least 7 words of readable text are needed for seven-word matching.")
@@ -314,12 +320,36 @@ async def analyse(submission, reference, reference_text, language, mode):
             "intervals":summary["intervals"] if evaluated else [],
         }
     intervals = result.pop("intervals", [])
-    result["highlight_html"] = highlight_html(original, intervals) if intervals else ""
+    result["highlight_html"] = ""
+    if result.get("percent") is not None:
+        review = await run_in_threadpool(citations.assess, original, language, intervals, **(options or {}))
+        result["highlight_html"] = highlight(original, review.pop("segments"))
+        result["citation"] = review
+        result["percent_all"] = review["percent_all"]
+        result["percent"] = review["percent_counted"]
+        result["matched_tokens_counted"] = review["matched_words_counted"]
     result.update({"document":clean_filename(submission.filename, "Document"),
                    "date":datetime.now(timezone.utc).isoformat(timespec="seconds"),
                    "quotations_excluded":False, "bibliography_excluded":False,
                    "sha256":hashlib.sha256(original.encode()).hexdigest()})
     return result
+
+
+MARK_CLASS = {"quotation_cited": "qc", "quotation_uncited": "qu", "bibliography": "bib", "other": "m"}
+
+
+def highlight(text, segments):
+    """Escaped manuscript with matched words wrapped in <mark>; class names only, no user markup."""
+    out, pos = [], 0
+    for start, end, where, reason in segments:
+        if start < pos:
+            continue
+        out.append(html.escape(text[pos:start]))
+        cls = MARK_CLASS[where] + (" x" if reason else "")
+        out.append(f'<mark class="{cls}">' + html.escape(text[start:end]) + "</mark>")
+        pos = end
+    out.append(html.escape(text[pos:]))
+    return "".join(out).replace("\n", "<br>")
 
 
 def finish(request, result):

@@ -22,6 +22,8 @@
 | Headers | CSP, `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy: no-referrer`, no server banner, and API docs disabled. | `test_private_service_requires_auth` |
 | Third-party processing consent | OpenAlex (a ≤14-word excerpt) and private-corpus checks each require their own consent tick, which resets whenever the mode changes. | browser tests |
 | Rights-gated corpus | Import requires citation, language, an HTTPS URL, a rights basis and a permission reference. The importer validates every record (fields, HTTPS citation, year, extractable text, script matches declared language, file stays inside the manifest folder) and imports all-or-nothing. There is no automatic downloading. Default limit 1,000 sources. | `test_import_is_all_or_nothing`, `test_import_pdf_docx_and_lists_problems` |
+| Harvester (owner-run) | HTTPS only; robots.txt and crawl delay respected (unreachable robots.txt means do not crawl); redirects to other hosts refused; PDFs only from the journal's own host and only the declared `citation_pdf_url`; 10 MB XML / 2 MB page / 25 MB PDF caps; XML with DOCTYPE refused; licence must be CC BY, CC BY-SA, CC0 or PDM and must match the article page; nothing is indexed without the owner's import. | `test_harvest.py` |
+| Citation exclusions | Off by default. Any exclusion shows the before/after percentage and words removed per reason in the page and PDF; the denominator never changes. | `test_citations.py`, `evaluation/CITATIONS.md` |
 
 ## B. Required before confidential manuscripts (not done; needs infrastructure, policy or contracts)
 
@@ -38,7 +40,7 @@
 
 - No AI-writing detection is performed. The result is always "Not performed".
 - No paraphrase, translation or web-wide detection. Matching is exact seven-word overlap after normalization, including between Uzbek Latin and Cyrillic.
-- Quotations and bibliography are **not** excluded, because no tested exclusion method exists yet. Reports state this.
+- Quotations and the bibliography are excluded only if the user chooses, using tested rules; the report shows both figures. The rules do not judge whether a citation is adequate.
 - The PDF is a scope-limited evidence report, not an accredited originality certificate.
 - No payment processing is included or changed.
 

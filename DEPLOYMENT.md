@@ -72,6 +72,20 @@ A technical administrator must run this *inside the engine service*, with its `/
 6. **Withdraw a source:** `python corpus.py --remove <SHA-256> --db /data/corpus.sqlite3`.
 7. Limits: 1,000,000 characters per text; 1,000 sources by default (`CORPUS_MAX_SOURCES` on the engine). Measured on a test machine: 1,000 article-sized sources use about 171 MB and searches take about 0.1 s (see `evaluation/BENCHMARKS.md`). Run `python evaluation/benchmark_corpus.py` on the engine before raising the limit. Never delete the volume without a tested backup.
 
+## Part 3b — Collect open-licence articles from a journal (optional)
+
+Many Uzbek and Russian journals run Open Journal Systems (OJS). OJS has a public "OAI-PMH" address that lists every article with its licence, usually `https://<journal site>/index.php/<journal>/oai`. You can find it on the journal's website or ask the editor.
+
+1. **Ask first when in doubt.** The tool only takes articles whose own record says CC BY, CC BY-SA, CC0 or Public Domain. Even so, telling the editor that PlagIQ indexes their open-access articles for similarity checking is good practice. Some journals have non-commercial (NC) licences; the tool puts those aside for you to decide, because PlagIQ may become a paid service.
+2. **Look without downloading:**
+   `python harvest.py https://journal.example.uz/index.php/j/oai --out /data/staging/journal-j`
+   Open `/data/staging/journal-j/review.csv` in Excel. Each article shows `accepted`, `review` (needs your decision, with the reason) or `rejected` (no usable licence or missing details).
+3. **Download the accepted PDFs:** run the same command with `--download`. The tool waits between requests and obeys the journal's robots.txt. It takes the PDF only from the journal's own site, and only the file the article page names. If the article page shows a different licence, it puts the article aside for review.
+4. **Import:** `python corpus.py /data/staging/journal-j/manifest.json --check`, then the same command without `--check`. Keep the staging folder: it records where each licence statement came from.
+5. **Updates:** run step 3 again later. Only new or changed articles are fetched; already harvested ones are skipped.
+
+This was tested against a simulated journal only. Try one journal and a small `--max-records 20` first, and check a few PDFs by hand.
+
 ## Part 4 — Checks before you approve the pull request
 
 Use only harmless sample text. Tick each item:
@@ -82,6 +96,7 @@ Use only harmless sample text. Tick each item:
 - [ ] Upload a `.txt` file saved in Windows-1251. A translated "save as UTF-8" message appears.
 - [ ] *Academic discovery*: the consent text names OpenAlex. If nothing usable comes back, the result says **Not evaluated** with a reason.
 - [ ] *Corpus* (if set up): import one synthetic text you wrote, then check it. The correct title, author, year, rights basis and passage appear. The percentage uses the same word measure as the other modes, and the corpus version matches `corpus.py --list`. A language with no indexed sources shows **Not evaluated**. The indexed-sources row shows counts per language.
+- [ ] Paste a reference, and put the same sentence in your document inside «quotation marks» followed by [1]. Tick **Exclude matches inside quotation marks**. The page must show the lower percentage *and* "Before exclusions: …" with the number of words excluded.
 - [ ] Download the PDF in each language. Check the Cyrillic text, "Page X of Y", the scope, the limitations, and that it says it is not a certificate.
 - [ ] Open the PDF link in a private/incognito window. It must show "not found". Click **Delete report**; the link must stop working.
 - [ ] The engine has no public domain, and no keys appear in GitHub or in the page source.

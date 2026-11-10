@@ -141,6 +141,21 @@ with tempfile.TemporaryDirectory() as tmp:
                 page.wait_for_function("() => document.querySelectorAll('#source-list blockquote').length === 1")
                 assert page.locator('#highlight-box summary').count() == 1
                 assert page.locator('#source-list').inner_text().count('Ваш источник') == 1
+                # Citation options: a quoted, referenced passage excluded on request, disclosed before/after.
+                assert 'ПАРАМЕТРЫ РАСЧЁТА' in page.locator('#options-label').inner_text()
+                page.locator('#submission').set_input_files({'name': 'q.txt', 'mimeType': 'text/plain',
+                                                             'buffer': ('Введение. «' + RU + '» [1]. Заключение.').encode()})
+                page.locator('#exclude_quotes').check()
+                page.locator('#submit').click()
+                page.wait_for_function("() => document.querySelector('#notice').textContent.includes('До исключений')")
+                assert page.locator('#score').inner_text() == '0%'
+                assert 'В цитате со ссылкой рядом' in page.locator('#breakdown').inner_text()
+                page.locator('#highlight-box summary').click()
+                assert page.locator('#highlight-box mark.qc.x').count() == 1
+                assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), (width, 'options overflow')
+                if SHOTS and width in (390, 1440):
+                    page.locator('#result').screenshot(path=str(SHOTS / f'citation-ru-{width}.png'))
+                page.locator('#exclude_quotes').uncheck()
                 if SHOTS:
                     page.goto('http://127.0.0.1:8133')
                     page.screenshot(path=str(SHOTS / f'home-ru-{width}.png'), full_page=width >= 768)

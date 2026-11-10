@@ -19,3 +19,12 @@ def test_ground_truth_properties():
     assert parity['mismatches'] == 0 and parity['cases'] > 0
     assert fp['pairs_with_match'] == 0
     assert run_eval.fold_check() == []
+
+
+def test_citation_ground_truth():
+    import eval_citations
+    confusion, ok = eval_citations.evaluate(trials=3, seed=11)
+    for matrix in confusion.values():
+        for truth, row in matrix.items():
+            assert all(v == 0 for k, v in row.items() if k != truth), (truth, row)
+    assert ok['none'] == ok['quotes'] == ok['bibliography'] == ok['both'] == ok['cases']

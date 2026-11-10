@@ -87,7 +87,7 @@ def test_every_mode_reports_the_same_number(monkeypatch, tmp_path):
                                     files={'submission': ('m.txt', manuscript.encode())}).json()
     assert reference['percent'] == academic['percent'] == data['percent'] == round(100 * 12 / 24, 2)
     assert reference['matched_tokens'] == academic['matched_tokens'] == data['matched_tokens'] == 12
-    assert len(data['corpus_version']) == 12 and '<mark>' in data['highlight_html']
+    assert len(data['corpus_version']) == 12 and '<mark' in data['highlight_html']
 
 
 def test_reference_mode_returns_evidence_and_highlight():
@@ -95,7 +95,7 @@ def test_reference_mode_returns_evidence_and_highlight():
                                         'reference_text': 'Header. ' + SRC}, files={'submission': ('m.txt', (FILL + ' ' + SRC).encode())})
     data = response.json()
     assert data['sources'][0]['passages'][0]['source_excerpt'] == SRC
-    assert data['highlight_html'].count('<mark>') == 1 and data['unit'] == 'words'
+    assert data['highlight_html'].count('<mark') == 1 and data['unit'] == 'words'
 
 
 def test_pdf_line_break_hyphenation_is_repaired():

@@ -51,7 +51,15 @@ T = {
     reasons=dict(provider_unavailable="The discovery provider was unavailable, so no text was compared.",
                  no_abstracts="No returned record had an abstract to compare.",
                  no_sources_in_language="The private corpus has no indexed sources in this language."),
-    exclusions="Quotations and bibliography", exclusions_v="Not excluded (no tested exclusion method)",
+    pasted="Pasted reference",
+    before="Matched before exclusions", applied="Exclusions chosen by the user",
+    ex_none="No exclusions — every verified match is counted", ex_q="quotations ({n} words)", ex_b="bibliography ({n} words)",
+    ex_s="matches under {m} words ({n} words)", where="Where the matched words are",
+    locs=dict(other="other text", quotation_cited="in quotations with a nearby reference",
+             quotation_uncited="in quotations without a nearby reference", bibliography="in the bibliography"),
+    detected="Detected structure", bib_yes="bibliography from heading “{h}”", bib_no="no bibliography heading",
+    quotes_v="{n} quotation(s), {c} with a reference marker within 80 characters",
+    rules="Quotations, references and the bibliography are located by fixed rules (quotation marks, markers such as [3] or (Author, 2020), a references heading). The rules do not judge whether a citation is correct or sufficient.",
     ai="AI-writing detection", ai_v="Not performed",
     no_sources="No matching source with comparable text was found in the stated scope. This does not establish originality.",
     shown="Showing {n} of {m} sources.", truncated="The source list is truncated; totals above include all matches.",
@@ -91,7 +99,15 @@ T = {
     reasons=dict(provider_unavailable="Сервис поиска был недоступен, текст не сравнивался.",
                  no_abstracts="Ни у одной найденной записи нет аннотации для сравнения.",
                  no_sources_in_language="Во внутреннем корпусе нет источников на этом языке."),
-    exclusions="Цитаты и список литературы", exclusions_v="Не исключаются (нет проверенного метода исключения)",
+    pasted="Вставленный текст источника",
+    before="Совпадения до исключений", applied="Исключения, выбранные пользователем",
+    ex_none="Нет — учитываются все проверенные совпадения", ex_q="цитаты ({n} слов)", ex_b="список литературы ({n} слов)",
+    ex_s="совпадения короче {m} слов ({n} слов)", where="Где находятся совпавшие слова",
+    locs=dict(other="остальной текст", quotation_cited="в цитатах со ссылкой рядом",
+             quotation_uncited="в цитатах без ссылки рядом", bibliography="в списке литературы"),
+    detected="Обнаруженная структура", bib_yes="список литературы по заголовку «{h}»", bib_no="заголовок списка литературы не найден",
+    quotes_v="цитат: {n}, из них {c} с меткой ссылки в пределах 80 символов",
+    rules="Цитаты, ссылки и список литературы определяются фиксированными правилами (кавычки, метки вида [3] или (Автор, 2020), заголовок списка литературы). Правила не оценивают правильность или достаточность цитирования.",
     ai="Определение текста ИИ", ai_v="Не проводилось",
     no_sources="В указанном охвате не найдено совпадающих источников с текстом для сравнения. Это не доказывает оригинальность.",
     shown="Показано {n} из {m} источников.", truncated="Список источников сокращён; итоги выше учитывают все совпадения.",
@@ -131,7 +147,15 @@ T = {
     reasons=dict(provider_unavailable="Qidiruv xizmati ishlamadi, matn solishtirilmadi.",
                  no_abstracts="Topilgan yozuvlarning hech birida solishtirish uchun annotatsiya yo‘q.",
                  no_sources_in_language="Ichki korpusda bu tildagi manbalar yo‘q."),
-    exclusions="Iqtiboslar va adabiyotlar ro‘yxati", exclusions_v="Chiqarib tashlanmaydi (sinovdan o‘tgan usul yo‘q)",
+    pasted="Kiritilgan manba matni",
+    before="Istisnolargacha moslik", applied="Foydalanuvchi tanlagan istisnolar",
+    ex_none="Yo‘q — barcha tasdiqlangan mosliklar hisoblanadi", ex_q="iqtiboslar ({n} so‘z)", ex_b="adabiyotlar ro‘yxati ({n} so‘z)",
+    ex_s="{m} so‘zdan qisqa mosliklar ({n} so‘z)", where="Mos so‘zlar qayerda",
+    locs=dict(other="boshqa matn", quotation_cited="yaqinida havolasi bor iqtiboslarda",
+             quotation_uncited="yaqinida havolasi yo‘q iqtiboslarda", bibliography="adabiyotlar ro‘yxatida"),
+    detected="Aniqlangan tuzilma", bib_yes="“{h}” sarlavhasi bo‘yicha adabiyotlar ro‘yxati", bib_no="adabiyotlar sarlavhasi topilmadi",
+    quotes_v="{n} ta iqtibos, ulardan {c} tasida 80 belgi ichida havola belgisi bor",
+    rules="Iqtiboslar, havolalar va adabiyotlar ro‘yxati qat’iy qoidalar bilan aniqlanadi (qo‘shtirnoq, [3] yoki (Muallif, 2020) kabi belgilar, adabiyotlar sarlavhasi). Qoidalar iqtibosning to‘g‘ri yoki yetarli ekanini baholamaydi.",
     ai="Sun’iy intellekt matnini aniqlash", ai_v="Bajarilmagan",
     no_sources="Ko‘rsatilgan doirada solishtiriladigan matnli mos manba topilmadi. Bu originallikni isbotlamaydi.",
     shown="{m} ta manbadan {n} tasi ko‘rsatilgan.", truncated="Manbalar ro‘yxati qisqartirilgan; yuqoridagi jami barcha mosliklarni o‘z ichiga oladi.",
@@ -226,8 +250,9 @@ def build_pdf(result, identifier, lang="en", minutes_left=15):
     scope_rows = [(t["mode"], t["modes"].get(mode, mode)), (t["method"], t["methods"].get(mode, result.get("method", ""))),
                   (t["scope"], t["scopes"].get(mode, result.get("scope", ""))),
                   (t["status"], t["states"].get(result.get("database_status"), t["states"]["not_searched"]))]
+    pasted = lambda name: t["pasted"] if name == "Pasted reference" else name
     if mode == "reference":
-        scope_rows.append((t["reference"], result.get("reference", "")))
+        scope_rows.append((t["reference"], pasted(result.get("reference", ""))))
     if mode == "academic":
         scope_rows.append((t["discovered"], f"{result.get('source_count', 0)} / {result.get('evaluated_sources', 0)}"))
     if mode == "corpus":
@@ -246,15 +271,30 @@ def build_pdf(result, identifier, lang="en", minutes_left=15):
     else:
         headline = f"{percent}%"
         basis = t["basis_tokens"]
-    result_rows = [(t["units_tokens"], t["tokens_v"].format(a=result.get("matched_tokens") or 0, b=result.get("total_tokens") or 0)),
-                   (t["units_chars"], t["chars_v"].format(a=result.get("matched_chars") or 0, b=result.get("total_chars") or 0)),
-                   (t["exclusions"], t["exclusions_v"]), (t["ai"], t["ai_v"])]
+    c = result.get("citation")
+    counted = c["matched_words_counted"] if c else (result.get("matched_tokens") or 0)
+    result_rows = [(t["units_tokens"], t["tokens_v"].format(a=counted, b=result.get("total_tokens") or 0)),
+                   (t["units_chars"], t["chars_v"].format(a=result.get("matched_chars") or 0, b=result.get("total_chars") or 0))]
+    if c:
+        o, ex = c["exclusions"], c["excluded"]
+        chosen = ([t["ex_q"].format(n=ex["quotations"])] if o["quotations"] else []) + \
+                 ([t["ex_b"].format(n=ex["bibliography"])] if o["bibliography"] else []) + \
+                 ([t["ex_s"].format(m=o["min_words"], n=ex["short"])] if o["min_words"] > 7 else [])
+        result_rows += [
+            (t["before"], f"{c['percent_all']}% · " + t["tokens_v"].format(a=c["matched_words_all"], b=c["total_words"])),
+            (t["applied"], "; ".join(chosen) or t["ex_none"]),
+            (t["where"], "; ".join(f"{t['locs'][k]}: {v}" for k, v in c["locations"].items() if v) or "—"),
+            (t["detected"], (t["bib_yes"].format(h=c["bibliography"]["heading"]) if c.get("bibliography") else t["bib_no"])
+             + "; " + t["quotes_v"].format(n=c["quotations_found"], c=c["quotations_cited"]))]
+    result_rows.append((t["ai"], t["ai_v"]))
     if mode == "reference":
         result_rows.append((t["identical"], t["yes"] if result.get("self_comparison") else t["no"]))
     story += [Paragraph(t["s_result"], st["h"]),
               KeepTogether([Paragraph(esc(t["matched"]), st["small"]), Paragraph(esc(headline), st["big"]),
                             Paragraph(esc(basis), st["small"]), Spacer(1, 6)]),
               table(result_rows)]
+    if c:
+        story.append(Paragraph(esc(t["rules"]), st["small"]))
 
     story.append(Paragraph(t["s_sources"], st["h"]))
     sources = result.get("sources") or []
@@ -269,7 +309,7 @@ def build_pdf(result, identifier, lang="en", minutes_left=15):
     if any(s.get("passages") for s in sources):
         story.append(Paragraph(esc(t["loc_note"]), st["small"]))
     for number, source in enumerate(sources[:PDF_SOURCES], 1):
-        block = [Paragraph(f"{number}. " + esc(source.get("title") or "—"), st["source"])]
+        block = [Paragraph(f"{number}. " + esc(pasted(source.get("title") or "—")), st["source"])]
         meta = []
         if source.get("authors"):
             meta.append(f"{t['authors']}: {source['authors']}")

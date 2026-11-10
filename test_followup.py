@@ -288,7 +288,7 @@ def test_pdf_discloses_exclusions_and_truncation():
         'passages': [{'query_start': 0, 'query_end': 5, 'source_start': 1, 'source_end': 6, 'source_excerpt': 'Ўзбек'}]}] * 20,
         sources_truncated=True, matched_source_count=40)
     text, pages = pdf_text(client, identifier, 'en')
-    assert 'Not excluded' in text and 'Showing 15 of 40' in text and 'Open licence' in text
+    assert 'No exclusions' in text and 'Showing 15 of 40' in text and 'Open licence' in text
     assert '8 further passage' in text and 'Ўзбек' in text and pages > 1 and f'Page {pages} of {pages}' in text
 
 
