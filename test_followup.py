@@ -307,3 +307,15 @@ def test_uzbek_strings_are_latin_script():
 
 def test_pdf_bold_unicode_font_available():
     assert report_pdf.UNICODE_FONT, 'Install fonts-dejavu-core so Cyrillic renders in PDFs'
+
+
+def test_academic_pdf_counts_discovered_records(monkeypatch):
+    records = [{'title': f'Record {i}', 'url': f'https://doi.org/10.1/{i}', 'abstract': 'unrelated words only here',
+                'coverage': 'abstract', 'year': 2024} for i in range(24)]
+    monkeypatch.setattr(web, 'discover', lambda text, *a: dict(sources=records, status='searched', message='', queries=3))
+    client = TestClient(web.app)
+    data = post(client, mode='academic', consent='true').json()
+    assert data['percent'] == 0 and data['source_count'] == 24
+    text, _ = pdf_text(client, data['report_id'], 'en')
+    text = ' '.join(text.split())
+    assert 'Showing 15 of 24 discovered records' in text and 'of 0 sources' not in text

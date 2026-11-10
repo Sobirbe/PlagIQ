@@ -52,6 +52,7 @@ T = {
                  no_abstracts="No returned record had an abstract to compare.",
                  no_sources_in_language="The private corpus has no indexed sources in this language."),
     searches="OpenAlex searches (excerpts of at most 14 words)",
+    shown_records="Showing {n} of {m} discovered records, most matched words first.", truncated_records="The list is shortened; the percentage above uses all records.",
     pasted="Pasted reference",
     before="Matched before exclusions", applied="Exclusions chosen by the user",
     ex_none="No exclusions — every verified match is counted", ex_q="quotations ({n} words)", ex_b="bibliography ({n} words)",
@@ -101,6 +102,7 @@ T = {
                  no_abstracts="Ни у одной найденной записи нет аннотации для сравнения.",
                  no_sources_in_language="Во внутреннем корпусе нет источников на этом языке."),
     searches="Запросов в OpenAlex (отрывки до 14 слов)",
+    shown_records="Показано {n} из {m} найденных записей, сначала с наибольшим числом совпавших слов.", truncated_records="Список сокращён; процент выше рассчитан по всем записям.",
     pasted="Вставленный текст источника",
     before="Совпадения до исключений", applied="Исключения, выбранные пользователем",
     ex_none="Нет — учитываются все проверенные совпадения", ex_q="цитаты ({n} слов)", ex_b="список литературы ({n} слов)",
@@ -150,6 +152,7 @@ T = {
                  no_abstracts="Topilgan yozuvlarning hech birida solishtirish uchun annotatsiya yo‘q.",
                  no_sources_in_language="Ichki korpusda bu tildagi manbalar yo‘q."),
     searches="OpenAlex so‘rovlari (14 so‘zgacha parchalar)",
+    shown_records="Topilgan {m} ta yozuvdan {n} tasi ko‘rsatilgan, eng ko‘p mos so‘zlilari birinchi.", truncated_records="Ro‘yxat qisqartirilgan; yuqoridagi foiz barcha yozuvlar bo‘yicha hisoblangan.",
     pasted="Kiritilgan manba matni",
     before="Istisnolargacha moslik", applied="Foydalanuvchi tanlagan istisnolar",
     ex_none="Yo‘q — barcha tasdiqlangan mosliklar hisoblanadi", ex_q="iqtiboslar ({n} so‘z)", ex_b="adabiyotlar ro‘yxati ({n} so‘z)",
@@ -303,13 +306,16 @@ def build_pdf(result, identifier, lang="en", minutes_left=15):
     story.append(Paragraph(t["s_sources"], st["h"]))
     sources = result.get("sources") or []
     sources = sorted(sources, key=lambda s: -(s.get("matched_tokens") or 0))
-    total = result.get("matched_source_count", len(sources))
+    # Academic mode lists every discovered record (matched or not); the corpus lists
+    # matched sources only, possibly fewer than the engine found.
+    total = len(sources) if mode == "academic" else result.get("matched_source_count", len(sources))
     if not sources and mode != "reference":
         story.append(Paragraph(esc(t["no_sources"]), st["body"]))
     if sources:
-        story.append(Paragraph(esc(t["shown"].format(n=min(len(sources), PDF_SOURCES), m=total)), st["small"]))
+        key = "shown_records" if mode == "academic" else "shown"
+        story.append(Paragraph(esc(t[key].format(n=min(len(sources), PDF_SOURCES), m=total)), st["small"]))
     if result.get("sources_truncated") or len(sources) > PDF_SOURCES:
-        story.append(Paragraph(esc(t["truncated"]), st["small"]))
+        story.append(Paragraph(esc(t["truncated_records" if mode == "academic" else "truncated"]), st["small"]))
     if any(s.get("passages") for s in sources):
         story.append(Paragraph(esc(t["loc_note"]), st["small"]))
     for number, source in enumerate(sources[:PDF_SOURCES], 1):
