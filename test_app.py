@@ -52,3 +52,27 @@ def test_user_reference_endpoint():
     assert result["self_comparison"] is True
     pdf=client.get("/api/report/"+result["report_id"]+".pdf")
     assert pdf.status_code==200 and pdf.content[:4]==b"%PDF"
+
+from textfold import fold_with_map, to_original_span
+from engine_client import highlight_html, engine_base_url, EngineError
+
+def test_fold_keeps_original_offsets():
+    normalized, starts, ends = fold_with_map("Ўзбекистон")
+    assert normalized
+    left, right = to_original_span(0, 1, starts, ends)
+    assert "Ўзбекистон"[left:right] == "Ў"
+
+def test_markup_escapes_user_text():
+    text = "<script>alert(1)</script> plain"
+    output = highlight_html(text, [[0,7]])
+    assert "<script>" not in output
+    assert "&lt;" in output
+    assert "<mark>" in output
+
+def test_corpus_mode_unconfigured(monkeypatch):
+    monkeypatch.delenv("ENGINE_URL",raising=False)
+    client=TestClient(app)
+    content=io.BytesIO(b"one two three four five six seven eight nine")
+    response=client.post("/api/check",data={"mode":"corpus","language":"en","consent":"true"},
+                         files={"submission":("sample.txt",content,"text/plain")})
+    assert response.status_code == 503
