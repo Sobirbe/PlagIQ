@@ -42,10 +42,10 @@ def discover(text, max_results=8):
     params = {"search":query[0], "per_page":str(min(max_results, 10)),
               "select":"id,display_name,doi,publication_year,abstract_inverted_index,primary_location"}
     key = os.environ.get("OPENALEX_API_KEY")
-    if key:
-        params["api_key"] = key
+    # Sent as a header, never in the URL, so the key cannot appear in access logs.
+    auth = {"Authorization": "Bearer " + key} if key else {}
     request = Request(API + "?" + urlencode(params),
-                      headers={"User-Agent":"PlagIQ-research-pilot/0.2 (+academic metadata search)",
+                      headers={**auth, "User-Agent":"PlagIQ-research-pilot/0.2 (+academic metadata search)",
                                "Accept":"application/json"})
     try:
         with urlopen(request, timeout=9) as response:

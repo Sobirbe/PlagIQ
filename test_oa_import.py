@@ -115,7 +115,8 @@ def test_openalex_staging_end_to_end(services, tmp_path, monkeypatch):
     assert status['W8'][0] == 'review' and 'Unpaywall states cc-by-nc' in status['W8'][1]
     assert 'non-commercial' not in status['W8'][1]                               # reason names the real cause
     first = [p for p in seen['paths'] if p.startswith('/oa/works?')][0]
-    assert 'best_oa_location.license%3Acc-by%7Ccc-by-sa' in first and 'api_key=test-key' in first
+    assert 'best_oa_location.license%3Acc-by%7Ccc-by-sa' in first and 'api_key' not in first
+    assert any(h.get('Authorization') == 'Bearer test-key' for h in seen['headers'])
     assert json.loads((tmp_path / 's' / 'cost.json').read_text())['calls'] == {'list': 2}
     with connect(tmp_path / 'c.db') as db:
         import_manifest(db, tmp_path / 's' / 'manifest.json')
@@ -166,3 +167,13 @@ def test_publisher_links_to_internal_hosts_are_refused():
         harvest.Fetcher(delay=0).get('https://127.0.0.1/x.pdf', 1000, cross_host=True)
     with pytest.raises(harvest.HarvestError, match='non-public'):
         harvest.Fetcher(delay=0).get('https://localhost/x.pdf', 1000, cross_host=True)
+
+
+def test_mislabelled_uzbek_cyrillic_is_corrected(tmp_path):
+    stage = oa_import.Stage(tmp_path / 's')
+    w = work(40, 'cc-by', 'ru')
+    w['display_name'] = 'Aйблaнувчининг қaеpдa экaнлиги нoмaълум бўлгaн ҳoллapдa'
+    oa_import.stage_work(w, args(download=False), fetcher(), oa_import.Budget(1), stage, '', '')
+    assert stage.rows[0]['language'] == 'uz' and 'corrected to uz' in stage.rows[0]['reason']
+    assert oa_import.correct_language('ru', 'Научный текст') is None
+    assert oa_import.correct_language('uz', 'Высшее образование') == 'ru'

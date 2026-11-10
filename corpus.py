@@ -15,13 +15,14 @@ from functools import lru_cache
 from pathlib import Path
 from urllib.parse import urlsplit
 import unicodedata
-from textfold import IGNORABLE, fold, fold_with_map, normalized_chars
+from textfold import IGNORABLE, fold, fold_with_map, normalized_chars, unify_scripts
 
 TOKEN = re.compile(r"(?:[^\W_]|[\ue000\ue001])+", re.UNICODE)
 # Uzbek: the tutuq belgisi (ta'lim, ma'no; Cyrillic ъ) is part of the word.
 UZ_TOKEN = re.compile(r"(?:[^\W_]|[\ue000\ue001])+(?:'(?:[^\W_]|[\ue000\ue001])+)*", re.UNICODE)
 # Bump when tokenization changes; connect() re-fingerprints stored sources.
-NORMALIZATION_VERSION = 3
+NORMALIZATION_VERSION = 4
+PREFER = {'ru': 'cyr', 'en': 'lat'}
 WINDOW = 7
 EXCERPT_LIMIT = 500
 MAX_SOURCE_CHARS = 1_000_000
@@ -48,7 +49,7 @@ def lexical(text, language):
     if language == 'uz':
         normalized, starts, ends = fold_with_map(text)
     else:
-        chars = normalized_chars(text)
+        chars = normalized_chars(text, prefer=PREFER[language], whole=True)
         if language == 'ru':
             chars = [('е' if c == 'ё' else c, s, e) for c, s, e in chars]
         normalized = ''.join(c for c, _, _ in chars)
@@ -66,7 +67,7 @@ def tokens(text, language):
     """Token strings only (no offsets). Same rules as lexical(), faster for ru/en."""
     if language == 'uz':
         return UZ_TOKEN.findall(fold(text))
-    text = _DROP.sub('', unicodedata.normalize('NFC', text).lower())
+    text = unify_scripts(_DROP.sub('', unicodedata.normalize('NFC', text).lower()), PREFER[language], True)
     if language == 'ru':
         text = text.replace('ё', 'е')
     return TOKEN.findall(text)
@@ -282,6 +283,24 @@ def script_shares(text):
     return cyrillic / len(letters), latin / len(letters)
 
 
+UZ_ONLY = frozenset("қғўҳ")
+
+
+def cyrillic_profile(text):
+    """'uz' if Uzbek-only Cyrillic letters (қ ғ ў ҳ) are present, 'ru' if Russian ы is
+    present without them, else None. Thresholds: 0.5% of Cyrillic letters."""
+    letters = [c for c in text.lower() if '\u0400' <= c <= '\u04ff']
+    if len(letters) < 20:
+        return None
+    uz = sum(c in UZ_ONLY for c in letters) / len(letters)
+    ru = letters.count('ы') / len(letters)
+    if uz >= 0.005:
+        return 'uz'
+    if ru >= 0.005:
+        return 'ru'
+    return None
+
+
 def validate(metadata, text):
     """Check one record before anything is written. Returns cleaned metadata."""
     required = ('title', 'url', 'language', 'authors', 'year', 'rights_basis', 'permission_reference')
@@ -308,6 +327,11 @@ def validate(metadata, text):
         raise ValueError('Declared Russian, but the text is not mostly Cyrillic')
     if metadata['language'] == 'en' and latin < 0.5:
         raise ValueError('Declared English, but the text is not mostly Latin script')
+    script = cyrillic_profile(text)
+    if metadata['language'] == 'ru' and script == 'uz':
+        raise ValueError('Declared Russian, but the text uses Uzbek Cyrillic letters (қ ғ ў ҳ); set language to "uz"')
+    if metadata['language'] == 'uz' and script == 'ru':
+        raise ValueError('Declared Uzbek, but the Cyrillic text looks Russian (ы, no қ ғ ў ҳ); set language to "ru"')
     return {**metadata, 'words': words}
 
 

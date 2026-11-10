@@ -26,6 +26,7 @@ from datetime import date
 from pathlib import Path
 from urllib.parse import quote, urlencode, urlsplit
 
+from corpus import UZ_ONLY
 from harvest import Fetcher, HarvestError, MAX_PDF
 
 OPENALEX = "https://api.openalex.org"
@@ -51,6 +52,11 @@ class Budget:
             raise HarvestError(f"cost limit ${self.limit:.2f} reached (estimated ${self.spent:.3f} spent)")
         self.spent += cost
         self.calls[kind] = self.calls.get(kind, 0) + 1
+
+
+def bearer(key):
+    """OpenAlex key as an Authorization header (never in the URL, so it stays out of logs)."""
+    return {"Authorization": "Bearer " + key} if key else {}
 
 
 def licence_of(value):
@@ -104,6 +110,17 @@ def safe_name(key, ext):
     return re.sub(r"[^A-Za-z0-9]+", "_", key)[-80:] + ext
 
 
+def correct_language(language, title):
+    """OpenAlex often labels Uzbek Cyrillic as Russian. Correct only when the
+    title's letters are unambiguous; the importer re-checks the full text."""
+    lowered = (title or "").lower()
+    if language == "ru" and set(lowered) & UZ_ONLY:
+        return "uz"
+    if language == "uz" and "ы" in lowered and not set(lowered) & UZ_ONLY:
+        return "ru"
+    return None
+
+
 def work_metadata(work):
     """Fields the importer needs, from an OpenAlex work; returns (entry, problems)."""
     location = work.get("best_oa_location") or {}
@@ -143,10 +160,8 @@ def run_openalex(args, fetcher, budget, stage, api=OPENALEX, content=OPENALEX_CO
                   "select": "id,doi,display_name,publication_year,language,authorships,best_oa_location,open_access"}
         if args.query:
             params["search"] = args.query
-        if key:
-            params["api_key"] = key
         budget.charge("search" if args.query else "list")
-        body, _ = fetcher.get(api + "/works?" + urlencode(params), 20 * 1024 * 1024, robots=False)
+        body, _ = fetcher.get(api + "/works?" + urlencode(params), 20 * 1024 * 1024, robots=False, headers=bearer(key))
         data = json.loads(body)
         cursor = (data.get("meta") or {}).get("next_cursor")
         if not data.get("results"):
@@ -163,7 +178,12 @@ def stage_work(work, args, fetcher, budget, stage, key, content, text=None):
     location = work.get("best_oa_location") or {}
     licence = licence_of(location.get("license"))
     entry, problems = work_metadata(work)
+    corrected = correct_language(entry["language"], entry["title"])
+    if corrected:
+        entry["language"] = corrected
     row = stage.row(wid, entry["title"], language=entry["language"] or "", licence=licence, url=entry["url"])
+    if corrected:
+        row["reason"] = f"language label {work.get('language')} corrected to {corrected} from the title's letters"
     if wid in stage.state["done"]:
         row.update(status="skipped", reason="already staged", file=stage.state["done"][wid])
         return
@@ -192,13 +212,12 @@ def stage_work(work, args, fetcher, budget, stage, key, content, text=None):
         row.update(status="staged", file="files/" + name)
         return
     if not args.download:
-        row.update(status="accepted", reason="metadata only; re-run with --download")
+        row.update(status="accepted", reason="; ".join(filter(None, [row["reason"], "metadata only; re-run with --download"])))
         return
     try:
         if args.pdf_from == "openalex":
             budget.charge("content")
-            url = f"{content}/works/{wid}.pdf" + (f"?api_key={quote(key)}" if key else "")
-            data, _ = fetcher.get(url, MAX_PDF, robots=False)
+            data, _ = fetcher.get(f"{content}/works/{wid}.pdf", MAX_PDF, robots=False, headers=bearer(key))
         else:
             pdf_url = location.get("pdf_url")
             if not pdf_url:
@@ -245,9 +264,9 @@ def run_core(args, fetcher, budget, stage, api=CORE, openalex=OPENALEX, content=
                 stage.row("core:" + str(item.get("id")), item.get("title"), status="rejected", reason="no DOI to verify the licence")
                 continue
             budget.charge("single")
-            params = {"api_key": oa_key} if oa_key else {}
             try:
-                work_body, _ = fetcher.get(f"{openalex}/works/doi:{quote(doi)}?" + urlencode(params), 2 * 1024 * 1024, robots=False)
+                work_body, _ = fetcher.get(f"{openalex}/works/doi:{quote(doi)}", 2 * 1024 * 1024, robots=False,
+                                           headers=bearer(oa_key))
                 work = json.loads(work_body)
             except (HarvestError, urllib.error.URLError, OSError, ValueError):
                 stage.row("core:" + str(item.get("id")), item.get("title"), status="review",

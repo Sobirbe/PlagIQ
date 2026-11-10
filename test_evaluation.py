@@ -10,7 +10,7 @@ def test_ground_truth_properties():
     rows, parity, fp = run_eval.evaluate(trials=1, seed=7)
     for row in rows:
         recall = row['tp'] / row['truth']
-        if row['transform'] in run_eval.EXPECTED_FULL:
+        if run_eval.expected_full(row['language'], row['transform']):
             assert recall == (1.0 if row['length'] >= 7 else 0.0), row
             assert row['aligned'] == row['n'] or row['length'] < 7, row
         if row['transform'] == 'exact copy' and row['length'] >= 7:

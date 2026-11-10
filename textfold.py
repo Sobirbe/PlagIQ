@@ -4,6 +4,7 @@ Adapted for PlagIQ from the user-supplied noplag integration bundle.
 For source matching only; not a substitute for translation detection.
 """
 from dataclasses import replace
+import re
 import unicodedata
 
 APOSTROPHES = frozenset("'ʻʼ‘’\u0060´ʹ′")
@@ -26,7 +27,56 @@ IGNORABLE = frozenset("\u00ad\u200b\u200c\u200d\u2060\ufeff")
 CYR["\u020f"] = O_CANON  # o with inverted breve (NFC of o + U+0311)
 
 
-def normalized_chars(text: str, keep_marks=frozenset()):
+# Latin and Cyrillic letters that look identical once lower-cased. Mixed-script
+# words (common in OCR/metadata, and a known way to evade text matching) are
+# converted to the word's majority script, one letter for one letter.
+LAT2CYR = dict(zip("abcehkmoptxy", "авсенкмортху"))
+CYR2LAT = {**{v: k for k, v in LAT2CYR.items()}, "і": "i", "ј": "j", "ѕ": "s"}
+_WORD_RUN = re.compile(r"[^\W\d_]+")
+
+
+def _script(c):
+    if "\u0400" <= c <= "\u04ff":
+        return "cyr"
+    if c.isascii() or "\u00c0" <= c <= "\u024f":
+        return "lat"
+    return None
+
+
+def _unify_word(word, prefer=None, whole=False):
+    """Pick the script from letters that exist in only one alphabet (қ, д, f, g...);
+    otherwise the majority; on a tie the document's preferred script. With
+    whole=True a word made only of lookalikes in the other script is converted
+    too (Russian/English documents; never Uzbek, whose Latin words such as
+    "ko'p" consist of lookalike letters). Words with distinctive letters of both
+    scripts are left unchanged."""
+    scripts = [_script(c) for c in word]
+    distinct = {s for c, s in zip(word, scripts) if s and c not in LAT2CYR and c not in CYR2LAT}
+    if "cyr" not in scripts or "lat" not in scripts:
+        other = "lat" if prefer == "cyr" else "cyr"
+        if not (whole and prefer and not distinct and other in scripts):
+            return word
+        target = prefer
+    elif len(distinct) == 1:
+        target = distinct.pop()
+    elif distinct:
+        return word
+    elif scripts.count("cyr") != scripts.count("lat"):
+        target = "cyr" if scripts.count("cyr") > scripts.count("lat") else "lat"
+    elif prefer:
+        target = prefer
+    else:
+        return word
+    table = LAT2CYR if target == "cyr" else CYR2LAT
+    return "".join(table.get(c, c) for c in word)
+
+
+def unify_scripts(text: str, prefer=None, whole=False) -> str:
+    """Same length as the input; only lookalike letters change."""
+    return _WORD_RUN.sub(lambda m: _unify_word(m.group(), prefer, whole), text)
+
+
+def normalized_chars(text: str, keep_marks=frozenset(), prefer=None, whole=False):
     """Lower-cased NFC characters, each mapped to its original [start, end).
 
     Each base character and its following combining marks are composed with
@@ -47,7 +97,8 @@ def normalized_chars(text: str, keep_marks=frozenset()):
                     continue
                 out.append((lower, i, j))
         i = j
-    return out
+    unified = unify_scripts("".join(c for c, _, _ in out), prefer, whole)
+    return [(u, start, end) for u, (_, start, end) in zip(unified, out)]
 
 
 def fold_with_map(text: str):

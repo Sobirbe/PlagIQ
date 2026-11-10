@@ -178,3 +178,26 @@ def test_remove_deletes_source_and_fingerprints(tmp_path):
 def test_uzbek_tutuq_belgisi_keeps_one_word():
     assert corpus.tokens("Ta'lim maʼno sanʼat таълим", 'uz') == ["ta'lim", "ma'no", "san'at", "ta'lim"]
     assert corpus.tokens("o'zbek 'quoted' word", 'uz')[0] == '\ue000zbek'
+
+
+def test_mixed_alphabet_words_match_their_correct_spelling():
+    for language, mixed, clean in [
+            ('ru', 'Aйблaнувчининг қaеpдa Pоссия', 'Айбланувчининг қаерда Россия'),
+            ('uz', 'Aйблaнувчининг қaеpдa', "Ayblanuvchining qayerda"),
+            ('en', 'Thе rеsеarch оf scіence', 'The research of science')]:
+        assert corpus.tokens(mixed, language) == corpus.tokens(clean, language)
+        assert [w for w, _, _ in corpus.lexical(mixed, language)] == corpus.tokens(mixed, language)
+    assert corpus.tokens('CO2 и NaCl', 'ru') == corpus.tokens('СО2 и NaCl', 'ru')  # normalized identically
+    assert corpus.tokens("ko'p bo", 'uz') == ['k\ue000p', 'bo']                   # Uzbek Latin words never converted
+
+
+def test_language_label_checked_against_letters(tmp_path):
+    uz_cyr = 'Олий таълим муассасаларида сифат муҳим ва долзарб масала ҳисобланади ўқитувчи ғоя'
+    ru = 'Научный текст о качестве высшего образования в регионах и новых университетах страны'
+    with connect(tmp_path / 'i.db') as db:
+        with pytest.raises(ValueError, match='set language to "uz"'):
+            ingest(db, meta('ru'), uz_cyr)
+        with pytest.raises(ValueError, match='set language to "ru"'):
+            ingest(db, meta('uz'), ru)
+        ingest(db, meta('uz'), uz_cyr)
+        ingest(db, meta('ru'), ru)

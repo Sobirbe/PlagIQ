@@ -110,6 +110,8 @@ def transforms(lang):
         "heavy edit (1 in 4 words)": lambda s: every_nth(s, 4, lambda w: "zzq"),
         "word order changed": lambda s: re.sub(r"(\S+) (\S+)", r"\2 \1", s),
     }
+    swap = str.maketrans("аеорсху", "aeopcxy") if lang in ("ru", "uz-Cyrl") else str.maketrans("aeopcxy", "аеорсху")
+    t["lookalike letters mixed in"] = lambda s: every_nth(s, 2, lambda w: w.translate(swap))
     if lang.startswith("uz"):
         t["Latin↔Cyrillic"] = lambda s: swap_script(s, lang)
     if lang == "uz-Latn":
@@ -119,8 +121,14 @@ def transforms(lang):
     return t
 
 
-EXPECTED_FULL = {"exact copy", "case + punctuation", "Unicode NFD", "invisible chars", "PDF line hyphenation",
+EXPECTED_FULL = {"exact copy", "lookalike letters mixed in", "case + punctuation", "Unicode NFD", "invisible chars", "PDF line hyphenation",
                  "Latin↔Cyrillic", "apostrophe variants", "ё written as е"}
+
+
+def expected_full(lang, name):
+    """Uzbek is written in both alphabets, so a lookalike letter (р/p, с/c, у/y)
+    inside an Uzbek word cannot always be resolved: documented as partial."""
+    return name in EXPECTED_FULL and not (lang.startswith("uz") and name == "lookalike letters mixed in")
 
 
 def make_case(rng, lang, length, transform):
@@ -231,7 +239,7 @@ def report(rows, parity, fp, trials, seed, seconds):
             out.append(f"| {lang} | {name} | " + " | ".join(cells) + " |")
     eligible = [r for r in rows if r["length"] >= 7]
     tp, fpw = sum(r["tp"] for r in rows), sum(r["fp"] for r in rows)
-    full = [r for r in eligible if r["transform"] in EXPECTED_FULL]
+    full = [r for r in eligible if expected_full(r["language"], r["transform"])]
     out += ["", "## Precision and alignment", "",
             f"- Words reported as matched that were **not** in the copied passage: {fpw} of {tp + fpw} "
             f"(word precision {tp / (tp + fpw):.4f}).",
@@ -254,7 +262,10 @@ def report(rows, parity, fp, trials, seed, seconds):
             f"(of {len(UZ_PAIRS)}).", "",
             "## Reading these results", "",
             "- Changes the method is designed for (exact, case/punctuation, Unicode form, invisible characters, "
-            "PDF hyphenation, Uzbek script, ё/е, apostrophes) should give recall 1.00 from 7 words.",
+            "PDF hyphenation, Uzbek script, ё/е, apostrophes, and lookalike Latin/Cyrillic letters in Russian and "
+            "English) should give recall 1.00 from 7 words.",
+            "- Lookalike letters in **Uzbek** are only partly resolved: Uzbek is written in both alphabets, so a "
+            "letter such as р/p or с/c inside a word made only of lookalikes cannot be assigned safely.",
             "- Edited or reordered copying is **expected** to be partly or wholly missed: an exact seven-word "
             "matcher only finds unchanged runs of seven or more words. These rows document that limitation; "
             "PlagIQ does not claim paraphrase or translation detection."]

@@ -109,7 +109,9 @@ Put the keys in Railway Variables on the engine service as `OPENALEX_API_KEY` an
 
 **Spending limit:** every run stops before its estimated OpenAlex cost passes `--max-cost-usd` (default $0.50) and keeps what it already staged. `cost.json` shows the estimate and the number of calls by type.
 
-**Not yet tried with the real services.** This was built from the providers' published documentation and tested against simulated OpenAlex, CORE, Unpaywall and publisher servers. The network used during development could not reach the real APIs. Start with `--max-records 20` and check `review.csv` and a few PDFs by hand.
+**What has been tried live:** OpenAlex search and the metadata-only run (`openalex` without `--download`) were run against the real OpenAlex API with a real key in November 2026: 300 records in uz/ru/en were staged correctly, OpenAlex's live prices matched the built-in cost estimates, and 12 of 100 records OpenAlex labelled Russian were Uzbek Cyrillic and were corrected. **Not yet tried live:** PDF downloads (`--download`) and CORE, because the development network could not reach publisher sites or CORE. Start with `--max-records 20` and check `review.csv` and a few PDFs by hand.
+
+**How much is available** (OpenAlex counts, November 2026, using OpenAlex's own language labels): Uzbek-language works with a reusable licence 110,482 (47,734 with an OpenAlex PDF copy); Russian-language 460,073; Russian-language by Uzbekistan-based authors 13,914; English by Uzbekistan-based authors 103,155. At about 0.17 MB of index per article, 100,000 articles would need roughly 17 GB; this size has not been benchmarked yet, so raise `CORPUS_MAX_SOURCES` in steps and re-run the benchmark.
 
 ## Part 4 — Checks before you approve the pull request
 
