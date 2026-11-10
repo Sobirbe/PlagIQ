@@ -157,7 +157,7 @@ def test_private_pilot_login(monkeypatch):
 
 
 def test_pdf_citation_escapes_unicode_and_long_text():
-    import fitz
+    import pymupdf as fitz
     client=TestClient(web.app)
     identifier=upload(client).json()['report_id']
     web.results[identifier]['result']['sources']=[{

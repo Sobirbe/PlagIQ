@@ -31,7 +31,7 @@ INK, MUTED, TEAL, LINE, TINT = (colors.HexColor(x) for x in ("#122A32", "#4C6368
 
 T = {
 "en": dict(
-    methods=dict(reference="Exact normalized seven-word (token) windows", academic="Exact normalized seven-word (token) windows against returned abstracts", corpus="Exact normalized seven-word fingerprints, mapped to original characters"),
+    methods=dict(reference="Exact seven-word matching after normalization, verified word by word", academic="The same exact seven-word matching, against returned abstracts", corpus="The same exact seven-word matching, against indexed full texts"),
     scopes=dict(reference="One user-provided reference; no academic databases searched.", academic="OpenAlex metadata and returned abstracts only; no full-text publisher corpus or web search.", corpus="Authorized texts indexed in the private PlagIQ corpus only; coverage depends on what has been lawfully imported."),
     subtitle="Scope-limited evidence report",
     disclaimer="This report lists exact text overlap found within the scope stated below. It is not an accredited "
@@ -44,9 +44,8 @@ T = {
     expiry_v="Deleted from PlagIQ within {m} min; downloadable only in the submitting browser session",
     corpus_by_lang="Indexed sources by language", discovered="Records discovered / with usable abstract",
     reference="Reference",
-    matched="Matched portion within scope", basis_tokens="Share of the manuscript's normalized words (tokens) covered by at least one exact seven-word match.",
-    basis_chars="Share of the manuscript's characters inside merged, de-duplicated matching passages.",
-    tokens_v="{a} of {b} words (tokens)", chars_v="{a} of {b} characters",
+    matched="Matched portion within scope", basis_tokens="Share of the manuscript's words that lie inside at least one verified match of seven or more consecutive words. Each word is counted once, whatever the number of sources. The same measure is used in every mode.",
+    tokens_v="{a} of {b} words", chars_v="{a} of {b} characters (supporting detail)", version="Corpus version (snapshot ID)",
     units_tokens="Matched words", units_chars="Matched characters",
     not_evaluated="Not evaluated", identical="Document and reference are identical",
     reasons=dict(provider_unavailable="The discovery provider was unavailable, so no text was compared.",
@@ -68,11 +67,11 @@ T = {
     modes=dict(reference="Your own reference", academic="OpenAlex discovery (abstracts only)", corpus="Private authorized corpus"),
     states=dict(searched="Searched", unavailable="Unavailable", no_query="No search phrase", not_searched="Not searched"),
     rights_v=dict(written_permission="Written permission", open_license="Open licence", public_domain="Public domain", unknown="Unknown"),
-    cov=dict(abstract="Abstract", metadata_only="Metadata only"), cov_full="Indexed full text",
+    cov=dict(abstract="Abstract", metadata_only="Metadata only", reference="Your reference"), cov_full="Indexed full text",
     yes="Yes", no="No",
 ),
 "ru": dict(
-    methods=dict(reference="Точные нормализованные окна из семи слов (токенов)", academic="Точные нормализованные окна из семи слов (токенов) по полученным аннотациям", corpus="Точные отпечатки из семи слов с привязкой к исходным символам"),
+    methods=dict(reference="Точное совпадение семи слов после нормализации, проверенное пословно", academic="То же точное сравнение семи слов по полученным аннотациям", corpus="То же точное сравнение семи слов по индексированным полным текстам"),
     scopes=dict(reference="Один источник, предоставленный пользователем; научные базы не проверялись.", academic="Только метаданные и полученные аннотации OpenAlex; без полнотекстовых баз издателей и поиска в интернете.", corpus="Только разрешённые тексты во внутреннем корпусе PlagIQ; охват зависит от законно загруженных источников."),
     subtitle="Отчёт о совпадениях в ограниченном охвате",
     disclaimer="Отчёт перечисляет точные текстовые совпадения только в указанном ниже охвате. Это не аккредитованный "
@@ -85,9 +84,8 @@ T = {
     expiry_v="Удаляется из PlagIQ в течение {m} мин; скачивание только в сессии браузера отправителя",
     corpus_by_lang="Индексированные источники по языкам", discovered="Найдено записей / с аннотацией",
     reference="Источник",
-    matched="Доля совпадений в охвате", basis_tokens="Доля нормализованных слов (токенов) рукописи, входящих хотя бы в одно точное совпадение из семи слов.",
-    basis_chars="Доля символов рукописи внутри объединённых совпадающих фрагментов без двойного учёта.",
-    tokens_v="{a} из {b} слов (токенов)", chars_v="{a} из {b} символов",
+    matched="Доля совпадений в охвате", basis_tokens="Доля слов рукописи, входящих хотя бы в одно проверенное совпадение не менее чем из семи слов подряд. Каждое слово учитывается один раз независимо от числа источников. Мера одинакова во всех режимах.",
+    tokens_v="{a} из {b} слов", chars_v="{a} из {b} символов (дополнительно)", version="Версия корпуса (идентификатор снимка)",
     units_tokens="Совпавшие слова", units_chars="Совпавшие символы",
     not_evaluated="Не оценено", identical="Документ и источник идентичны",
     reasons=dict(provider_unavailable="Сервис поиска был недоступен, текст не сравнивался.",
@@ -109,11 +107,11 @@ T = {
     modes=dict(reference="Ваш источник", academic="Поиск OpenAlex (только аннотации)", corpus="Внутренний разрешённый корпус"),
     states=dict(searched="Поиск выполнен", unavailable="Недоступно", no_query="Нет поисковой фразы", not_searched="Поиск не проводился"),
     rights_v=dict(written_permission="Письменное разрешение", open_license="Открытая лицензия", public_domain="Общественное достояние", unknown="Неизвестно"),
-    cov=dict(abstract="Аннотация", metadata_only="Только метаданные"), cov_full="Индексированный полный текст",
+    cov=dict(abstract="Аннотация", metadata_only="Только метаданные", reference="Ваш источник"), cov_full="Индексированный полный текст",
     yes="Да", no="Нет",
 ),
 "uz": dict(
-    methods=dict(reference="Aniq normallashtirilgan yetti so‘zli (token) oynalar", academic="Olingan annotatsiyalarga nisbatan aniq yetti so‘zli (token) oynalar", corpus="Asl belgilarga bog‘langan aniq yetti so‘zli barmoq izlari"),
+    methods=dict(reference="Normallashtirishdan keyin aniq yetti so‘zli moslik, so‘zma-so‘z tekshirilgan", academic="Xuddi shu aniq yetti so‘zli moslik, olingan annotatsiyalar bo‘yicha", corpus="Xuddi shu aniq yetti so‘zli moslik, indekslangan to‘liq matnlar bo‘yicha"),
     scopes=dict(reference="Foydalanuvchi bergan bitta manba; ilmiy bazalar qidirilmagan.", academic="Faqat OpenAlex metadata va olingan annotatsiyalar; to‘liq matnli nashriyot bazalari va internet qidirilmagan.", corpus="Faqat PlagIQ ichki korpusidagi ruxsat berilgan matnlar; qamrov qonuniy yuklangan manbalarga bog‘liq."),
     subtitle="Cheklangan doiradagi dalillar hisoboti",
     disclaimer="Ushbu hisobot faqat quyida ko‘rsatilgan doirada topilgan aniq matn mosliklarini sanab o‘tadi. U akkreditatsiyalangan "
@@ -126,9 +124,8 @@ T = {
     expiry_v="PlagIQ’dan {m} daqiqa ichida o‘chiriladi; faqat yuborgan brauzer seansida yuklab olinadi",
     corpus_by_lang="Tillar bo‘yicha indekslangan manbalar", discovered="Topilgan yozuvlar / annotatsiyasi borlari",
     reference="Manba",
-    matched="Doira ichidagi moslik ulushi", basis_tokens="Hujjatdagi normallashtirilgan so‘zlar (tokenlar)dan kamida bitta aniq yetti so‘zli moslikka kirganlari ulushi.",
-    basis_chars="Birlashtirilgan, takrorsiz mos parchalar ichidagi belgilar ulushi.",
-    tokens_v="{b} ta so‘zdan (token) {a} tasi", chars_v="{b} ta belgidan {a} tasi",
+    matched="Doira ichidagi moslik ulushi", basis_tokens="Hujjatdagi so‘zlardan kamida yetti ketma-ket so‘zli tasdiqlangan moslik ichida bo‘lganlari ulushi. Har bir so‘z manbalar sonidan qat’i nazar bir marta sanaladi. O‘lchov barcha rejimlarda bir xil.",
+    tokens_v="{b} ta so‘zdan {a} tasi", chars_v="{b} ta belgidan {a} tasi (qo‘shimcha)", version="Korpus versiyasi (holat identifikatori)",
     units_tokens="Mos so‘zlar", units_chars="Mos belgilar",
     not_evaluated="Baholanmagan", identical="Hujjat va manba bir xil",
     reasons=dict(provider_unavailable="Qidiruv xizmati ishlamadi, matn solishtirilmadi.",
@@ -150,7 +147,7 @@ T = {
     modes=dict(reference="O‘z manbangiz", academic="OpenAlex qidiruvi (faqat annotatsiyalar)", corpus="Ruxsat berilgan ichki korpus"),
     states=dict(searched="Qidirildi", unavailable="Mavjud emas", no_query="Qidiruv iborasi yo‘q", not_searched="Qidirilmagan"),
     rights_v=dict(written_permission="Yozma ruxsat", open_license="Ochiq litsenziya", public_domain="Jamoat mulki", unknown="Noma’lum"),
-    cov=dict(abstract="Annotatsiya", metadata_only="Faqat metadata"), cov_full="Indekslangan to‘liq matn",
+    cov=dict(abstract="Annotatsiya", metadata_only="Faqat metadata", reference="Sizning manbangiz"), cov_full="Indekslangan to‘liq matn",
     yes="Ha", no="Yo‘q",
 ),
 }
@@ -206,7 +203,6 @@ def build_pdf(result, identifier, lang="en", minutes_left=15):
     t = T.get(lang, T["en"])
     st = _styles()
     esc = lambda value: html.escape(str(value))
-    unit = "characters" if result.get("mode") == "corpus" else "tokens"
 
     def table(rows):
         data = [[Paragraph(esc(k), st["key"]), Paragraph(esc(v), st["cell"])] for k, v in rows]
@@ -239,6 +235,8 @@ def build_pdf(result, identifier, lang="en", minutes_left=15):
         scope_rows.append((t["corpus_by_lang"], " · ".join(
             f"{k.upper()} {counts.get(k, 0) or t['not_evaluated']}" for k in ("uz", "ru", "en"))
             + f" · Σ {result.get('source_count', 0)}"))
+        if result.get("corpus_version"):
+            scope_rows.append((t["version"], result["corpus_version"]))
     story += [Paragraph(t["s_scope"], st["h"]), table(scope_rows)]
 
     percent = result.get("percent")
@@ -247,12 +245,10 @@ def build_pdf(result, identifier, lang="en", minutes_left=15):
         basis = t["reasons"].get(result.get("not_evaluated_reason"), "")
     else:
         headline = f"{percent}%"
-        basis = t["basis_chars"] if unit == "characters" else t["basis_tokens"]
-    if unit == "characters":
-        units_row = (t["units_chars"], t["chars_v"].format(a=result.get("matched_chars", 0), b=result.get("total_chars", 0)))
-    else:
-        units_row = (t["units_tokens"], t["tokens_v"].format(a=result.get("matched_tokens", 0), b=result.get("total_tokens", 0)))
-    result_rows = [units_row, (t["exclusions"], t["exclusions_v"]), (t["ai"], t["ai_v"])]
+        basis = t["basis_tokens"]
+    result_rows = [(t["units_tokens"], t["tokens_v"].format(a=result.get("matched_tokens") or 0, b=result.get("total_tokens") or 0)),
+                   (t["units_chars"], t["chars_v"].format(a=result.get("matched_chars") or 0, b=result.get("total_chars") or 0)),
+                   (t["exclusions"], t["exclusions_v"]), (t["ai"], t["ai_v"])]
     if mode == "reference":
         result_rows.append((t["identical"], t["yes"] if result.get("self_comparison") else t["no"]))
     story += [Paragraph(t["s_result"], st["h"]),
@@ -262,8 +258,7 @@ def build_pdf(result, identifier, lang="en", minutes_left=15):
 
     story.append(Paragraph(t["s_sources"], st["h"]))
     sources = result.get("sources") or []
-    if mode == "academic":
-        sources = sorted(sources, key=lambda s: -(s.get("matched_tokens") or 0))
+    sources = sorted(sources, key=lambda s: -(s.get("matched_tokens") or 0))
     total = result.get("matched_source_count", len(sources))
     if not sources and mode != "reference":
         story.append(Paragraph(esc(t["no_sources"]), st["body"]))
@@ -284,10 +279,7 @@ def build_pdf(result, identifier, lang="en", minutes_left=15):
         meta.append(f"{t['coverage']}: {coverage}")
         if source.get("rights_basis"):
             meta.append(f"{t['rights']}: {t['rights_v'].get(source['rights_basis'], t['rights_v']['unknown'])}")
-        if source.get("matched_tokens") is not None:
-            meta.append(f"{t['units_tokens']}: {source['matched_tokens']}")
-        if source.get("matched_chars") is not None:
-            meta.append(f"{t['units_chars']}: {source['matched_chars']}")
+        meta.append(f"{t['units_tokens']}: {source.get('matched_tokens') or 0}")
         block.append(Paragraph(esc(" · ".join(meta)), st["small"]))
         if source.get("url"):
             block.append(Paragraph(esc(source["url"]), st["small"]))

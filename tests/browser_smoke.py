@@ -58,7 +58,7 @@ with tempfile.TemporaryDirectory() as tmp:
                             page.locator('#report').click()
                         download=download_info.value
                         download.save_as(tmp+'/report.pdf')
-                        import fitz
+                        import pymupdf as fitz
                         with fitz.open(tmp+'/report.pdf') as pdf:
                             assert 'PlagIQ' in ''.join(pg.get_text() for pg in pdf)
                         page.locator('[name=mode][value=corpus]').check()

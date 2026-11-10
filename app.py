@@ -1,18 +1,14 @@
 import asyncio
 from contextlib import asynccontextmanager
 import hashlib
-import io
 import os
 import re
 import time
 import uuid
 import secrets
-import zipfile
 from datetime import datetime, timezone
 from pathlib import Path
 
-import fitz
-from docx import Document
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.concurrency import run_in_threadpool
 from fastapi.exceptions import RequestValidationError
@@ -21,6 +17,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.formparsers import MultiPartParser
 
 import corpus
+import extract
 from discovery import discover
 from engine_client import EngineError, configured as corpus_configured, run_check, summarize, highlight_html
 from report_pdf import build_pdf
@@ -94,73 +91,54 @@ def tokens(value, language):
     return corpus.tokens(value, language)
 
 
+METHOD = "Exact seven-word matching after normalization (verified word by word)"
+
+
+def _percent(matched, total):
+    return round(100 * matched / total, 2) if total else 0
+
+
+def _source_entry(evidence, **fields):
+    evidence = evidence or {}
+    return {**fields, "matched_tokens": evidence.get("matched_words", 0),
+            "matched_chars": evidence.get("matched_chars", 0),
+            "passage_count": evidence.get("passage_count", 0), "passages": evidence.get("passages", [])}
+
+
+def _measure(q, covered, intervals):
+    return {"matched_tokens": len(covered), "total_tokens": len(q),
+            "matched_chars": sum(e - s for s, e in intervals), "unit": "words",
+            "percent": _percent(len(covered), len(q))}, intervals
+
+
 def compare(text, source, language):
-    a, b = tokens(text, language), tokens(source, language)
-    n = WINDOW
-    windows = {tuple(b[i:i+n]) for i in range(max(0, len(b)-n+1))}
-    matched = set()
-    for i in range(max(0, len(a)-n+1)):
-        if tuple(a[i:i+n]) in windows:
-            matched.update(range(i, i+n))
-    return {"percent":round(100 * len(matched)/len(a), 2) if a else 0,
-            "matched_tokens":len(matched), "total_tokens":len(a), "unit":"tokens",
-            "language":language, "method":"Exact normalized seven-token windows",
-            "ai_detection":"Not performed"}
+    """Manuscript vs one user-supplied reference."""
+    q, (evidence,), covered, intervals = corpus.compare_texts(text, [source], language)
+    result, intervals = _measure(q, covered, intervals)
+    result.update({"language": language, "method": METHOD, "ai_detection": "Not performed",
+                   "total_chars": len(text), "intervals": intervals,
+                   "passages": (evidence or {}).get("passages", []), "evidence": evidence})
+    return result
 
 
 def compare_sources(text, sources, language):
-    """Union of matched document-token positions across readable abstracts."""
-    manuscript = tokens(text, language)
-    n = WINDOW
-    covered = set()
-    entries = []
-    for source in sources:
-        abstract = source.get("abstract", "")
-        lexical = tokens(abstract, language)
-        windows = {tuple(lexical[i:i+n]) for i in range(max(0,len(lexical)-n+1))}
-        positions = set()
-        if windows:
-            for i in range(max(0,len(manuscript)-n+1)):
-                if tuple(manuscript[i:i+n]) in windows:
-                    positions.update(range(i, i+n))
-        covered.update(positions)
-        entries.append({"title":source.get("title", "Untitled"),"url":source.get("url", ""),
-                        "year":source.get("year"),"coverage":source.get("coverage", "metadata_only"),
-                        "matched_tokens":len(positions)})
-    return {"percent":round(100 * len(covered)/len(manuscript),2) if manuscript else 0,
-            "matched_tokens":len(covered),"total_tokens":len(manuscript), "unit":"tokens",
-            "language":language, "method":"Exact normalized seven-token windows against available abstracts",
-            "sources":entries,"ai_detection":"Not performed"}
+    """Union of verified matches across returned abstracts (metadata-only records are not compared)."""
+    q, evidence, covered, intervals = corpus.compare_texts(text, [s.get("abstract", "") for s in sources], language)
+    result, intervals = _measure(q, covered, intervals)
+    entries = [_source_entry(e, title=s.get("title", "Untitled"), url=s.get("url", ""), year=s.get("year"),
+                             coverage=s.get("coverage", "metadata_only")) for s, e in zip(sources, evidence)]
+    result.update({"language": language, "method": METHOD + " against returned abstracts",
+                   "total_chars": len(text), "intervals": intervals, "sources": entries,
+                   "ai_detection": "Not performed"})
+    return result
 
 
 def extract_text(name, content):
     """Extract text from bounded bytes. Runs in a worker thread, not the event loop."""
-    if not content:
-        raise ApiError(400, "empty_file", "The file is empty.")
-    if name.endswith(".txt"):
-        try:
-            if content.startswith((b"\xff\xfe", b"\xfe\xff")):
-                return content.decode("utf-16")
-            return content.decode("utf-8-sig")
-        except UnicodeDecodeError:
-            raise ApiError(400, "txt_encoding", "TXT files must be saved as UTF-8 (or UTF-16 with a byte-order mark).")
     try:
-        if name.endswith(".docx"):
-            with zipfile.ZipFile(io.BytesIO(content)) as archive:
-                if (len(archive.infolist()) > 1000 or
-                        sum(item.file_size for item in archive.infolist()) > 20 * 1024 * 1024):
-                    raise ApiError(413, "docx_expanded", "Expanded DOCX exceeds safe limits")
-            doc = Document(io.BytesIO(content))
-            return "\n".join([p.text for p in doc.paragraphs] +
-                             [cell.text for table in doc.tables for row in table.rows for cell in row.cells])
-        with fitz.open(stream=content, filetype="pdf") as pdf:
-            if pdf.page_count > 40:
-                raise ApiError(400, "pdf_pages", "PDF exceeds 40 pages")
-            return "\n".join(page.get_text() for page in pdf)
-    except ApiError:
-        raise
-    except Exception:
-        raise ApiError(400, "extract_failed", "Could not read this file. Check that it is a valid DOCX or text-based PDF.")
+        return extract.extract_text(name, content)
+    except extract.ExtractError as exc:
+        raise ApiError(exc.status, exc.code, str(exc))
 
 
 async def read_file(upload, kind="document"):
@@ -285,9 +263,12 @@ async def analyse(submission, reference, reference_text, language, mode):
                        "The reference needs at least 7 words of readable text.")
         result = await run_in_threadpool(compare, original, source, language)
         same = original.strip() == source.strip()
-        result.update({"mode":"reference",
-                       "reference":clean_filename(reference.filename, "Pasted reference") if reference and reference.filename else "Pasted reference",
-                       "sources":[],"database_status":"not_searched","source_count":1,
+        name = clean_filename(reference.filename, "Pasted reference") if reference and reference.filename else "Pasted reference"
+        evidence = result.pop("evidence")
+        result.pop("passages")
+        sources = [_source_entry(evidence, title=name, url="", year=None, coverage="reference")] if evidence else []
+        result.update({"mode":"reference", "reference":name, "matched_source_count":len(sources),
+                       "sources":sources,"database_status":"not_searched","source_count":1,
                        "scope":"One user-provided reference; no public academic databases searched.",
                        "self_comparison":same})
     elif mode == "academic":
@@ -298,6 +279,7 @@ async def analyse(submission, reference, reference_text, language, mode):
             result["percent"] = None
             result["not_evaluated_reason"] = "provider_unavailable" if discovery["status"] != "searched" else "no_abstracts"
         result["evaluated_sources"] = evaluated
+        result["matched_source_count"] = sum(1 for e in result["sources"] if e["matched_tokens"])
         result.update({"mode":"academic","reference":"None","source_count":len(discovery["sources"]),
                        "database_status":discovery["status"],"database_message":discovery["message"],
                        "queries":discovery["queries"],"self_comparison":False,
@@ -311,14 +293,16 @@ async def analyse(submission, reference, reference_text, language, mode):
         except EngineError as exc:
             raise ApiError(503, exc.code, str(exc))
         evaluated = summary["language_counts"].get(language, 0) > 0
+        q = await run_in_threadpool(corpus.lexical, original, language)
+        matched_words = corpus.words_in_intervals(q, summary["intervals"])
         result = {
             "mode":"corpus", "reference":"PlagIQ authorized private corpus",
-            "percent":summary["percent"] if evaluated else None,
+            "percent":_percent(matched_words, len(q)) if evaluated else None,
             "not_evaluated_reason": None if evaluated else "no_sources_in_language",
-            "matched_tokens":None, "unit":"characters",
+            "matched_tokens":matched_words, "unit":"words",
             "matched_chars":summary["matched_chars"],"total_chars":summary["total_chars"],
-            "total_tokens":len(tokens(original,language)),"language":language,
-            "method":"Exact normalized seven-token fingerprint matches in indexed corpus",
+            "total_tokens":len(q),"language":language, "corpus_version":summary["corpus_version"],
+            "method":METHOD + " against the indexed corpus",
             "database_status":"searched","database_message":"Matched against ingested corpus only, not the whole web.",
             "source_count":summary["corpus_size"],"sources":summary["sources"],
             "matched_source_count":summary["matched_source_count"],
@@ -327,8 +311,10 @@ async def analyse(submission, reference, reference_text, language, mode):
             "corpus_coverage":summary["coverage"],
             "language_counts":summary["language_counts"],
             "sources_truncated":summary["sources_truncated"],
-            "highlight_html":highlight_html(original,summary["intervals"]) if evaluated else "",
+            "intervals":summary["intervals"] if evaluated else [],
         }
+    intervals = result.pop("intervals", [])
+    result["highlight_html"] = highlight_html(original, intervals) if intervals else ""
     result.update({"document":clean_filename(submission.filename, "Document"),
                    "date":datetime.now(timezone.utc).isoformat(timespec="seconds"),
                    "quotations_excluded":False, "bibliography_excluded":False,

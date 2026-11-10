@@ -21,7 +21,7 @@
 | Unsafe URLs | Only `https://` source links are rendered, and they open with `noopener noreferrer`. PlagIQ never fetches user-supplied URLs. OpenAlex responses are capped at 5 MB. | code review |
 | Headers | CSP, `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy: no-referrer`, no server banner, and API docs disabled. | `test_private_service_requires_auth` |
 | Third-party processing consent | OpenAlex (a ≤14-word excerpt) and private-corpus checks each require their own consent tick, which resets whenever the mode changes. | browser tests |
-| Rights-gated corpus | Import requires citation, language, an HTTPS URL, a rights basis and a permission reference. There is no automatic downloading, and the pilot is capped at 100 sources. | `test_rights_required_and_idempotent` |
+| Rights-gated corpus | Import requires citation, language, an HTTPS URL, a rights basis and a permission reference. The importer validates every record (fields, HTTPS citation, year, extractable text, script matches declared language, file stays inside the manifest folder) and imports all-or-nothing. There is no automatic downloading. Default limit 1,000 sources. | `test_import_is_all_or_nothing`, `test_import_pdf_docx_and_lists_problems` |
 
 ## B. Required before confidential manuscripts (not done; needs infrastructure, policy or contracts)
 

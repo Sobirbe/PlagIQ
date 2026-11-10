@@ -147,6 +147,9 @@ def summarize(report: dict, max_sources=25) -> dict:
                     raise ValueError()
                 passages.append({k: passage[k] for k in ('query_start','query_end','source_start','source_end')}
                                 | {'source_excerpt': str(passage.get('source_excerpt', ''))[:501]})
+            matched_words = src.get("matched_words", 0)
+            if type(matched_words) is not int or not 0 <= matched_words <= document_length:
+                raise ValueError()
             year = src.get("year")
             passage_count = src.get("passage_count", len(passages))
             sources.append({
@@ -154,14 +157,20 @@ def summarize(report: dict, max_sources=25) -> dict:
                 "url": url if urlsplit(url).scheme == "https" else "",
                 "coverage": "indexed full-text source",
                 "matched_chars": matched_chars,
+                "matched_tokens": matched_words,
                 "authors": str(src.get("authors") or "")[:300],
                 "year": year if type(year) is int and 1000 <= year <= 2200 else None,
                 "language": src.get("language") if src.get("language") in LANGUAGES else None,
                 "rights_basis": src.get("rights_basis") if src.get("rights_basis") in RIGHTS else "unknown",
                 "passage_count": passage_count if type(passage_count) is int and passage_count >= len(passages) else len(passages),
-                "passages": passages,
+                "passages": [p | {"words": _int(raw.get("words", 0), 0, document_length)}
+                             for p, raw in zip(passages, raw_passages)],
             })
+        version = report.get("corpus_version")
+        if version is not None and not (isinstance(version, str) and re.fullmatch(r"[0-9a-f]{12}", version)):
+            raise ValueError()
         return {"percent": round(100 * matched / document_length, 2),
+                "corpus_version": version,
                 "matched_chars": matched, "total_chars": document_length,
                 "coverage": str(report.get("coverage") or "unknown")[:500],
                 "corpus_size": sum(counts.values()),

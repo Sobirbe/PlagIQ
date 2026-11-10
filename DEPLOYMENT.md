@@ -49,35 +49,39 @@ The engine holds the authorized full texts. It must **never** be reachable from 
 7. Optional website settings: `ENGINE_TIMEOUT=120` (15–180 seconds) and `SCAN_CONCURRENCY=2` (1–8; higher needs more memory).
 8. Redeploy the engine, then the website. `/health` now shows `"corpus_engine_configured": true`. This only means the settings exist. The synthetic test in Part 4 proves the connection works.
 
-**Upgrading an existing engine:** v0.5 improves Unicode handling (for example `ё`/`е` and decomposed letters from PDFs). On first start, the engine automatically re-fingerprints the texts already stored in its database. It downloads nothing. With 100 sources this takes seconds.
+**Upgrading an existing engine:** v0.5 changes the index format (7× smaller) and improves Unicode handling. On first start, the engine automatically rebuilds the index from the texts already stored in its database. It downloads nothing. Measured at about 0.1–0.2 s per source. Back up the volume first.
 
 ## Part 3 — Add publications you are allowed to index
 
 A technical administrator must run this *inside the engine service*, with its `/data` volume attached. Railway's local CLI may not run inside the remote container, so confirm that first.
 
 1. For each publication, keep written proof that you may store it in full, index it and show short excerpts. Being free to read online, or appearing in OpenAlex, is **not** permission.
-2. Save each text as a UTF-8 `.txt` file. Create a private `manifest.json` next to the files:
+2. Put the publication files (`.pdf` with selectable text, `.docx` or UTF-8 `.txt`) in one private folder. Create a `manifest.json` in the same folder:
 
    ```json
-   [{"text_file": "article.txt", "title": "Exact title", "authors": "Author names", "year": 2025,
-     "url": "https://publisher.example/article", "language": "uz",
+   [{"title": "Exact title", "authors": "Author names", "year": 2025,
+     "url": "https://publisher.example/article", "language": "uz", "text_file": "article.pdf",
      "rights_basis": "written_permission", "permission_reference": "Agreement #12, 2026-03-01"}]
    ```
 
    `language` is `uz`, `ru` or `en`. `rights_basis` is `written_permission`, `open_license` or `public_domain`. The importer checks that these fields are filled in, but **a person must check that they are true.**
-3. Pause scans, then run: `python corpus.py /private/import/manifest.json --db /data/corpus.sqlite3`
-4. Limits: 300,000 characters per text and 100 sources in total (pilot). Importing the same text again replaces it. To withdraw a source, rebuild from a manifest without it, or delete it by its SHA-256 identifier. Never delete the volume without a tested backup.
+3. **Check first (writes nothing):** `python corpus.py /private/import/manifest.json --check --db /data/corpus.sqlite3`
+   It lists every problem at once: missing citation or rights fields, wrong year format, non-HTTPS link, a scanned PDF with no text, a text whose script does not match its declared language (e.g. "ru" but mostly Latin letters), or a file outside the folder.
+4. **Import:** pause scans, then run the same command without `--check`. Either every record is imported or none is.
+5. **See what is indexed:** `python corpus.py --list --db /data/corpus.sqlite3` prints each source with language, year, rights basis, word count and identifier, totals by language, and the **corpus version**. Every PlagIQ report shows the corpus version it searched, so you can prove which collection a result covers.
+6. **Withdraw a source:** `python corpus.py --remove <SHA-256> --db /data/corpus.sqlite3`.
+7. Limits: 1,000,000 characters per text; 1,000 sources by default (`CORPUS_MAX_SOURCES` on the engine). Measured on a test machine: 1,000 article-sized sources use about 171 MB and searches take about 0.1 s (see `evaluation/BENCHMARKS.md`). Run `python evaluation/benchmark_corpus.py` on the engine before raising the limit. Never delete the volume without a tested backup.
 
 ## Part 4 — Checks before you approve the pull request
 
 Use only harmless sample text. Tick each item:
 
 - [ ] In UZ, RU and EN, on a phone and a computer, the page fits the screen with no sideways scrolling.
-- [ ] *Compare with my own source*: paste the same 10-word sentence as the document and the reference. The result is 100% and labelled in **words (tokens)**.
+- [ ] *Compare with my own source*: paste the same 10-word sentence as the document and the reference. The result is 100%, measured in **words**, with the matching passage quoted and highlighted.
 - [ ] Upload a 3-word file. A translated "at least 7 words" message appears, not 0%.
 - [ ] Upload a `.txt` file saved in Windows-1251. A translated "save as UTF-8" message appears.
 - [ ] *Academic discovery*: the consent text names OpenAlex. If nothing usable comes back, the result says **Not evaluated** with a reason.
-- [ ] *Corpus* (if set up): import one synthetic text you wrote, then check it. The correct title, author, year, rights basis and passage appear, labelled in **characters**. A language with no indexed sources shows **Not evaluated**. The indexed-sources row shows counts per language.
+- [ ] *Corpus* (if set up): import one synthetic text you wrote, then check it. The correct title, author, year, rights basis and passage appear. The percentage uses the same word measure as the other modes, and the corpus version matches `corpus.py --list`. A language with no indexed sources shows **Not evaluated**. The indexed-sources row shows counts per language.
 - [ ] Download the PDF in each language. Check the Cyrillic text, "Page X of Y", the scope, the limitations, and that it says it is not a certificate.
 - [ ] Open the PDF link in a private/incognito window. It must show "not found". Click **Delete report**; the link must stop working.
 - [ ] The engine has no public domain, and no keys appear in GitHub or in the page source.

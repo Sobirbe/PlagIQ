@@ -5,7 +5,7 @@ import sqlite3
 import unicodedata
 import zipfile
 
-import fitz
+import pymupdf as fitz
 import pytest
 from docx import Document
 from fastapi.testclient import TestClient
@@ -13,7 +13,7 @@ from fastapi.testclient import TestClient
 import app as web
 import engine_client
 import report_pdf
-from corpus import connect, ingest, lexical, search, tokens
+from corpus import NORMALIZATION_VERSION, connect, ingest, lexical, search, tokens
 
 EN = 'one two three four five six seven eight nine'
 
@@ -62,16 +62,21 @@ def test_offsets_point_to_original_decomposed_text():
     assert word == 'йод' and text[start:end] == text
 
 
-def test_index_migrates_old_normalization(tmp_path):
+def test_index_migrates_v04_database(tmp_path):
+    """A database written by v0.4 (hex fingerprints, char columns) upgrades in place."""
+    import json
     path = tmp_path / 'old.db'
     text = 'Научный текст ещё содержит семь слов для проверки'
-    with connect(path) as db:
-        ingest(db, meta('ru'), text)
-        db.execute('DELETE FROM windows')          # simulate a legacy index
-        db.execute('PRAGMA user_version=1')
-        db.commit()
-    db = connect(path)                             # reconnect re-fingerprints stored text
-    assert db.execute('PRAGMA user_version').fetchone()[0] == 2
+    old = sqlite3.connect(path)
+    old.executescript('''CREATE TABLE sources (id TEXT PRIMARY KEY, metadata TEXT NOT NULL, text TEXT NOT NULL);
+      CREATE TABLE windows (fingerprint TEXT NOT NULL, source_id TEXT NOT NULL, source_start INTEGER NOT NULL,
+      source_end INTEGER NOT NULL); CREATE INDEX window_lookup ON windows(fingerprint);''')
+    old.execute('INSERT INTO sources VALUES (?,?,?)', ('abc', json.dumps(meta('ru')), text))
+    old.execute("INSERT INTO windows VALUES ('deadbeef','abc',0,5)")
+    old.execute('PRAGMA user_version=2')
+    old.commit(); old.close()
+    db = connect(path)
+    assert db.execute('PRAGMA user_version').fetchone()[0] == NORMALIZATION_VERSION
     assert search(db, text.replace('ё', 'е'), 'ru')['unique_passages'] == [[0, len(text)]]
 
 
@@ -208,7 +213,7 @@ def test_summary_sanitizes_untrusted_fields():
     report['language_counts']['zz'] = 5
     src = engine_client.summarize(report)['sources'][0]
     assert src['year'] is None and len(src['authors']) == 300 and src['rights_basis'] == 'unknown'
-    assert 'extra' not in src and set(src['passages'][0]) == {'query_start', 'query_end', 'source_start', 'source_end', 'source_excerpt'}
+    assert 'extra' not in src and set(src['passages'][0]) == {'query_start', 'query_end', 'source_start', 'source_end', 'source_excerpt', 'words'}
     assert engine_client.summarize(report)['language_counts'] == {'uz': 0, 'ru': 0, 'en': 1}
 
 
@@ -234,7 +239,7 @@ def test_corpus_result_language_without_sources_is_not_evaluated(monkeypatch):
     monkeypatch.setattr(web, 'run_check', fake)
     data = post(mode='corpus', consent='true').json()
     assert data['percent'] is None and data['not_evaluated_reason'] == 'no_sources_in_language'
-    assert data['unit'] == 'characters'
+    assert data['unit'] == 'words'
 
 
 def test_engine_busy_is_reported(monkeypatch):

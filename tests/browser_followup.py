@@ -15,7 +15,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 from browser_smoke_lib import start  # noqa: E402
 from corpus import connect, ingest  # noqa: E402
 from docx import Document  # noqa: E402
-import fitz  # noqa: E402
+import pymupdf as fitz  # noqa: E402
 from playwright.sync_api import sync_playwright  # noqa: E402
 
 SHOTS = Path(sys.argv[1]) if len(sys.argv) > 1 else None
@@ -98,7 +98,8 @@ with tempfile.TemporaryDirectory() as tmp:
                 page.wait_for_function("() => document.querySelector('#source-list').textContent.includes('sintetik')")
                 assert 'UZ 1' in page.locator('#coverage').inner_text()
                 assert 'Iqtiboslar' in page.locator('#notice').inner_text()
-                assert 'belgi' in page.locator('#details').inner_text(), 'character unit shown'
+                assert 'so‘zdan' in page.locator('#details').inner_text(), 'word measure shown'
+                assert 'korpus versiyasi' in page.locator('#coverage').inner_text()
                 assert page.locator('#highlight-box summary').count() == 1
                 page.locator('#highlight-box summary').click()
                 assert page.locator('#highlight-box mark').count() >= 1
@@ -107,7 +108,7 @@ with tempfile.TemporaryDirectory() as tmp:
                     page.locator('#result').screenshot(path=str(SHOTS / f'result-uz-{width}.png'))
                 # Switch language after analysis: results re-render, PDF link follows.
                 page.locator('[data-lang=en]').click()
-                assert 'characters' in page.locator('#details').inner_text()
+                assert 'words matched' in page.locator('#details').inner_text()
                 assert 'lang=en' in page.locator('#report').get_attribute('href')
                 page.locator('[data-lang=ru]').click()
                 with page.expect_download() as info:
@@ -116,6 +117,7 @@ with tempfile.TemporaryDirectory() as tmp:
                 with fitz.open(tmp + '/r.pdf') as pdf:
                     text = ''.join(pg.get_text() for pg in pdf)
                 assert 'Отчёт о совпадениях' in text and 'Письменное разрешение' in text and 'None' not in text
+                assert 'Версия корпуса' in text
 
                 # Russian-language corpus check with no Uzbek fallback; English has no sources -> Not evaluated.
                 page.locator('#language').select_option('en')
@@ -129,6 +131,16 @@ with tempfile.TemporaryDirectory() as tmp:
                     page.locator('#result').screenshot(path=str(SHOTS / f'not-evaluated-ru-{width}.png'))
                 page.locator('#delete-report').click()
                 page.wait_for_function("() => document.querySelector('#status').textContent.includes('удалён')")
+                # Own-reference mode now shows the same passage evidence and highlighting.
+                page.locator('#language').select_option('ru')
+                page.locator('#submission').set_input_files({'name': 'ru.txt', 'mimeType': 'text/plain',
+                                                             'buffer': ('Введение. ' + RU + '. Заключение.').encode()})
+                page.locator('[name=mode][value=reference]').check()
+                page.locator('#reference_text').fill('Источник: ' + RU)
+                page.locator('#submit').click()
+                page.wait_for_function("() => document.querySelectorAll('#source-list blockquote').length === 1")
+                assert page.locator('#highlight-box summary').count() == 1
+                assert page.locator('#source-list').inner_text().count('Ваш источник') == 1
                 if SHOTS:
                     page.goto('http://127.0.0.1:8133')
                     page.screenshot(path=str(SHOTS / f'home-ru-{width}.png'), full_page=width >= 768)

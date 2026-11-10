@@ -8,9 +8,22 @@ PlagIQ compares Uzbek Latin/Cyrillic, Russian and English manuscripts. It report
 - **Academic discovery:** explicit consent sends at most 14 words to OpenAlex; compares returned abstracts only. Metadata records are not full-text coverage. Failure/no usable abstracts displays **Not evaluated**.
 - **Private corpus:** the existing Noplag-style client now connects to an included, authenticated private backend (`engine_service.py`). This is PlagIQ's bounded exact-match implementation of the adapter protocol, not a bundled upstream Noplag distribution or its advanced algorithms. Seven-token SHA-256 fingerprints retrieve sources; original-character offsets support evidence and Uzbek script folding. Overlapping spans are merged before calculating character overlap. Tokens and characters are different measurement units.
 
-**No academic collection is bundled or claimed.** The corpus starts empty; this pilot caps imports at 100 sources. Rights-gated imports support all three languages, but operational coverage exists only after authorized full texts are supplied. Corpus counts are reported by language, not inferred from a publisher's size. Empty language coverage displays **Not evaluated**. Searching a populated corpus with no matches can return 0%; this does not establish originality. Source lists are bounded (25 browser / 15 PDF entries); truncation is disclosed and totals include all matches. Exact quotes and bibliography text can match and are **not excluded** (stated in every result and PDF); paraphrase matching and cross-language translation detection are not implemented.
+**No academic collection is bundled or claimed.** The corpus starts empty; imports are limited to 1,000 sources by default (`CORPUS_MAX_SOURCES`; see measured resources in [evaluation/BENCHMARKS.md](evaluation/BENCHMARKS.md)). Rights-gated imports support all three languages, but operational coverage exists only after authorized full texts are supplied. Corpus counts are reported by language, not inferred from a publisher's size. Empty language coverage displays **Not evaluated**. Searching a populated corpus with no matches can return 0%; this does not establish originality. Source lists are bounded (25 browser / 15 PDF entries); truncation is disclosed and totals include all matches. Exact quotes and bibliography text can match and are **not excluded** (stated in every result and PDF); paraphrase matching and cross-language translation detection are not implemented.
 
-All modes share one tokenizer (`corpus.lexical`/`corpus.tokens`): Unicode NFC composition, removal of invisible characters (soft hyphen, zero-width), lower-casing, Uzbek Latin↔Cyrillic folding and Russian ё→е, with original-character offsets kept for evidence. Reference and OpenAlex results are **token (word)** measures; private-corpus results are **character** measures over merged passages. The UI and PDF name the unit.
+## One matcher, one measure
+
+Every mode (own reference, OpenAlex abstracts, private corpus) uses the same code in `corpus.py`:
+
+1. **Normalize** without losing positions: Unicode NFC, invisible characters removed (soft hyphen, zero-width), lower case, Uzbek Latin↔Cyrillic folding with the tutuq belgisi kept inside words, Russian ё→е; PDF line-end hyphenation is repaired at extraction.
+2. **Find** every run of seven or more identical consecutive words (64-bit fingerprints as an index only).
+3. **Verify** each candidate word by word against the real source text — a fingerprint collision can never become a match — and join consecutive hits on the same alignment into passages; repeated phrases are reported once.
+4. **Measure** the share of manuscript words inside at least one verified passage, each word counted once regardless of the number of sources. The private engine's character spans are converted to this word count by the website; no engine-supplied percentage is used.
+
+The result is exact-copy evidence with character positions in both texts. It does not detect paraphrase, translation or edited copying (measured below).
+
+## Accuracy evidence
+
+`python evaluation/run_eval.py` regenerates [evaluation/RESULTS.md](evaluation/RESULTS.md): seeded synthetic cases with known copied locations in Uzbek Latin, Uzbek Cyrillic, Russian and English, covering script changes, Unicode forms, PDF hyphenation and deliberately unsupported edits. `pytest` runs a small version of it. These are algorithm checks on synthetic text, not accuracy claims for real manuscripts; real-world false-positive rates need licensed real test collections.
 
 The uploaded stack document is background reading, not an instruction to install models or an independently verified benchmark. AI detection remains **Not performed**; additional models require license review and language-specific evaluation.
 
