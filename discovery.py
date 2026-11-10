@@ -9,6 +9,7 @@ import re
 from urllib.parse import urlencode
 from urllib.request import urlopen, Request
 from urllib.error import HTTPError, URLError
+from concurrent.futures import ThreadPoolExecutor
 
 API = "https://api.openalex.org/works"
 MAX_RESPONSE = 5 * 1024 * 1024
@@ -26,49 +27,107 @@ def reconstruct_abstract(inverted):
                 positions[p] = term
     return " ".join(positions[x] for x in sorted(positions))
 
-def suggest_queries(text):
-    """Send short excerpts only; not an entire unpublished manuscript."""
+MAX_QUERIES = 3
+QUERY_WORDS = 14
+SENTENCE = re.compile(r"[^.!?\n]+[.!?]?")
+# Search the manuscript's language; Russian and Uzbek together because OpenAlex
+# often labels Uzbek Cyrillic works as Russian.
+LANGUAGE_FILTER = {"uz": "language:uz|ru", "ru": "language:ru|uz", "en": "language:en"}
+
+
+def _first_line_query(text):
     lines = [re.sub(r"\s+", " ", line).strip() for line in text.splitlines()]
     lines = [line for line in lines if 35 <= len(line) <= 220 and len(line.split()) >= 6]
     if not lines:
         lines = [re.sub(r"\s+", " ", text).strip()]
-    query = " ".join(lines[0].split()[:14])[:220]
-    return [query] if query.strip() else []
+    return " ".join(lines[0].split()[:QUERY_WORDS])[:220]
 
-def discover(text, max_results=8):
-    query = suggest_queries(text)
-    if not query:
-        return {"status":"no_query","sources":[],"queries":0,"message":"No search phrase could be extracted"}
-    params = {"search":query[0], "per_page":str(min(max_results, 10)),
-              "select":"id,display_name,doi,publication_year,abstract_inverted_index,primary_location"}
+
+def _distinctive(sentence):
+    words = re.findall(r"[^\W\d_]{6,}", sentence.lower())
+    return len(set(words))
+
+
+def suggest_queries(text, max_queries=MAX_QUERIES):
+    """Up to max_queries excerpts of at most 14 words: the title-like first line,
+    then the most distinctive sentence from each of the beginning, middle and end
+    of the body (bibliography excluded). Never the whole manuscript."""
+    from citations import bibliography_span
+    bib = bibliography_span(text)
+    body = text[:bib[0]] if bib else text
+    queries = [_first_line_query(body)]
+    # Whole sentences are assigned to a third by where they start, so an excerpt
+    # never begins or ends in the middle of a word.
+    sentences = [(m.start(), re.sub(r"\s+", " ", m.group()).strip()) for m in SENTENCE.finditer(body)]
+    third = max(1, len(body) // 3)
+    for part in range(3):
+        candidates = [c for start, c in sentences if start // third == part or (part == 2 and start // third > 2)]
+        candidates = [c for c in candidates if 8 <= len(c.split()) <= 80 and _distinctive(c) >= 4]
+        if candidates:
+            best = max(candidates, key=_distinctive)
+            queries.append(" ".join(best.split()[:QUERY_WORDS])[:220])
+    unique = []
+    for query in queries:
+        if query.strip() and query.lower() not in (u.lower() for u in unique):
+            unique.append(query)
+    return unique[:max_queries]
+
+
+def _search(query, language, max_results):
+    params = {"search": query, "per_page": str(min(max_results, 10)),
+              "select": "id,display_name,doi,publication_year,abstract_inverted_index,primary_location"}
+    if language in LANGUAGE_FILTER:
+        params["filter"] = LANGUAGE_FILTER[language]
     key = os.environ.get("OPENALEX_API_KEY")
     # Sent as a header, never in the URL, so the key cannot appear in access logs.
     auth = {"Authorization": "Bearer " + key} if key else {}
     request = Request(API + "?" + urlencode(params),
-                      headers={**auth, "User-Agent":"PlagIQ-research-pilot/0.2 (+academic metadata search)",
-                               "Accept":"application/json"})
+                      headers={**auth, "User-Agent": "PlagIQ-research-pilot/0.5 (+academic metadata search)",
+                               "Accept": "application/json"})
+    with urlopen(request, timeout=9) as response:
+        body = response.read(MAX_RESPONSE + 1)
+    if len(body) > MAX_RESPONSE:
+        raise ValueError("response too large")
+    payload = json.loads(body)
+    if not isinstance(payload, dict) or not isinstance(payload.get("results"), list):
+        raise ValueError("invalid OpenAlex response")
+    return payload["results"]
+
+
+def discover(text, max_results=8, language=None):
+    queries = suggest_queries(text)
+    if not queries:
+        return {"status": "no_query", "sources": [], "queries": 0, "message": "No search phrase could be extracted"}
+    with ThreadPoolExecutor(max_workers=len(queries)) as pool:
+        outcomes = list(pool.map(lambda q: _safe(_search, q, language, max_results), queries))
+    failures = [o for o in outcomes if isinstance(o, Exception)]
+    if len(failures) == len(outcomes):
+        return {"status": "unavailable", "sources": [], "queries": len(queries),
+                "message": "OpenAlex unavailable or rate limited (" + type(failures[0]).__name__ + ")"}
+    sources, seen = [], set()
+    for results in outcomes:
+        if isinstance(results, Exception):
+            continue
+        for work in results[:max_results]:
+            if not isinstance(work, dict) or work.get("id") in seen:
+                continue
+            seen.add(work.get("id"))
+            title = str(work.get("display_name") or "Untitled")
+            url = work.get("doi") or work.get("id") or ""
+            if not isinstance(url, str) or not url.startswith("https://"):
+                continue
+            abstract = reconstruct_abstract(work.get("abstract_inverted_index"))
+            year = work.get("publication_year")
+            sources.append({"title": title[:300], "url": url[:500], "year": year if type(year) is int else None,
+                            "abstract": abstract[:20000], "coverage": "abstract" if abstract else "metadata_only"})
+    status = "partial" if failures else "searched"
+    return {"status": status, "sources": sources, "queries": len(queries), "failed_queries": len(failures),
+            "message": (f"{len(failures)} of {len(queries)} OpenAlex searches failed; " if failures else "")
+                       + "OpenAlex metadata searched; only returned abstracts can be text-compared"}
+
+
+def _safe(fn, *args):
     try:
-        with urlopen(request, timeout=9) as response:
-            body = response.read(MAX_RESPONSE + 1)
-        if len(body) > MAX_RESPONSE:
-            raise ValueError("response too large")
-        payload = json.loads(body)
+        return fn(*args)
     except (TimeoutError, HTTPError, URLError, OSError, ValueError) as exc:
-        return {"status":"unavailable","sources":[],"queries":1,
-                "message":"OpenAlex unavailable or rate limited (" + type(exc).__name__ + ")"}
-    if not isinstance(payload, dict) or not isinstance(payload.get('results'), list):
-        return {"status":"unavailable", "sources":[], "queries":1, "message":"Invalid OpenAlex response"}
-    sources = []
-    for work in payload.get("results", [])[:max_results]:
-        if not isinstance(work, dict):
-            continue
-        title = str(work.get("display_name") or "Untitled")
-        url = work.get("doi") or work.get("id") or ""
-        if not isinstance(url,str) or not url.startswith("https://"):
-            continue
-        abstract = reconstruct_abstract(work.get("abstract_inverted_index"))
-        year = work.get("publication_year")
-        sources.append({"title":title[:300],"url":url[:500],"year":year if type(year) is int else None,
-                        "abstract":abstract[:20000],"coverage":"abstract" if abstract else "metadata_only"})
-    return {"status":"searched","sources":sources,"queries":1,
-            "message":"OpenAlex metadata searched; only returned abstracts can be text-compared"}
+        return exc

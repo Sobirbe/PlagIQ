@@ -278,12 +278,12 @@ async def analyse(submission, reference, reference_text, language, mode, options
                        "scope":"One user-provided reference; no public academic databases searched.",
                        "self_comparison":same})
     elif mode == "academic":
-        discovery = await run_in_threadpool(discover, original)
+        discovery = await run_in_threadpool(discover, original, 8, language)
         result = await run_in_threadpool(compare_sources, original, discovery["sources"], language)
         evaluated = sum(bool(s.get("abstract")) for s in discovery["sources"])
         if not evaluated:
             result["percent"] = None
-            result["not_evaluated_reason"] = "provider_unavailable" if discovery["status"] != "searched" else "no_abstracts"
+            result["not_evaluated_reason"] = "provider_unavailable" if discovery["status"] not in ("searched", "partial") else "no_abstracts"
         result["evaluated_sources"] = evaluated
         result["matched_source_count"] = sum(1 for e in result["sources"] if e["matched_tokens"])
         result.update({"mode":"academic","reference":"None","source_count":len(discovery["sources"]),

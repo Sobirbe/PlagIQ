@@ -51,6 +51,7 @@ T = {
     reasons=dict(provider_unavailable="The discovery provider was unavailable, so no text was compared.",
                  no_abstracts="No returned record had an abstract to compare.",
                  no_sources_in_language="The private corpus has no indexed sources in this language."),
+    searches="OpenAlex searches (excerpts of at most 14 words)",
     pasted="Pasted reference",
     before="Matched before exclusions", applied="Exclusions chosen by the user",
     ex_none="No exclusions — every verified match is counted", ex_q="quotations ({n} words)", ex_b="bibliography ({n} words)",
@@ -73,7 +74,7 @@ T = {
             "Text extraction from PDF/DOCX can omit headers, footnotes, text boxes or images."],
     footer="PlagIQ · Scope-limited evidence · not a certificate", page="Page {p} of {n}",
     modes=dict(reference="Your own reference", academic="OpenAlex discovery (abstracts only)", corpus="Private authorized corpus"),
-    states=dict(searched="Searched", unavailable="Unavailable", no_query="No search phrase", not_searched="Not searched"),
+    states=dict(partial="Partly searched (some searches failed)", searched="Searched", unavailable="Unavailable", no_query="No search phrase", not_searched="Not searched"),
     rights_v=dict(written_permission="Written permission", open_license="Open licence", public_domain="Public domain", unknown="Unknown"),
     cov=dict(abstract="Abstract", metadata_only="Metadata only", reference="Your reference"), cov_full="Indexed full text",
     yes="Yes", no="No",
@@ -99,6 +100,7 @@ T = {
     reasons=dict(provider_unavailable="Сервис поиска был недоступен, текст не сравнивался.",
                  no_abstracts="Ни у одной найденной записи нет аннотации для сравнения.",
                  no_sources_in_language="Во внутреннем корпусе нет источников на этом языке."),
+    searches="Запросов в OpenAlex (отрывки до 14 слов)",
     pasted="Вставленный текст источника",
     before="Совпадения до исключений", applied="Исключения, выбранные пользователем",
     ex_none="Нет — учитываются все проверенные совпадения", ex_q="цитаты ({n} слов)", ex_b="список литературы ({n} слов)",
@@ -121,7 +123,7 @@ T = {
             "Извлечение текста из PDF/DOCX может пропускать колонтитулы, сноски, надписи и изображения."],
     footer="PlagIQ · Доказательства в ограниченном охвате · не сертификат", page="Стр. {p} из {n}",
     modes=dict(reference="Ваш источник", academic="Поиск OpenAlex (только аннотации)", corpus="Внутренний разрешённый корпус"),
-    states=dict(searched="Поиск выполнен", unavailable="Недоступно", no_query="Нет поисковой фразы", not_searched="Поиск не проводился"),
+    states=dict(partial="Поиск выполнен частично (часть запросов не удалась)", searched="Поиск выполнен", unavailable="Недоступно", no_query="Нет поисковой фразы", not_searched="Поиск не проводился"),
     rights_v=dict(written_permission="Письменное разрешение", open_license="Открытая лицензия", public_domain="Общественное достояние", unknown="Неизвестно"),
     cov=dict(abstract="Аннотация", metadata_only="Только метаданные", reference="Ваш источник"), cov_full="Индексированный полный текст",
     yes="Да", no="Нет",
@@ -147,6 +149,7 @@ T = {
     reasons=dict(provider_unavailable="Qidiruv xizmati ishlamadi, matn solishtirilmadi.",
                  no_abstracts="Topilgan yozuvlarning hech birida solishtirish uchun annotatsiya yo‘q.",
                  no_sources_in_language="Ichki korpusda bu tildagi manbalar yo‘q."),
+    searches="OpenAlex so‘rovlari (14 so‘zgacha parchalar)",
     pasted="Kiritilgan manba matni",
     before="Istisnolargacha moslik", applied="Foydalanuvchi tanlagan istisnolar",
     ex_none="Yo‘q — barcha tasdiqlangan mosliklar hisoblanadi", ex_q="iqtiboslar ({n} so‘z)", ex_b="adabiyotlar ro‘yxati ({n} so‘z)",
@@ -169,7 +172,7 @@ T = {
             "PDF/DOCX’dan matn ajratishda sarlavhalar, izohlar, matn bloklari yoki rasmlar tushib qolishi mumkin."],
     footer="PlagIQ · Cheklangan doiradagi dalillar · sertifikat emas", page="{n} sahifadan {p}",
     modes=dict(reference="O‘z manbangiz", academic="OpenAlex qidiruvi (faqat annotatsiyalar)", corpus="Ruxsat berilgan ichki korpus"),
-    states=dict(searched="Qidirildi", unavailable="Mavjud emas", no_query="Qidiruv iborasi yo‘q", not_searched="Qidirilmagan"),
+    states=dict(partial="Qisman qidirildi (ayrim so‘rovlar bajarilmadi)", searched="Qidirildi", unavailable="Mavjud emas", no_query="Qidiruv iborasi yo‘q", not_searched="Qidirilmagan"),
     rights_v=dict(written_permission="Yozma ruxsat", open_license="Ochiq litsenziya", public_domain="Jamoat mulki", unknown="Noma’lum"),
     cov=dict(abstract="Annotatsiya", metadata_only="Faqat metadata", reference="Sizning manbangiz"), cov_full="Indekslangan to‘liq matn",
     yes="Ha", no="Yo‘q",
@@ -254,6 +257,7 @@ def build_pdf(result, identifier, lang="en", minutes_left=15):
     if mode == "reference":
         scope_rows.append((t["reference"], pasted(result.get("reference", ""))))
     if mode == "academic":
+        scope_rows.append((t["searches"], str(result.get("queries") or 1)))
         scope_rows.append((t["discovered"], f"{result.get('source_count', 0)} / {result.get('evaluated_sources', 0)}"))
     if mode == "corpus":
         counts = result.get("language_counts") or {}

@@ -252,7 +252,7 @@ def test_engine_busy_is_reported(monkeypatch):
 
 
 def test_academic_reason_distinguishes_unavailable_and_no_abstracts(monkeypatch):
-    monkeypatch.setattr(web, 'discover', lambda text: dict(sources=[{'title': 'T', 'url': 'https://e.org', 'abstract': ''}],
+    monkeypatch.setattr(web, 'discover', lambda text, *a: dict(sources=[{'title': 'T', 'url': 'https://e.org', 'abstract': ''}],
                                                            status='searched', message='', queries=1))
     data = post(mode='academic', consent='true').json()
     assert data['percent'] is None and data['not_evaluated_reason'] == 'no_abstracts' and data['source_count'] == 1

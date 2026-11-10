@@ -123,7 +123,7 @@ def test_adapter_to_real_private_service(monkeypatch,tmp_path):
 
 
 def test_unavailable_discovery_does_not_claim_zero(monkeypatch):
-    monkeypatch.setattr(web,'discover',lambda text:dict(sources=[],status='unavailable',message='Unavailable',queries=1))
+    monkeypatch.setattr(web,'discover',lambda text,*a:dict(sources=[],status='unavailable',message='Unavailable',queries=1))
     response=TestClient(web.app).post('/api/check',data={'mode':'academic','language':'en','consent':'true'},
                                     files={'submission':('test.txt',b'one two three four five six seven')})
     assert response.status_code == 200
