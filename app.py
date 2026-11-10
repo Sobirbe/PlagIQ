@@ -11,6 +11,8 @@ import fitz
 from docx import Document
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 
 app = FastAPI(title="PlagIQ Pilot")
 results = {}
@@ -86,6 +88,10 @@ def report(identifier:str):
     out=io.BytesIO()
     doc=SimpleDocTemplate(out)
     styles=getSampleStyleSheet()
+    font_path="/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+    if Path(font_path).exists():
+        pdfmetrics.registerFont(TTFont("PlagIQUnicode",font_path))
+        styles["Normal"].fontName="PlagIQUnicode"
     lines=["PlagIQ — Pilot Similarity Report","Limited source coverage — not an official certificate",
            "Scope of examination"]
     for k,v in result.items(): lines.append(k.replace("_"," ").title()+": "+str(v))
