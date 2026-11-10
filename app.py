@@ -19,7 +19,7 @@ CYR = dict(zip("абвгдежзийклмнопрстуфхчшэюяқғўҳ",
 def tokens(value, language):
     value = value.lower().replace("ʻ", "'").replace("‘", "'").replace("’", "'")
     if language == "uz":
-        value = "".join(CYR.get(ch,ch) for ch in value)
+        value = "".join({"ъ":"\u0027","ь":"","ё":"yo","ы":"i","ц":"ts","щ":"shch"}.get(ch,CYR.get(ch,ch)) for ch in value)
         value = value.replace("o'", "o").replace("g'", "g")
     return re.findall(r"[^\W_]+", value, re.UNICODE)
 
