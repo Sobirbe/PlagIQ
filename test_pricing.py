@@ -16,10 +16,12 @@ def test_word_count_is_fair_across_languages():
 
 def test_tiers_and_boundaries(monkeypatch):
     monkeypatch.delenv('PRICING_TIERS', raising=False)
-    assert pricing.quote(2000)['id'] == 'free'
-    assert pricing.quote(2001)['id'] == 'researcher' and pricing.quote(2001)['price_uzs'] == 15000
-    assert pricing.quote(45000)['id'] == 'extended'
-    assert pricing.quote(45001) == {'id': 'contact', 'max_words': None, 'price_uzs': None, 'words': 45001, 'fits': False}
+    assert pricing.quote(1000)['id'] == 'free' and pricing.quote(1000)['price_uzs'] == 0
+    assert pricing.quote(1001)['id'] == 'researcher' and pricing.quote(1001)['price_uzs'] == 15000
+    assert pricing.quote(3500)['id'] == 'researcher'
+    assert pricing.quote(3501)['id'] == 'extended' and pricing.quote(3501)['price_uzs'] == 45000
+    assert pricing.quote(15000)['id'] == 'extended'
+    assert pricing.quote(15001) == {'id': 'contact', 'max_words': None, 'price_uzs': None, 'words': 15001, 'fits': False}
 
 
 def test_owner_configuration_and_invalid_fallback(monkeypatch):
@@ -36,7 +38,7 @@ def test_quote_endpoint_counts_words_and_stores_nothing(monkeypatch):
     client = TestClient(web.app)
     text = ('word ' * 2500).encode()
     data = client.post('/api/quote', files={'submission': ('a.txt', text)}).json()
-    assert data['words'] == 2500 and data['id'] == 'researcher' and data['payments_enabled'] is False
+    assert data['words'] == 2500 and data['id'] == 'researcher' and data['price_uzs'] == 15000 and data['payments_enabled'] is False
     assert not web.results and not web.RATE                       # no report, no scan allowance used
     assert client.post('/api/quote', files={'submission': ('a.exe', b'x')}).json()['code'] == 'unsupported_type'
     config = client.get('/api/pricing').json()

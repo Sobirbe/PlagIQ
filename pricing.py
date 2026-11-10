@@ -3,9 +3,9 @@
 Tiers come from the PRICING_TIERS environment variable (JSON list) so the owner
 can change them in Railway without code changes, e.g.
 
-  [{"id": "free", "max_words": 2000, "price_uzs": 0},
-   {"id": "researcher", "max_words": 15000, "price_uzs": 15000},
-   {"id": "extended", "max_words": 45000, "price_uzs": 25000}]
+  [{"id": "free", "max_words": 1000, "price_uzs": 0},
+   {"id": "researcher", "max_words": 3500, "price_uzs": 15000},
+   {"id": "extended", "max_words": 15000, "price_uzs": 45000}]
 
 Prices are labelled "planned" until real per-check costs are measured and a
 payment provider is integrated; checks stay free during the pilot.
@@ -15,9 +15,9 @@ import os
 import re
 
 DEFAULT_TIERS = [
-    {"id": "free", "max_words": 2000, "price_uzs": 0},
-    {"id": "researcher", "max_words": 15000, "price_uzs": 15000},
-    {"id": "extended", "max_words": 45000, "price_uzs": 25000},
+    {"id": "free", "max_words": 1000, "price_uzs": 0},
+    {"id": "researcher", "max_words": 3500, "price_uzs": 15000},
+    {"id": "extended", "max_words": 15000, "price_uzs": 45000},
 ]
 # A word: letters/digits, with apostrophes inside (Uzbek ta'lim, o‘qish; English don't).
 WORD = re.compile(r"[^\W_]+(?:['’ʼʻ‘`][^\W_]+)*")

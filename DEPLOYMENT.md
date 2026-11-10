@@ -122,10 +122,10 @@ Put the keys in Railway Variables on the engine service as `OPENALEX_API_KEY` an
 
 The website shows the word count and the **planned** price as soon as a file is chosen, plus a price table and calculator. **No money is taken.** There is no payment system, and the page says checks are free during the pilot.
 
-Default plans: Free up to 2,000 words (0 UZS), Researcher up to 15,000 words (15,000 UZS), Extended up to 45,000 words (25,000 UZS). Larger documents are shown as "contact us". To change them, add a `PRICING_TIERS` variable to the website service in Railway, for example:
+Default plans: Free up to 1,000 words (0 UZS), Researcher 1,001–3,500 words (15,000 UZS), Extended 3,501–15,000 words (45,000 UZS). Larger documents are shown as "contact us". To change them, add a `PRICING_TIERS` variable to the website service in Railway, for example:
 
 ```json
-[{"id":"free","max_words":2000,"price_uzs":0},{"id":"researcher","max_words":15000,"price_uzs":15000},{"id":"extended","max_words":45000,"price_uzs":25000}]
+[{"id":"free","max_words":1000,"price_uzs":0},{"id":"researcher","max_words":3500,"price_uzs":15000},{"id":"extended","max_words":15000,"price_uzs":45000}]
 ```
 
 Keep the ids `free`, `researcher` and `extended`, which have names and descriptions in all three languages. Change only the numbers. If the value is invalid, the site quietly uses the defaults. Before charging real money, measure the real cost per check and add a payment provider (Payme, Click or Uzum) in a separate, reviewed change.
