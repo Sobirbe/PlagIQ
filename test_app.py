@@ -12,3 +12,43 @@ def test_short_text_returns_zero():
 
 def test_russian_cyrillic_maintained():
     assert tokens("Школа", "ru") == ["школа"]
+
+from app import compare_sources
+from discovery import reconstruct_abstract, suggest_queries
+from fastapi.testclient import TestClient
+from app import app
+import io
+
+def test_openalex_inverted_abstract():
+    assert reconstruct_abstract({"Hello":[0],"world":[1]}) == "Hello world"
+
+def test_academic_verified_only_from_abstract():
+    sources=[
+        {"title":"Article A","url":"https://example.org/a","year":2025,
+         "coverage":"abstract","abstract":"one two three four five six seven alpha"},
+        {"title":"Article B","url":"https://example.org/b","year":2024,
+         "coverage":"metadata_only","abstract":""}]
+    result=compare_sources("one two three four five six seven eight", sources, "en")
+    assert result["matched_tokens"]==7
+    assert result["sources"][1]["matched_tokens"]==0
+
+def test_academic_requires_explicit_consent():
+    client=TestClient(app)
+    data=io.BytesIO(b"one two three four five six seven eight")
+    response=client.post("/api/check",data={"language":"en","mode":"academic"},
+                         files={"submission":("sample.txt",data,"text/plain")})
+    assert response.status_code==400
+    assert "consent" in response.json()["detail"].lower()
+
+def test_user_reference_endpoint():
+    client=TestClient(app)
+    text=b"one two three four five six seven eight nine"
+    response=client.post("/api/check",
+       data={"language":"en","mode":"reference","reference_text":text.decode()},
+       files={"submission":("sample.txt",io.BytesIO(text),"text/plain")})
+    assert response.status_code==200
+    result=response.json()
+    assert result["percent"]==100.0
+    assert result["self_comparison"] is True
+    pdf=client.get("/api/report/"+result["report_id"]+".pdf")
+    assert pdf.status_code==200 and pdf.content[:4]==b"%PDF"
