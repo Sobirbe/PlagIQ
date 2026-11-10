@@ -18,7 +18,7 @@ def reconstruct_abstract(inverted):
         return ""
     positions = {}
     for term, indexes in inverted.items():
-        if not isinstance(indexes, list):
+        if not isinstance(term, str) or not isinstance(indexes, list):
             continue
         for p in indexes:
             if isinstance(p, int) and 0 <= p < 5000:
@@ -31,7 +31,7 @@ def suggest_queries(text):
     lines = [line for line in lines if 35 <= len(line) <= 220 and len(line.split()) >= 6]
     if not lines:
         lines = [re.sub(r"\s+", " ", text).strip()]
-    query = " ".join(lines[0].split()[:14])
+    query = " ".join(lines[0].split()[:14])[:220]
     return [query] if query.strip() else []
 
 def discover(text, max_results=8):
@@ -52,9 +52,13 @@ def discover(text, max_results=8):
     except (TimeoutError, HTTPError, URLError, OSError, ValueError) as exc:
         return {"status":"unavailable","sources":[],"queries":1,
                 "message":"OpenAlex unavailable or rate limited (" + type(exc).__name__ + ")"}
+    if not isinstance(payload, dict) or not isinstance(payload.get('results'), list):
+        return {"status":"unavailable", "sources":[], "queries":1, "message":"Invalid OpenAlex response"}
     sources = []
     for work in payload.get("results", [])[:max_results]:
-        title = work.get("display_name") or "Untitled"
+        if not isinstance(work, dict):
+            continue
+        title = str(work.get("display_name") or "Untitled")
         url = work.get("doi") or work.get("id") or ""
         if not isinstance(url,str) or not url.startswith("https://"):
             continue

@@ -1,66 +1,46 @@
-# PlagIQ · Academic similarity pilot (v0.2)
+# PlagIQ · multilingual academic comparison pilot (v0.4)
 
-PlagIQ is a **working experimental** multilingual source-comparison website deployed from GitHub to Railway.
+PlagIQ compares Uzbek Latin/Cyrillic, Russian and English manuscripts. It reports **observed overlap in a stated scope**, never a plagiarism verdict, AI-authorship score or guarantee of originality.
 
-Live test site: https://plagiq-production.up.railway.app
+## Available comparisons
 
-## What actually works
+- **Reference:** exact normalized seven-token matches against your uploaded/pasted reference.
+- **Academic discovery:** explicit consent sends at most 14 words to OpenAlex; compares returned abstracts only. Metadata records are not full-text coverage. Failure/no usable abstracts displays **Not evaluated**.
+- **Private corpus:** the existing Noplag-style client now connects to an included, authenticated private backend (`engine_service.py`). This is PlagIQ's bounded exact-match implementation of the adapter protocol, not a bundled upstream Noplag distribution or its advanced algorithms. Seven-token SHA-256 fingerprints retrieve sources; original-character offsets support evidence and Uzbek script folding. Overlapping spans are merged before calculating character overlap. Tokens and characters are different measurement units.
 
-- Uzbek (Latin/Cyrillic), Russian, and English language modes.
-- TXT, DOCX, and readable PDF uploads, up to 2 MB and 40 PDF pages.
-- **Mode 1:** compare your manuscript with one supplied reference document or pasted text.
-- **Mode 2:** with explicit consent, send a short search excerpt to [OpenAlex](https://openalex.org/), discover academic publication metadata and available abstracts, then compute exact seven-token matches **against returned abstracts only**.
-- Clearly display source title, URL, whether abstract/metadata only was available, query status, and bounded overlap percentage.
-- Create downloadable scope-disclosure PDF.
-- Basic scan throttling (12 requests per IP per hour in memory), upload limits, and test suite.
+**No academic collection is bundled or claimed.** The corpus starts empty; this pilot caps imports at 100 sources. Rights-gated imports support all three languages, but operational coverage exists only after authorized full texts are supplied. Corpus counts are reported by language, not inferred from a publisher's size. Empty language coverage displays **Not evaluated**. Searching a populated corpus with no matches can return 0%; this does not establish originality. Source lists are bounded (25 browser / 15 PDF entries); totals can be larger. Exact quotes and bibliography text can match; citation/quotation exclusion, paraphrase matching and cross-language translation detection are not implemented.
 
-**Crucial limitations:** This is not an exhaustive plagiarism check. OpenAlex metadata discovery is not full-text search. A zero match cannot establish originality. Matching seven normalized words is not proof of plagiarism. The service cannot detect paraphrases, translated copying, or AI-generated writing. OpenAlex queries can return zero relevant results, fail or be rate limited. Uzbek Cyrillic normalization is experimental and may miss nuances.
+The uploaded stack document is background reading, not an instruction to install models or an independently verified benchmark. AI detection remains **Not performed**; additional models require license review and language-specific evaluation.
 
-## Privacy and safety
+## Local use and tests
 
-In academic-discovery mode, the server sends a **short excerpt** to OpenAlex only after explicit consent. Never upload confidential or unpublished sensitive manuscripts to the public pilot.
-
-The site has no accounts, encryption-at-application-level, persistent ownership checks, or production data protections. Scan summaries remain briefly in server memory, and pilot PDF report URLs are not authenticated. There is no production accreditation or payment integration.
-
-## Run locally
-
-Python 3.12 recommended:
+Python 3.12:
 
 ```bash
-pip install -r requirements.txt
-pytest -q
-uvicorn app:app --reload
+python -m venv .venv
+.venv/bin/pip install -r requirements.lock
+.venv/bin/pytest -q
+.venv/bin/uvicorn app:app --reload
 ```
 
-Open http://localhost:8000 and http://localhost:8000/docs.
+Open http://localhost:8000. Use nonconfidential samples. Developer API documentation is disabled on served applications.
 
-Optional `OPENALEX_API_KEY` server-side environment variable can be set in Railway if required by the provider. Never put API keys in GitHub or browser code.
+Browser regression uses isolated processes, synthetic UZ/RU/EN sources and a temporary database. It checks 320/390/768/1440px layouts, uploads, reference/corpus checks, consent reset, language switching, PDF downloads and deletion; no publisher or production endpoints are contacted:
 
-## Railway deployment (nontechnical owner)
+```bash
+.venv/bin/pip install -r requirements-dev.txt
+# If Chromium is installed elsewhere, set CHROMIUM_PATH to its executable.
+CHROMIUM_PATH=/usr/bin/chromium .venv/bin/python tests/browser_smoke.py
+```
 
-1. Open https://railway.com/dashboard.
-2. Open your PlagIQ project linked to `Sobirbe/PlagIQ`.
-3. Railway deploys GitHub pushes using the supplied Dockerfile and `railway.json`.
-4. Check **Deployments** for the newest deployment status.
-5. Check `/health` and open the homepage. Version should be `0.2`.
-6. Test with an ordinary, nonconfidential sample manuscript.
-7. In the form's second panel, select **Academic discovery / Ilmiy qidiruv**, consent, then scan.
-8. Inspect the report's **Scope of Examination**, academic URLs, and whether matches refer only to abstracts.
+See [DEPLOYMENT.md](DEPLOYMENT.md) for owner-friendly Railway instructions, private service setup and rollback. See [SECURITY.md](SECURITY.md) for retention and readiness limits. No payments were introduced or changed.
 
-## Code structure
+## Structure
 
-- `app.py`: FastAPI, upload handling, text matching and pilot PDFs.
-- `discovery.py`: bounded OpenAlex metadata search and reconstructed abstracts.
-- `index.html`: UZ/RU/EN client interface and results.
-- `test_app.py`: automated regression tests.
-- `.github/workflows/test.yml`: Python tests on GitHub pushes.
-
-## Roadmap
-
-1. Secure accounts and proper per-user report access and retention policies.
-2. Authorised, licensed full-text indexing for Uzbek/Russian/English.
-3. Better language normalization, citation filtering, paragraph alignment, and evaluation on real benchmarks.
-4. Separate, calibrated AI-writing assessment only after language-specific validation.
-5. Verifiable professional certificate; then Payme/Click sandbox and production payment integration after merchant onboarding.
-
-Do not claim a plagiarism-free percentage or AI-authorship verdict from this pilot.
+- `app.py`, `index.html`: website, bounded uploads, multilingual workflow, private PDF reports.
+- `engine_client.py`: internal-only authenticated adapter; validates paths, lengths and match spans.
+- `engine_service.py`: private check/status/report API; never ingests manuscripts.
+- `corpus.py`: owner-run local importer and SQLite fingerprint index.
+- `textfold.py`: Uzbek script folding with original offsets.
+- `discovery.py`: bounded OpenAlex metadata/abstract discovery.
+- `test_app.py`, `test_security_corpus.py`, `tests/browser_smoke.py`: regression checks.
