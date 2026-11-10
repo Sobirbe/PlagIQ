@@ -53,12 +53,23 @@ def services():
                 body = json.dumps({'meta': {'next_cursor': None}, 'results': [work(7, 'cc-by-sa', 'ru', base + '/pub/redir')]})
             elif url.path.startswith('/oa/works/doi:'):
                 doi = url.path.split('doi:')[1]
-                body = json.dumps(work(int(doi.rsplit('/', 1)[-1]) if 'nd' not in doi else 30, 'cc-by-nd' if 'nd' in doi else 'cc-by', 'ru'))
-            elif url.path == '/core/search/works':
+                tail = doi.rsplit('/', 1)[-1]
+                licence = 'cc-by-nd' if 'nd' in tail else 'cc-by-nc' if 'nc' in tail else 'cc-by'
+                body = json.dumps(work(int(''.join(c for c in tail if c.isdigit())) + (19 if 'nd' in tail else 0), licence, 'ru'))
+            elif url.path == '/core/search/works':                         # live API redirects without slash
+                status, ctype, body = 301, 'text/plain', b''
+            elif url.path == '/core/search/works/':
+                long_ru = (RU + ' ') * 12
+                prov = lambda i, n: [{'id': i, 'name': n}]
+                core = lambda i, doi, text=long_ru, provider=prov(1, 'Other'): {
+                    'id': i, 'title': f'Core {i}', 'doi': doi, 'fullText': text, 'yearPublished': 2023,
+                    'language': {'code': 'ru', 'name': 'Russian'}, 'authors': [{'name': 'Автор'}],
+                    'downloadUrl': f'https://core.ac.uk/download/{i}.pdf', 'dataProviders': provider}
                 body = json.dumps({'results': [] if q.get('offset') != '0' else [
-                    {'id': 11, 'title': 'Core 11', 'doi': '10.1/11', 'fullText': RU},
-                    {'id': 12, 'title': 'Core 12', 'doi': None, 'fullText': RU},
-                    {'id': 13, 'title': 'Core 13', 'doi': '10.1/nd13', 'fullText': RU}]})
+                    core(11, '10.1/11'), core(12, None), core(13, '10.1/nd13'),
+                    core(14, None, provider=prov(14935, 'Uzbekistan Research Online')),
+                    core(15, None, text='junk', provider=prov(14935, 'Uzbekistan Research Online')),
+                    core(16, '10.1/nc16', provider=prov(14935, 'Uzbekistan Research Online'))]})
             elif url.path.startswith('/upw/'):
                 body = json.dumps({'best_oa_location': {'license': {'8': 'cc-by-nc', '7': 'cc-by-sa'}.get(url.path.rsplit('/', 1)[-1], 'cc-by')}})
             elif url.path == '/pub/1.pdf':
@@ -91,7 +102,8 @@ def services():
 
 def args(**kw):
     defaults = dict(language=None, country=None, since=None, source_id=None, query=None, download=True,
-                    pdf_from='publisher', unpaywall_email=None, max_records=50)
+                    pdf_from='publisher', unpaywall_email=None, max_records=50, trusted_provider=None,
+                    trusted_note=None, trusted_basis='open_license')
     return argparse.Namespace(**{**defaults, **kw})
 
 
@@ -151,7 +163,8 @@ def test_core_texts_need_verified_licence(services, tmp_path, monkeypatch):
     stage, budget = oa_import.Stage(tmp_path / 's'), oa_import.Budget(0.5)
     oa_import.run_core(args(query='language.code:ru'), fetcher(), budget, stage, api=base + '/core', openalex=base + '/oa')
     status = {r['title']: r['status'] for r in stage.rows}
-    assert status == {'Work 11': 'staged', 'Core 12': 'rejected', 'Work 30': 'review'}
+    assert status == {'Work 11': 'staged', 'Core 12': 'rejected', 'Work 32': 'review', 'Core 14': 'rejected',
+                      'Core 15': 'rejected', 'Work 16': 'review'}
     assert any(h.get('Authorization') == 'Bearer core-key' for h in seen['headers'])
     assert stage.manifest[0]['text_file'].endswith('.txt') and stage.manifest[0]['rights_basis'] == 'open_license'
 
@@ -177,3 +190,21 @@ def test_mislabelled_uzbek_cyrillic_is_corrected(tmp_path):
     assert stage.rows[0]['language'] == 'uz' and 'corrected to uz' in stage.rows[0]['reason']
     assert oa_import.correct_language('ru', 'Научный текст') is None
     assert oa_import.correct_language('uz', 'Высшее образование') == 'ru'
+
+
+def test_core_trusted_repository_policy(services, tmp_path, monkeypatch):
+    base, _ = services
+    monkeypatch.setenv('CORE_API_KEY', 'core-key')
+    with pytest.raises(harvest.HarvestError, match='trusted-note'):
+        oa_import.run_core(args(trusted_provider=[14935]), fetcher(), oa_import.Budget(1), oa_import.Stage(tmp_path / 'x'),
+                           api=base + '/core', openalex=base + '/oa')
+    stage = oa_import.Stage(tmp_path / 's')
+    oa_import.run_core(args(trusted_provider=[14935], trusted_note='CC BY policy page checked 2026-11-10'), fetcher(),
+                       oa_import.Budget(1), stage, api=base + '/core', openalex=base + '/oa')
+    status = {r['title']: (r['status'], r['licence']) for r in stage.rows}
+    assert status['Core 14'] == ('staged', 'repository policy')              # no DOI, trusted repository
+    assert status['Core 15'][0] == 'rejected'                                # junk full text
+    assert status['Work 16'][0] == 'review'                                  # explicit NC licence beats trust
+    entry = next(m for m in stage.manifest if m['title'] == 'Core 14')
+    assert 'Uzbekistan Research Online' in entry['permission_reference'] and 'checked 2026-11-10' in entry['permission_reference']
+    assert entry['language'] == 'ru' and entry['url'].startswith('https://')

@@ -201,3 +201,13 @@ def test_language_label_checked_against_letters(tmp_path):
             ingest(db, meta('uz'), ru)
         ingest(db, meta('uz'), uz_cyr)
         ingest(db, meta('ru'), ru)
+
+
+def test_detect_language_from_text():
+    from corpus import detect_language
+    ru = 'Научный текст о качестве высшего образования в регионах страны и новых университетах. ' * 5
+    uz_cyr = 'Олий таълим муассасаларида сифат муҳим ва долзарб масала ҳисобланади. ' * 5
+    uz_lat = "Oliy ta'lim sifati bilan bog'liq masalalar va ularning yechimi uchun yangi yondashuv kerak bo'lib turibdi. " * 6
+    en = 'The quality of higher education is assessed with the help of new indicators for the region. ' * 6
+    assert [detect_language(t) for t in (ru, uz_cyr, uz_lat, en)] == ['ru', 'uz', 'uz', 'en']
+    assert detect_language('short') is None

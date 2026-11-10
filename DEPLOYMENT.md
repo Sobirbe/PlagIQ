@@ -104,12 +104,17 @@ Put the keys in Railway Variables on the engine service as `OPENALEX_API_KEY` an
    `python oa_import.py openalex --language uz --out /data/staging/openalex-uz --download`
    Other filters: `--country UZ` (authors at Uzbek institutions), `--since 2020`, `--query "oliy ta'lim"`, `--source-id S...` (one journal). Add `--unpaywall-email you@example.org` to double-check every licence with Unpaywall; disagreements go to review.
 3. If a publisher link fails, `--pdf-from openalex` uses OpenAlex's cached copy instead (reported price about $0.01 per PDF).
-4. CORE: `python oa_import.py core --query "language.code:ru" --out /data/staging/core-ru`
+4. CORE: `python oa_import.py core --query "language.code:ru AND (Uzbekistan OR Узбекистан)" --out /data/staging/core-ru`
+   **What to expect from CORE** (measured live, November 2026): CORE returns full texts but **no licence information at all**, and few records have a DOI to look the licence up (2 in a sample of 100 Russian records; 11 of 100 Uzbek). So most CORE records are rejected unless you trust their repository:
+   - Open the repository's website and find its licence or open-access policy (for example "all content is published under CC BY 4.0"). Save a screenshot or PDF with the date.
+   - Find the repository's CORE ID in `review.csv`, or on core.ac.uk. Examples seen live: Uzbekistan Research Online = 14935; Publishing House of the National University of Uzbekistan = 25822.
+   - Run with `--trusted-provider 14935 --trusted-note "CC BY 4.0 policy at <page>, checked 2026-11-10, screenshot saved"`. Your note is stored with every text as the permission evidence. An explicit non-commercial licence found for a paper still sends it to review.
+   - Only trust a repository after reading its policy yourself. PlagIQ cannot verify it for you.
 5. Import as usual: `python corpus.py /data/staging/openalex-uz/manifest.json --check`, then without `--check`.
 
 **Spending limit:** every run stops before its estimated OpenAlex cost passes `--max-cost-usd` (default $0.50) and keeps what it already staged. `cost.json` shows the estimate and the number of calls by type.
 
-**What has been tried live:** OpenAlex search and the metadata-only run (`openalex` without `--download`) were run against the real OpenAlex API with a real key in November 2026: 300 records in uz/ru/en were staged correctly, OpenAlex's live prices matched the built-in cost estimates, and 12 of 100 records OpenAlex labelled Russian were Uzbek Cyrillic and were corrected. **Not yet tried live:** PDF downloads (`--download`) and CORE, because the development network could not reach publisher sites or CORE. Start with `--max-records 20` and check `review.csv` and a few PDFs by hand.
+**What has been tried live:** CORE (with a real key, November 2026): 40 records searched, 5 CC BY Russian full texts staged with their language corrected from the text, and all 5 passed `corpus.py --check`. OpenAlex search and the metadata-only run (`openalex` without `--download`) were run against the real OpenAlex API with a real key in November 2026: 300 records in uz/ru/en were staged correctly, OpenAlex's live prices matched the built-in cost estimates, and 12 of 100 records OpenAlex labelled Russian were Uzbek Cyrillic and were corrected. **Not yet tried live:** PDF downloads (`--download`), because the development network could not reach publisher sites. Start with `--max-records 20` and check `review.csv` and a few PDFs by hand.
 
 **How much is available** (OpenAlex counts, November 2026, using OpenAlex's own language labels): Uzbek-language works with a reusable licence 110,482 (47,734 with an OpenAlex PDF copy); Russian-language 460,073; Russian-language by Uzbekistan-based authors 13,914; English by Uzbekistan-based authors 103,155. At about 0.17 MB of index per article, 100,000 articles would need roughly 17 GB; this size has not been benchmarked yet, so raise `CORPUS_MAX_SOURCES` in steps and re-run the benchmark.
 

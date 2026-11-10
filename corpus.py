@@ -301,6 +301,32 @@ def cyrillic_profile(text):
     return None
 
 
+UZ_WORDS = frozenset("va bilan uchun hamda ham bu ushbu esa yoki ekan bo'lib bo'yicha qilish kerak orqali sifatida".split())
+EN_WORDS = frozenset("the of and in to is for with that are on as by this from".split())
+
+
+def detect_language(text):
+    """'uz', 'ru' or 'en' from the text itself, or None when unclear.
+
+    Cyrillic texts: Uzbek-only letters (қ ғ ў ҳ) or Russian ы (cyrillic_profile).
+    Latin texts: share of very common Uzbek vs English function words.
+    """
+    cyrillic, latin = script_shares(text)
+    if cyrillic >= 0.6:
+        return cyrillic_profile(text)
+    if latin >= 0.6:
+        words = re.findall(r"[a-z']+", text.lower().replace("ʻ", "'").replace("‘", "'").replace("’", "'"))[:20000]
+        if len(words) < 50:
+            return None
+        uz = sum(w in UZ_WORDS for w in words) / len(words)
+        en = sum(w in EN_WORDS for w in words) / len(words)
+        if en >= 0.05 and en > 3 * uz:
+            return 'en'
+        if uz >= 0.02 and uz > 3 * en:
+            return 'uz'
+    return None
+
+
 def validate(metadata, text):
     """Check one record before anything is written. Returns cleaned metadata."""
     required = ('title', 'url', 'language', 'authors', 'year', 'rights_basis', 'permission_reference')

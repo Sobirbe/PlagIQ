@@ -26,7 +26,7 @@ from datetime import date
 from pathlib import Path
 from urllib.parse import quote, urlencode, urlsplit
 
-from corpus import UZ_ONLY
+from corpus import UZ_ONLY, detect_language
 from harvest import Fetcher, HarvestError, MAX_PDF
 
 OPENALEX = "https://api.openalex.org"
@@ -178,12 +178,17 @@ def stage_work(work, args, fetcher, budget, stage, key, content, text=None):
     location = work.get("best_oa_location") or {}
     licence = licence_of(location.get("license"))
     entry, problems = work_metadata(work)
-    corrected = correct_language(entry["language"], entry["title"])
+    from_text = detect_language(text) if text else None      # CORE: we hold the full text itself
+    corrected = (from_text if from_text and from_text != entry["language"] else None) or \
+        correct_language(entry["language"], entry["title"])
+    if corrected:
+        problems = [p for p in problems if p != "language is not uz/ru/en"]
     if corrected:
         entry["language"] = corrected
     row = stage.row(wid, entry["title"], language=entry["language"] or "", licence=licence, url=entry["url"])
     if corrected:
-        row["reason"] = f"language label {work.get('language')} corrected to {corrected} from the title's letters"
+        row["reason"] = (f"language label {work.get('language')} corrected to {corrected} "
+                         + ("from the full text" if from_text == corrected else "from the title's letters"))
     if wid in stage.state["done"]:
         row.update(status="skipped", reason="already staged", file=stage.state["done"][wid])
         return
@@ -245,34 +250,85 @@ def unpaywall_licence(doi, email, fetcher, api=None):
         return None
 
 
+MIN_CORE_TEXT = 500   # characters; CORE sometimes returns a few stray characters as "full text"
+
+
+def core_entry(item, args):
+    """Importer metadata for a CORE record accepted under a trusted repository policy."""
+    lang = (item.get("language") or {}).get("code") if isinstance(item.get("language"), dict) else None
+    lang = detect_language(item.get("fullText") or "") or correct_language(lang, item.get("title")) or lang
+    urls = [u for u in [item.get("downloadUrl")] + list(item.get("sourceFulltextUrls") or []) if str(u).startswith("https://")]
+    authors = [a.get("name") for a in item.get("authors") or [] if isinstance(a, dict) and a.get("name")]
+    year = item.get("yearPublished")
+    problems = [p for p, bad in (("language is not uz/ru/en", lang not in LANGS), ("no year", type(year) is not int),
+                                 ("no authors", not authors), ("no title", not item.get("title"))) if bad]
+    entry = {"title": item.get("title") or "", "authors": "; ".join(authors[:30]), "year": year,
+             "url": urls[0] if urls else f"https://core.ac.uk/works/{item.get('id')}", "language": lang}
+    return entry, problems
+
+
 def run_core(args, fetcher, budget, stage, api=CORE, openalex=OPENALEX, content=OPENALEX_CONTENT):
+    """CORE texts carry no licence field (verified against the live API, Nov 2026).
+    Accepted only when (a) the DOI's licence in OpenAlex allows reuse, or (b) the
+    record comes from a repository the owner has verified and listed with
+    --trusted-provider; an explicit NC/ND licence in OpenAlex always goes to review."""
     core_key, oa_key = os.environ.get("CORE_API_KEY", ""), os.environ.get("OPENALEX_API_KEY", "")
     if not core_key:
         raise HarvestError("CORE_API_KEY is not set (free registration at core.ac.uk/services/api)")
+    trusted = set(args.trusted_provider or [])
+    if trusted and not (args.trusted_note or "").strip():
+        raise HarvestError("--trusted-note is required with --trusted-provider (how and when you verified the policy)")
     offset = 0
     while offset < args.max_records:
-        params = {"q": (args.query or "") + " AND _exists_:fullText AND _exists_:doi", "limit": "50", "offset": str(offset)}
-        body, _ = fetcher.get(api + "/search/works?" + urlencode(params), 50 * 1024 * 1024, robots=False,
+        params = {"q": args.query or "*", "limit": "50", "offset": str(offset)}
+        # The live API redirects /search/works to /search/works/ (trailing slash required).
+        body, _ = fetcher.get(api + "/search/works/?" + urlencode(params), 50 * 1024 * 1024, robots=False,
                               headers={"Authorization": "Bearer " + core_key})
         results = json.loads(body).get("results") or []
         if not results:
             break
         for item in results[: args.max_records - offset]:
+            key = "core:" + str(item.get("id"))
             doi = str(item.get("doi") or "").lower().replace("https://doi.org/", "")
             text = item.get("fullText") or ""
-            if not doi:
-                stage.row("core:" + str(item.get("id")), item.get("title"), status="rejected", reason="no DOI to verify the licence")
+            providers = {p.get("id"): p.get("name") for p in item.get("dataProviders") or [] if isinstance(p, dict)}
+            provider = next((pid for pid in providers if pid in trusted), None)
+            if len(text.strip()) < MIN_CORE_TEXT:
+                stage.row(key, item.get("title"), status="rejected", reason="no usable full text in CORE")
                 continue
-            budget.charge("single")
-            try:
-                work_body, _ = fetcher.get(f"{openalex}/works/doi:{quote(doi)}", 2 * 1024 * 1024, robots=False,
-                                           headers=bearer(oa_key))
-                work = json.loads(work_body)
-            except (HarvestError, urllib.error.URLError, OSError, ValueError):
-                stage.row("core:" + str(item.get("id")), item.get("title"), status="review",
-                          reason="licence could not be verified in OpenAlex")
+            work, licence = None, None
+            if doi:
+                budget.charge("single")
+                try:
+                    work_body, _ = fetcher.get(f"{openalex}/works/doi:{quote(doi)}", 2 * 1024 * 1024, robots=False,
+                                               headers=bearer(oa_key))
+                    work = json.loads(work_body)
+                    licence = licence_of((work.get("best_oa_location") or {}).get("license"))
+                except (HarvestError, urllib.error.URLError, OSError, ValueError):
+                    work = None
+            if work and (decide(licence) in ("accept", "review") or provider is None):
+                stage_work(work, args, fetcher, budget, stage, oa_key, content, text=text)
                 continue
-            stage_work(work, args, fetcher, budget, stage, oa_key, content, text=text)
+            if provider is None:
+                stage.row(key, item.get("title"), status="rejected" if not doi else "review",
+                          reason="no DOI to verify the licence, and the repository is not on your trusted list"
+                          if not doi else "licence could not be verified in OpenAlex")
+                continue
+            entry, problems = core_entry(item, args)
+            row = stage.row(key, entry["title"], language=entry["language"] or "", licence="repository policy",
+                            url=entry["url"])
+            if key in stage.state["done"]:
+                row.update(status="skipped", reason="already staged", file=stage.state["done"][key])
+                continue
+            if problems or len(text) > MAX_TEXT:
+                row.update(status="review", reason="; ".join(problems or ["full text too long"]))
+                continue
+            entry.update(rights_basis=args.trusted_basis, permission_reference=(
+                f"Repository policy of CORE data provider {provider} ({providers[provider]}) verified by the owner: "
+                f"{args.trusted_note.strip()}; CORE work {item.get('id')}; staged {date.today().isoformat()}"))
+            name = safe_name(key, ".txt")
+            stage.add(key, entry, name, text.encode("utf-8"))
+            row.update(status="staged", file="files/" + name)
         offset += len(results)
 
 
@@ -288,6 +344,10 @@ def main():
     parser.add_argument("--download", action="store_true", help="download PDFs of accepted OpenAlex works")
     parser.add_argument("--pdf-from", choices=["publisher", "openalex"], default="publisher",
                         help="publisher: free direct link; openalex: OpenAlex's cached copy (billed per file)")
+    parser.add_argument("--trusted-provider", type=int, action="append",
+                        help="CORE data-provider ID whose open-licence policy you have verified (repeatable)")
+    parser.add_argument("--trusted-note", help="how and when you verified that repository's policy (required with --trusted-provider)")
+    parser.add_argument("--trusted-basis", choices=["open_license", "written_permission"], default="open_license")
     parser.add_argument("--unpaywall-email", help="cross-check each licence with Unpaywall (your contact email)")
     parser.add_argument("--max-records", type=int, default=200)
     parser.add_argument("--max-cost-usd", type=float, default=0.50)
