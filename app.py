@@ -240,7 +240,7 @@ async def check(request:Request, submission:UploadFile=File(...),
 def report(identifier:str, request:Request):
     purge_reports()
     entry = results.get(identifier)
-    if entry is None or not secrets.compare_digest(entry['owner'], request.cookies.get('plagiq_session', '')):
+    if entry is None or not secrets.compare_digest(entry['owner'].encode(), request.cookies.get('plagiq_session', '').encode()):
         raise HTTPException(404, "Report unavailable or expired")
     result = entry["result"]
     out = io.BytesIO()
@@ -310,7 +310,7 @@ def report(identifier:str, request:Request):
 def delete_report(identifier: str, request: Request):
     purge_reports()
     entry = results.get(identifier)
-    if entry is None or not secrets.compare_digest(entry['owner'], request.cookies.get('plagiq_session', '')):
+    if entry is None or not secrets.compare_digest(entry['owner'].encode(), request.cookies.get('plagiq_session', '').encode()):
         raise HTTPException(404, "Report unavailable or expired")
     del results[identifier]
     return {"deleted": True}

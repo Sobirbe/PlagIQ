@@ -47,7 +47,7 @@ lock = threading.Lock()
 
 def authorize(authorization: str = Header('')):
     key = os.environ.get('ENGINE_API_KEY', '')
-    if len(key) < 32 or not secrets.compare_digest(authorization, 'Bearer ' + key):
+    if len(key) < 32 or not secrets.compare_digest(authorization.encode(), ('Bearer ' + key).encode()):
         raise HTTPException(401, 'Private service authentication required')
 
 

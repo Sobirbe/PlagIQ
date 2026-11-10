@@ -187,3 +187,11 @@ def test_adapter_failure_is_controlled(monkeypatch,bad_response):
     monkeypatch.setattr(engine_client.httpx,'AsyncClient',client)
     with pytest.raises(engine_client.EngineError):
         asyncio.run(engine_client.run_check('one two three four five six seven','en'))
+
+
+def test_non_ascii_authentication_is_rejected(monkeypatch):
+    monkeypatch.setenv('ENGINE_API_KEY','x'*32)
+    assert TestClient(engine_service.app).get('/v1/checks/missing',headers=[(b'authorization',b'Bearer \xff')]).status_code == 401
+    owner=TestClient(web.app)
+    identifier=upload(owner).json()['report_id']
+    assert TestClient(web.app).get(f'/api/report/{identifier}.pdf',headers=[(b'cookie',b'plagiq_session=\xff')]).status_code == 404
