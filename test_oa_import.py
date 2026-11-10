@@ -83,6 +83,12 @@ def services():
                 return
             elif url.path == '/pub/page.html':
                 status, ctype, body = 200, 'text/html', b'<html>landing page</html>'
+            elif url.path.startswith('/landing/'):
+                n = url.path.rsplit('/', 1)[-1]
+                licence = {'10': 'https://creativecommons.org/licenses/by-nc/4.0/'}.get(n, 'https://creativecommons.org/licenses/by/4.0/')
+                pdf_meta = '' if n == '11' else '<meta name="citation_pdf_url" content="../pub/2.pdf">'
+                status, ctype, body = 200, 'text/html', (f'<html><head>{pdf_meta}<meta name="DC.Rights" content="{licence}">'
+                                                         '</head></html>').encode()
             elif url.path == '/content/works/W6.pdf':
                 status, ctype, body = 200, 'application/pdf', pdf(UZ)
             if isinstance(body, str):
@@ -208,3 +214,29 @@ def test_core_trusted_repository_policy(services, tmp_path, monkeypatch):
     entry = next(m for m in stage.manifest if m['title'] == 'Core 14')
     assert 'Uzbekistan Research Online' in entry['permission_reference'] and 'checked 2026-11-10' in entry['permission_reference']
     assert entry['language'] == 'ru' and entry['url'].startswith('https://')
+
+
+def test_pdf_found_on_article_page_and_paid_fallback(services, tmp_path):
+    base, seen = services
+    def landing_work(n, licence='cc-by', has_pdf=False):
+        w = work(n, licence, 'ru')
+        w['best_oa_location']['landing_page_url'] = f'{base}/landing/{n}'
+        w['has_content'] = {'pdf': has_pdf}
+        return w
+    stage, budget = oa_import.Stage(tmp_path / 's'), oa_import.Budget(0.5)
+    for w in (landing_work(9), landing_work(10), landing_work(11)):
+        oa_import.stage_work(w, args(), fetcher(), budget, stage, '', base + '/content')
+    status = {r['id']: (r['status'], r['reason']) for r in stage.rows}
+    assert status['W9'][0] == 'downloaded'                                   # citation_pdf_url, relative link
+    assert status['W10'][0] == 'review' and 'different licence' in status['W10'][1]
+    assert status['W11'][0] == 'review' and 'declares no PDF' in status['W11'][1]
+    assert budget.calls == {}                                                # nothing billed without opt-in
+    # Paid fallback: only with openalex_fallback, only if OpenAlex holds a PDF, and billed.
+    w6 = landing_work(6, has_pdf=True)
+    w6['best_oa_location']['landing_page_url'] = f'{base}/landing/11'
+    stage2, budget2 = oa_import.Stage(tmp_path / 's2'), oa_import.Budget(0.5)
+    oa_import.stage_work(w6, args(openalex_fallback=True), fetcher(), budget2, stage2, '', base + '/content')
+    assert stage2.rows[0]['status'] == 'downloaded' and budget2.calls == {'content': 1}
+    stage3, budget3 = oa_import.Stage(tmp_path / 's3'), oa_import.Budget(0.005)
+    with pytest.raises(harvest.HarvestError, match='cost limit'):
+        oa_import.stage_work(w6, args(openalex_fallback=True), fetcher(), budget3, stage3, '', base + '/content')

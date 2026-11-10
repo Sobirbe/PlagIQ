@@ -27,7 +27,11 @@ from pathlib import Path
 from urllib.parse import quote, urlencode, urlsplit
 
 from corpus import UZ_ONLY, detect_language
-from harvest import Fetcher, HarvestError, MAX_PDF
+from urllib.parse import urljoin
+from harvest import MAX_PAGE, Fetcher, HarvestError, MAX_PDF, _PageMeta, classify_licence
+
+# classify_licence() labels -> OpenAlex licence strings
+LICENCE_CODES = {"by": "cc-by", "by-sa": "cc-by-sa", "zero": "cc0", "mark": "public-domain"}
 
 OPENALEX = "https://api.openalex.org"
 OPENALEX_CONTENT = "https://content.openalex.org"
@@ -154,23 +158,33 @@ def openalex_filter(args):
 
 def run_openalex(args, fetcher, budget, stage, api=OPENALEX, content=OPENALEX_CONTENT):
     key = os.environ.get("OPENALEX_API_KEY", "")
-    cursor, seen = "*", 0
-    while cursor and seen < args.max_records:
+    resume, max_new = getattr(args, "resume", False), getattr(args, "max_new", None)
+    cursor = (stage.state.get("cursor") if resume else None) or "*"
+    seen = new = 0
+    # Whole pages are processed before stopping, so a resumed run never skips works.
+    while cursor and seen < args.max_records and (max_new is None or new < max_new):
         params = {"filter": openalex_filter(args), "per-page": "100", "cursor": cursor,
-                  "select": "id,doi,display_name,publication_year,language,authorships,best_oa_location,open_access"}
+                  "select": "id,doi,display_name,publication_year,language,authorships,best_oa_location,open_access,has_content"}
         if args.query:
             params["search"] = args.query
         budget.charge("search" if args.query else "list")
         body, _ = fetcher.get(api + "/works?" + urlencode(params), 20 * 1024 * 1024, robots=False, headers=bearer(key))
         data = json.loads(body)
-        cursor = (data.get("meta") or {}).get("next_cursor")
+        next_cursor = (data.get("meta") or {}).get("next_cursor")
         if not data.get("results"):
-            break
-        for work in data["results"]:
-            if seen >= args.max_records:
+            next_cursor = None
+        for work in data.get("results") or []:
+            if seen >= args.max_records and not resume:
                 break
             seen += 1
+            before = len(stage.manifest)
             stage_work(work, args, fetcher, budget, stage, key, content)
+            new += len(stage.manifest) - before
+        cursor = next_cursor
+        if resume:
+            stage.state["cursor"] = cursor          # None: the listing is finished; next run starts again
+            stage.state["listing_complete"] = cursor is None
+            stage.save(budget)
 
 
 def stage_work(work, args, fetcher, budget, stage, key, content, text=None):
@@ -220,16 +234,7 @@ def stage_work(work, args, fetcher, budget, stage, key, content, text=None):
         row.update(status="accepted", reason="; ".join(filter(None, [row["reason"], "metadata only; re-run with --download"])))
         return
     try:
-        if args.pdf_from == "openalex":
-            budget.charge("content")
-            data, _ = fetcher.get(f"{content}/works/{wid}.pdf", MAX_PDF, robots=False, headers=bearer(key))
-        else:
-            pdf_url = location.get("pdf_url")
-            if not pdf_url:
-                raise HarvestError("no direct PDF link; try --pdf-from openalex")
-            data, _ = fetcher.get(pdf_url, MAX_PDF, cross_host=True)
-        if not data.startswith(b"%PDF"):
-            raise HarvestError("download is not a PDF")
+        data = fetch_pdf(work, location, licence, args, fetcher, budget, key, content)
     except (HarvestError, urllib.error.URLError, OSError) as exc:
         if "cost limit" in str(exc):
             raise
@@ -238,6 +243,55 @@ def stage_work(work, args, fetcher, budget, stage, key, content, text=None):
     name = safe_name(wid, ".pdf")
     stage.add(wid, entry, name, data)
     row.update(status="downloaded", file="files/" + name)
+
+
+def fetch_pdf(work, location, licence, args, fetcher, budget, key, content):
+    """Publisher PDF link; else the PDF declared on the article page (citation_pdf_url, as
+    OJS journals publish), after confirming the page does not state another licence;
+    else, if allowed, OpenAlex's cached copy (billed). Returns PDF bytes."""
+    wid = (work.get("id") or "").rsplit("/", 1)[-1]
+    if args.pdf_from == "openalex":
+        budget.charge("content")
+        data, _ = fetcher.get(f"{content}/works/{wid}.pdf", MAX_PDF, robots=False, headers=bearer(key))
+        return _pdf(data)
+    problems = []
+    pdf_url = location.get("pdf_url")
+    landing = location.get("landing_page_url") or work.get("doi")
+    if not pdf_url and landing:
+        try:
+            page, _ = fetcher.get(landing, MAX_PAGE, cross_host=True)
+            meta = _PageMeta()
+            meta.feed(page.decode("utf-8", "replace"))
+            if meta.licences:
+                stated, _, page_label = classify_licence(meta.licences)
+                if stated != "accept" or LICENCE_CODES.get(page_label) != licence:
+                    raise HarvestError(f"article page states a different licence ({page_label})")
+            if meta.pdf:
+                pdf_url = urljoin(getattr(fetcher, "last_url", None) or landing, meta.pdf)
+            else:
+                problems.append("article page declares no PDF")
+        except (HarvestError, urllib.error.URLError, OSError) as exc:
+            if "different licence" in str(exc):
+                raise
+            problems.append(str(exc))
+    if pdf_url:
+        try:
+            return _pdf(fetcher.get(pdf_url, MAX_PDF, cross_host=True)[0])
+        except (HarvestError, urllib.error.URLError, OSError) as exc:
+            problems.append(str(exc))
+    elif not problems:
+        problems.append("no PDF link")
+    if getattr(args, "openalex_fallback", False) and (work.get("has_content") or {}).get("pdf"):
+        budget.charge("content")
+        data, _ = fetcher.get(f"{content}/works/{wid}.pdf", MAX_PDF, robots=False, headers=bearer(key))
+        return _pdf(data)
+    raise HarvestError("; ".join(problems))
+
+
+def _pdf(data):
+    if not data.startswith(b"%PDF"):
+        raise HarvestError("download is not a PDF")
+    return data
 
 
 def unpaywall_licence(doi, email, fetcher, api=None):

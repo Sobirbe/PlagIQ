@@ -78,7 +78,9 @@ SOURCES_SQL = ('CREATE TABLE IF NOT EXISTS sources (num INTEGER PRIMARY KEY, id 
 
 
 def connect(path=None):
-    db = sqlite3.connect(path or os.environ.get('CORPUS_DB', 'corpus.sqlite3'))
+    db = sqlite3.connect(path or os.environ.get('CORPUS_DB', 'corpus.sqlite3'), timeout=60)
+    # WAL lets searches read while a background import writes.
+    db.execute('PRAGMA journal_mode=WAL')
     db.execute(SOURCES_SQL)
     if db.execute('PRAGMA user_version').fetchone()[0] < NORMALIZATION_VERSION:
         reindex(db)

@@ -64,8 +64,15 @@ def public_host(host):
     try:
         infos = socket.getaddrinfo(host, None)
     except OSError:
-        return False
+        raise HarvestError(f"could not resolve host {host}")
     return bool(infos) and all(ipaddress.ip_address(info[4][0].split("%")[0]).is_global for info in infos)
+
+
+def _public_or_false(host):
+    try:
+        return public_host(host)
+    except HarvestError:
+        return False
 
 
 class _Redirect(urllib.request.HTTPRedirectHandler):
@@ -79,7 +86,7 @@ class _Redirect(urllib.request.HTTPRedirectHandler):
         old, new = urlsplit(req.full_url), urlsplit(newurl)
         if new.hostname != old.hostname or new.scheme != old.scheme:
             local_test = new.hostname in self.allow_http_hosts
-            if not self.cross_host or not (local_test or (new.scheme == "https" and public_host(new.hostname))):
+            if not self.cross_host or not (local_test or (new.scheme == "https" and _public_or_false(new.hostname))):
                 raise HarvestError(f"refused redirect to another host: {newurl}")
         return super().redirect_request(req, fp, code, msg, headers, newurl)
 
@@ -103,6 +110,7 @@ class Fetcher:
     def _raw(self, url, limit, cross_host=False, headers=None):
         request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT, **(headers or {})})
         with self.openers[cross_host].open(request, timeout=30) as response:
+            self.last_url = response.geturl()           # after redirects, for resolving relative links
             body = response.read(limit + 1)
             if len(body) > limit:
                 raise HarvestError(f"response over {limit // (1024 * 1024)} MB: {url}")
