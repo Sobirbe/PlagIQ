@@ -117,7 +117,7 @@ def health():
 
 @app.get("/", response_class=HTMLResponse)
 def home():
-    return Path(__file__).with_name("index.html").read_text("utf-8")
+    return HTMLResponse(Path(__file__).with_name("index.html").read_text("utf-8"), headers={"Cache-Control":"no-store, max-age=0"})
 
 @app.post("/api/check")
 async def check(request:Request, submission:UploadFile=File(...),
