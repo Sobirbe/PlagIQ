@@ -35,12 +35,28 @@ SENTENCE = re.compile(r"[^.!?\n]+[.!?]?")
 LANGUAGE_FILTER = {"uz": "language:uz|ru", "ru": "language:ru|uz", "en": "language:en"}
 
 
+NOT_TITLE = re.compile(
+    r"^(?:abstract|annotation|annotatsiya|аннотация|аннотация\.|keywords?|kalit so|ключевые слова|introduction|kirish|введение"
+    r"|udc|udk|удк|ббк|doi|vol\.|volume|no\.|№|issn|received|accepted|e-?mail)\b", re.I)
+
+
+def _looks_like_title(line):
+    words = line.split()
+    letters = sum(c.isalpha() for c in line)
+    return (3 <= len(words) <= 30 and 15 <= len(line) <= 250 and letters >= 0.7 * len(line.replace(" ", ""))
+            and not NOT_TITLE.match(line) and "@" not in line)
+
+
 def _first_line_query(text):
+    """The title is usually among the first lines; many real titles have only 3-5 words."""
     lines = [re.sub(r"\s+", " ", line).strip() for line in text.splitlines()]
-    lines = [line for line in lines if 35 <= len(line) <= 220 and len(line.split()) >= 6]
-    if not lines:
-        lines = [re.sub(r"\s+", " ", text).strip()]
-    return " ".join(lines[0].split()[:QUERY_WORDS])[:220]
+    lines = [line for line in lines if line]
+    titles = [line for line in lines[:15] if _looks_like_title(line)]
+    if not titles:
+        titles = [line for line in lines if 35 <= len(line) <= 220 and len(line.split()) >= 6]
+    if not titles:
+        titles = [re.sub(r"\s+", " ", text).strip()]
+    return " ".join(titles[0].split()[:QUERY_WORDS])[:220]
 
 
 def _distinctive(sentence):
