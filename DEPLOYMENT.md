@@ -118,6 +118,18 @@ Put the keys in Railway Variables on the engine service as `OPENALEX_API_KEY` an
 
 **How much is available** (OpenAlex counts, November 2026, using OpenAlex's own language labels): Uzbek-language works with a reusable licence 110,482 (47,734 with an OpenAlex PDF copy); Russian-language 460,073; Russian-language by Uzbekistan-based authors 13,914; English by Uzbekistan-based authors 103,155. At about 0.17 MB of index per article, 100,000 articles would need roughly 17 GB; this size has not been benchmarked yet, so raise `CORPUS_MAX_SOURCES` in steps and re-run the benchmark.
 
+## Part 3d — Prices shown on the website
+
+The website shows the word count and the **planned** price as soon as a file is chosen, plus a price table and calculator. **No money is taken.** There is no payment system, and the page says checks are free during the pilot.
+
+Default plans: Free up to 1,000 words (0 UZS), Researcher 1,001–3,500 words (15,000 UZS), Extended 3,501–15,000 words (45,000 UZS). Larger documents are shown as "contact us". To change them, add a `PRICING_TIERS` variable to the website service in Railway, for example:
+
+```json
+[{"id":"free","max_words":1000,"price_uzs":0},{"id":"researcher","max_words":3500,"price_uzs":15000},{"id":"extended","max_words":15000,"price_uzs":45000}]
+```
+
+Keep the ids `free`, `researcher` and `extended`, which have names and descriptions in all three languages. Change only the numbers. If the value is invalid, the site quietly uses the defaults. Before charging real money, measure the real cost per check and add a payment provider (Payme, Click or Uzum) in a separate, reviewed change.
+
 ## Part 4 — Checks before you approve the pull request
 
 Use only harmless sample text. Tick each item:

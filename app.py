@@ -18,6 +18,7 @@ from starlette.formparsers import MultiPartParser
 
 import citations
 import corpus
+import pricing
 import extract
 from discovery import discover
 import html
@@ -218,6 +219,30 @@ def health():
     return {"status":"ok","version":VERSION,"corpus_engine_configured":corpus_configured()}
 
 
+QUOTES = {}
+QUOTE_LIMIT = 60
+
+
+@app.get("/api/pricing")
+def pricing_config():
+    return pricing.public_config()
+
+
+@app.post("/api/quote")
+async def price_quote(request: Request, submission: UploadFile = File(...)):
+    """Word count and planned price for a file. Nothing is stored; no check is run."""
+    key, now = client_key(request), time.monotonic()
+    history = [t for t in QUOTES.get(key, []) if now - t < 3600]
+    if len(history) >= QUOTE_LIMIT:
+        raise ApiError(429, "rate_limited", "Hourly quote allowance reached.")
+    QUOTES[key] = history + [now]
+    if len(QUOTES) > 3000:
+        QUOTES.clear()
+    text = await read_file(submission)
+    return {**pricing.quote(pricing.count_words(text)), "characters": len(text),
+            "currency": "UZS", "payments_enabled": False}
+
+
 @app.get("/", response_class=HTMLResponse)
 def home():
     return HTMLResponse(Path(__file__).with_name("index.html").read_text("utf-8"), headers={"Cache-Control":"no-store, max-age=0"})
@@ -328,6 +353,7 @@ async def analyse(submission, reference, reference_text, language, mode, options
         result["percent_all"] = review["percent_all"]
         result["percent"] = review["percent_counted"]
         result["matched_tokens_counted"] = review["matched_words_counted"]
+    result["plan"] = pricing.quote(pricing.count_words(original))
     result.update({"document":clean_filename(submission.filename, "Document"),
                    "date":datetime.now(timezone.utc).isoformat(timespec="seconds"),
                    "quotations_excluded":False, "bibliography_excluded":False,
