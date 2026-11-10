@@ -8,11 +8,23 @@
 <div class="hero"><h1 id="heading">Academic similarity, with evidence</h1><p id="subtitle" class="muted">Compare text in Uzbek, Russian, and English.</p><span class="badge">Uzbek · Latin & Cyrillic</span><span class="badge">Русский</span><span class="badge">English</span></div>
 <p class="notice" id="notice">PILOT: Only your own reference material is compared. No websites or academic publication databases are searched, and AI writing is not detected. Do not upload confidential manuscripts to a public test deployment.</p>
 <form id="form" class="grid"><div class="card"><h2 id="step1">1. Your manuscript</h2><label id="uploadlabel" for="submission">Upload TXT, DOCX, or text-based PDF (max 2 MB)</label><input id="submission" name="submission" type="file" accept=".txt,.docx,.pdf" required><label id="languagelabel" for="language">Language</label><select id="language" name="language"><option value="uz">Uzbek · Latin / Cyrillic</option><option value="ru">Russian</option><option value="en">English</option></select></div>
-<div class="card"><h2 id="step2">2. Your comparison source</h2><label id="reflabel" for="reference">Upload reference document (optional)</label><input id="reference" name="reference" type="file" accept=".txt,.docx,.pdf"><label id="textlabel" for="reference_text">Or paste source text</label><textarea id="reference_text" name="reference_text" placeholder="Paste reference text here..."></textarea></div>
+<div class="card"><h2 id="step2">2. Your comparison source</h2><label for="mode">Comparison mode / Solishtirish usuli</label>
+<select name="mode" id="mode"><option value="reference">My own reference · O‘z manbam</option><option value="academic">Academic discovery / Ilmiy qidiruv (OpenAlex beta)</option></select>
+<div id="academic-note" hidden style="background:#e8f4fa;padding:12px;border-radius:10px;margin-top:12px">
+<p id="academic-hint">Only a short excerpt is sent to OpenAlex; it searches metadata and compares available abstracts, not full journal texts.</p>
+<label><input type="checkbox" name="consent" id="consent" value="true" style="width:auto;margin-right:8px"><span id="consentlabel">I consent to sending a short search excerpt to OpenAlex.</span></label>
+</div><div id="reference-fields"><label id="reflabel" for="reference">Upload reference document (optional)</label><input id="reference" name="reference" type="file" accept=".txt,.docx,.pdf"><label id="textlabel" for="reference_text">Or paste source text</label><textarea id="reference_text" name="reference_text" placeholder="Paste reference text here..."></textarea></div></div>
 <div class="card" style="grid-column:1/-1"><button type="submit" class="go" id="submit">Compare texts</button><p role="status" id="status" class="muted"></p></div></form>
-<div class="card" id="result"><h2 id="resultheading">Limited reference comparison</h2><div class="score" id="score"></div><p id="details"></p><p id="scope"></p><a id="report" href="#" target="_blank" rel="noopener">Download pilot PDF report</a></div>
+<div class="card" id="result"><h2 id="resultheading">Limited reference comparison</h2><div class="score" id="score"></div><p id="details"></p><p id="scope"></p><div id="source-list"></div><a id="report" href="#" target="_blank" rel="noopener">Download pilot PDF report</a></div>
 <footer>PlagIQ pilot · Scores never imply plagiarism or verified authorship</footer></main>
 <script>
+const selectMode=document.getElementById("mode");
+selectMode.addEventListener("change",()=>{
+const isAcademic=selectMode.value==="academic";
+document.getElementById("academic-note").hidden=!isAcademic;
+document.getElementById("reference-fields").hidden=isAcademic;
+document.getElementById("consent").required=isAcademic;
+});
 const dict={
 en:{heading:"Academic similarity, with evidence",subtitle:"Compare text in Uzbek, Russian, and English.",notice:"PILOT: Only your own reference material is compared. No websites or academic publication databases are searched, and AI writing is not detected. Do not upload confidential manuscripts to a public test deployment.",step1:"1. Your manuscript",uploadlabel:"Upload TXT, DOCX, or text-based PDF (max 2 MB)",languagelabel:"Language",step2:"2. Your comparison source",reflabel:"Upload reference document (optional)",textlabel:"Or paste source text",submit:"Compare texts",resultheading:"Limited reference comparison"},
 uz:{heading:"Matn o‘xshashligini dalillar asosida tekshirish",subtitle:"O‘zbek, rus va ingliz tillaridagi matnlarni solishtiring.",notice:"SINOV: Faqat siz taqdim etgan manba bilan solishtiriladi. Internet va ilmiy bazalar tekshirilmaydi, sun'iy intellekt matni aniqlanmaydi. Maxfiy hujjatni ochiq sinov saytiga yuklamang.",step1:"1. Qo‘lyozmangiz",uploadlabel:"TXT, DOCX yoki matnli PDF yuklang (2 MB gacha)",languagelabel:"Til",step2:"2. Solishtirish manbasi",reflabel:"Manba hujjatini yuklang (ixtiyoriy)",textlabel:"Yoki manba matnini kiriting",submit:"Solishtirish",resultheading:"Cheklangan manba bilan solishtirish"},
@@ -24,9 +36,12 @@ try{
 const res=await fetch("/api/check",{method:"POST",body:new FormData(event.target)});const data=await res.json();
 if(!res.ok)throw Error(data.detail||"Unable to compare");
 document.getElementById("result").style.display="block";
-document.getElementById("score").textContent=data.percent+"%";
+document.getElementById("score").textContent=data.percent+"% matched in stated scope";
 document.getElementById("details").textContent=data.matched_tokens+" / "+data.total_tokens+" normalized tokens matched in the reference.";
-document.getElementById("scope").textContent=data.scope+" AI writing assessment: "+data.ai_detection+".";
+document.getElementById("scope").textContent=data.scope+" Search status: "+data.database_status+". AI assessment: "+data.ai_detection+". "+(data.self_comparison?"Self-comparison detected; this only tests the matching system.":"");
+const listing=document.getElementById("source-list");listing.replaceChildren();
+if(data.database_message){const p=document.createElement("p");p.textContent=data.database_message;listing.appendChild(p)}
+(data.sources||[]).forEach(src=>{const p=document.createElement("p");const a=document.createElement("a");a.href=src.url;a.target="_blank";a.rel="noopener noreferrer";a.textContent=src.title;p.appendChild(a);p.appendChild(document.createTextNode(" — "+src.coverage+", "+src.matched_tokens+" matched tokens"));listing.appendChild(p)});
 document.getElementById("report").href="/api/report/"+data.report_id+".pdf";
 status.textContent="Completed.";
 }catch(error){status.textContent="Error: "+error.message}finally{b.disabled=false}
