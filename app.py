@@ -23,12 +23,14 @@ import websearch
 import integrity
 import aidetect
 import auth
+import institutions
 import pricing
 import verify
 import extract
 from discovery import discover
 import html
 from engine_client import EngineError, configured as corpus_configured, library as engine_library, run_check, summarize
+import engine_client
 from report_pdf import build_pdf
 from security import SecurityMiddleware, MAX_REQUEST
 
@@ -286,7 +288,7 @@ def verify_page(request: Request, ui: str = ""):
 def health():
     return {"status":"ok","version":VERSION,"corpus_engine_configured":corpus_configured(),
             "web_search":websearch.settings()[0],"web_providers":websearch.providers(),
-            "login":auth.public_config(),"ai_detector":aidetect.settings()}
+            "login":auth.public_config(),"ai_detector":aidetect.settings(),"archive":corpus_configured() and auth.enabled()}
 
 
 def _secure(request):
@@ -336,10 +338,106 @@ async def delete_me(request: Request):
     user = auth.read(request.cookies.get(auth.COOKIE))
     if not user:
         raise ApiError(401, "login_required", "Sign in with Telegram first.")
+    if corpus_configured():                    # the right to erasure covers archived works too
+        try:
+            for item in await engine_client.list_deposits(auth.owner_id(user)):
+                await engine_client.remove_deposit(item["id"], auth.owner_id(user))
+        except EngineError as exc:
+            raise ApiError(503, exc.code, "Archived works could not be removed; the account was kept. Try again later.")
     await run_in_threadpool(auth.forget, user)
     response = JSONResponse({"deleted": True})
     response.delete_cookie(auth.COOKIE)
     return response
+
+
+@app.get("/api/archive")
+async def my_archive(request: Request):
+    user = auth.read(request.cookies.get(auth.COOKIE))
+    if not user:
+        raise ApiError(401, "login_required", "Sign in with Telegram first.")
+    if not corpus_configured():
+        return {"enabled": False, "items": []}
+    try:
+        return {"enabled": True, "items": await engine_client.list_deposits(auth.owner_id(user))}
+    except EngineError as exc:
+        raise ApiError(503, exc.code, str(exc))
+
+
+@app.delete("/api/archive/{identifier}")
+async def remove_from_archive(identifier: str, request: Request):
+    user = auth.read(request.cookies.get(auth.COOKIE))
+    if not user:
+        raise ApiError(401, "login_required", "Sign in with Telegram first.")
+    if not re.fullmatch(r"[0-9a-f]{64}", identifier) or not corpus_configured():
+        raise ApiError(404, "report_unavailable", "Not found")
+    try:
+        removed = await engine_client.remove_deposit(identifier, auth.owner_id(user))
+    except EngineError as exc:
+        raise ApiError(503, exc.code, str(exc))
+    if not removed:
+        raise ApiError(404, "report_unavailable", "Not found")
+    return {"deleted": True}
+
+
+@app.get("/api/institution")
+def my_institutions(request: Request):
+    user = auth.read(request.cookies.get(auth.COOKIE))
+    return {"enabled": corpus_configured(), "institutions": institutions.for_user(user)}
+
+
+@app.post("/api/institution/deposit")
+async def institution_deposit(request: Request, institution: str = Form(..., max_length=80), file: UploadFile = File(...),
+                              year: int = Form(...), authors: str = Form("", max_length=300), title: str = Form("", max_length=300)):
+    """One work per request (the browser sends files one by one; each request is capped at 5 MB)."""
+    user = auth.read(request.cookies.get(auth.COOKIE))
+    if not institutions.allowed(user, institution):
+        raise ApiError(403, "institution_forbidden", "This account may not deposit works for this institution.")
+    if not corpus_configured():
+        raise ApiError(503, "engine_not_configured", "Private PlagIQ corpus engine is not configured.")
+    if not 1900 <= year <= datetime.now(timezone.utc).year:
+        raise ApiError(400, "invalid_option", "Invalid year")
+    text = await read_file(file)
+    language = await run_in_threadpool(corpus.detect_language, text)
+    if not language:
+        raise ApiError(400, "language_unknown", "The language of this file could not be detected (Uzbek, Russian or English).")
+    require_tokens(text, language, "too_short", "At least 7 words of readable text are needed.")
+    name_author, name_title = institutions.from_filename(file.filename)
+    item = {**institutions.record(institution, institutions.configured()[institution]["agreement"],
+                                  " ".join(title.split()) or name_title, " ".join(authors.split()) or name_author or "—",
+                                  year, language), "text": text}
+    try:
+        identifier = await engine_client.deposit(item)
+    except EngineError as exc:
+        raise ApiError(422 if exc.code == "archive_refused" else 503, exc.code, str(exc))
+    return {"id": identifier, "title": item["title"], "authors": item["authors"], "language": language,
+            "words": pricing.count_words(text)}
+
+
+@app.get("/api/institution/archive")
+async def institution_archive(request: Request, institution: str):
+    user = auth.read(request.cookies.get(auth.COOKIE))
+    if not institutions.allowed(user, institution):
+        raise ApiError(403, "institution_forbidden", "This account may not manage this institution's works.")
+    try:
+        return {"items": await engine_client.list_deposits(institutions.owner_id(institution))}
+    except EngineError as exc:
+        raise ApiError(503, exc.code, str(exc))
+
+
+@app.delete("/api/institution/archive/{identifier}")
+async def institution_remove(identifier: str, request: Request, institution: str):
+    user = auth.read(request.cookies.get(auth.COOKIE))
+    if not institutions.allowed(user, institution):
+        raise ApiError(403, "institution_forbidden", "This account may not manage this institution's works.")
+    if not re.fullmatch(r"[0-9a-f]{64}", identifier):
+        raise ApiError(404, "report_unavailable", "Not found")
+    try:
+        removed = await engine_client.remove_deposit(identifier, institutions.owner_id(institution))
+    except EngineError as exc:
+        raise ApiError(503, exc.code, str(exc))
+    if not removed:
+        raise ApiError(404, "report_unavailable", "Not found")
+    return {"deleted": True}
 
 
 QUOTES = {}
@@ -389,7 +487,9 @@ async def check(request:Request, submission:UploadFile=File(...),
                 reference:UploadFile|None=File(None),reference_text:str=Form(""),
                 language:str=Form("uz"),mode:str=Form("reference"),consent:bool=Form(False),
                 exclude_quotes:bool=Form(False),exclude_bibliography:bool=Form(False),min_words:int=Form(7),
-                web_search:bool=Form(False),ai_check:bool=Form(False),ai_consent:bool=Form(False)):
+                web_search:bool=Form(False),ai_check:bool=Form(False),ai_consent:bool=Form(False),
+                archive:bool=Form(False),archive_consent:bool=Form(False),archive_title:str=Form("",max_length=300),
+                archive_author:str=Form("",max_length=300)):
     global active_scans
     purge_reports()
     user = auth.read(request.cookies.get(auth.COOKIE))
@@ -405,6 +505,15 @@ async def check(request:Request, submission:UploadFile=File(...),
     ai_check = ai_check or mode == "ai"
     if ai_check and not aidetect.configured():
         raise ApiError(503, "ai_not_configured", "The AI detector is not set up on this server.")
+    deposit = None
+    if archive:
+        if not user:
+            raise ApiError(401, "login_required", "Sign in with Telegram to add a work to the archive.")
+        if not corpus_configured():
+            raise ApiError(503, "engine_not_configured", "Private PlagIQ corpus engine is not configured.")
+        if not archive_consent:
+            raise ApiError(400, "archive_consent_required", "Consent is required to keep the text in the protected archive.")
+        deposit = {"title": archive_title, "authors": archive_author or user["name"]}
     if ai_check and not ai_consent:
         raise ApiError(400, "ai_consent_required", "Consent is required before the full text is sent to the AI detector.")
     if mode == "academic" and not consent:
@@ -419,7 +528,8 @@ async def check(request:Request, submission:UploadFile=File(...),
     rate_limit(request)
     active_scans += 1
     try:
-        result = await analyse(submission, reference, reference_text, language, mode, options, web_search, ai_check)
+        result = await analyse(submission, reference, reference_text, language, mode, options, web_search, ai_check,
+                               auth.owner_id(user), deposit)
     finally:
         active_scans -= 1
     response = finish(request, result)
@@ -428,7 +538,56 @@ async def check(request:Request, submission:UploadFile=File(...),
     return response
 
 
-async def analyse(submission, reference, reference_text, language, mode, options=None, web_search=False, ai_check=False):
+async def search_library(result, original, language, owner):
+    """Add matches from PlagIQ's private library (imported sources and the protected archive)
+    to an academic check. Errors never fail the check; they are reported."""
+    if not corpus_configured():
+        return {"searched": False}
+    try:
+        summary = summarize(await run_check(original, language, [hashlib.sha256(original.encode()).hexdigest()]))
+        if summary["total_chars"] != len(original):
+            raise EngineError("Engine returned inconsistent document length.")
+    except EngineError as exc:
+        return {"searched": False, "error": exc.code}
+    for source in summary["sources"]:
+        mark_own(source, owner)
+    result["sources"] = summary["sources"] + result["sources"]
+    intervals = corpus.merge([list(i) for i in result.get("intervals", [])] + [list(i) for i in summary["intervals"]])
+    q = corpus.lexical(original, language)
+    matched = corpus.words_in_intervals(q, intervals)
+    result.update(intervals=intervals, matched_tokens=matched, matched_chars=sum(e - s for s, e in intervals))
+    # The check counts as evaluated if either the OpenAlex texts or the library had text in this language.
+    if result.get("percent") is not None or summary["language_counts"].get(language, 0):
+        result["percent"] = _percent(matched, len(q))
+        result.pop("not_evaluated_reason", None)
+    return {"searched": True, "size": summary["corpus_size"],
+            "matched_sources": sum(1 for s in summary["sources"] if s["matched_tokens"])}
+
+
+async def deposit_work(original, language, owner, archive, filename):
+    """Put the checked text into the protected archive (author consent given at check time)."""
+    title = " ".join((archive.get("title") or clean_filename(filename, "Document").rsplit(".", 1)[0]).split())[:300]
+    item = {"text": original, "language": language, "title": title or "Document",
+            "authors": " ".join((archive.get("authors") or "").split())[:300] or "—",
+            "year": datetime.now(timezone.utc).year, "owner": owner, "rights_basis": "author_deposit",
+            "permission_reference": "author consent at check time " + datetime.now(timezone.utc).isoformat(timespec="seconds"),
+            "collection": "user"}
+    try:
+        identifier = await engine_client.deposit(item)
+    except EngineError as exc:
+        return {"deposited": False, "error": exc.code}
+    return {"deposited": True, "id": identifier[:12], "title": item["title"]}
+
+
+def mark_own(source, owner):
+    """A user's own deposited work is labelled as such (self-citation), not hidden."""
+    if source.get("coverage") == "archive" and owner and source.pop("owner", "") == owner:
+        source["coverage"] = "own_archive"
+    source.pop("owner", None)
+
+
+async def analyse(submission, reference, reference_text, language, mode, options=None, web_search=False, ai_check=False,
+                  owner="", archive=None):
     original = await read_file(submission)
     # The menu defaults to Uzbek; when the text clearly is another language, use that
     # (search filter and normalization depend on it) and say so in the result.
@@ -484,6 +643,7 @@ async def analyse(submission, reference, reference_text, language, mode, options
             result["percent"] = None
             result["not_evaluated_reason"] = "provider_unavailable" if discovery["status"] not in ("searched", "partial") else "no_abstracts"
         result["evaluated_sources"] = evaluated
+        result["library"] = await search_library(result, original, language, owner)
         result["matched_source_count"] = sum(1 for e in result["sources"] if e["matched_tokens"])
         result.update({"mode":"academic","reference":"None","source_count":len(discovery["sources"]),
                        "database_status":discovery["status"],"database_message":discovery["message"],
@@ -495,12 +655,14 @@ async def analyse(submission, reference, reference_text, language, mode, options
                                    if web.get("enabled") else "No web-wide plagiarism check.")})
     else:
         try:
-            engine_report = await run_check(original, language)
+            engine_report = await run_check(original, language, [hashlib.sha256(original.encode()).hexdigest()])
             summary = summarize(engine_report)
             if summary['total_chars'] != len(original):
                 raise EngineError("Engine returned inconsistent document length.")
         except EngineError as exc:
             raise ApiError(503, exc.code, str(exc))
+        for source in summary["sources"]:
+            mark_own(source, owner)
         evaluated = summary["language_counts"].get(language, 0) > 0
         q = await run_in_threadpool(corpus.lexical, original, language)
         matched_words = corpus.words_in_intervals(q, summary["intervals"])
@@ -537,6 +699,8 @@ async def analyse(submission, reference, reference_text, language, mode, options
     result["integrity"], result["integrity_examples"] = await run_in_threadpool(
         integrity.assess, original, mode == "academic")
     words = pricing.count_words(original)
+    if archive:
+        result["archive"] = await deposit_work(original, language, owner, archive, submission.filename)
     if ai_check:
         # Separate consent: the full text goes to Pangram; flagged passages stay out of the cache and PDF.
         result["ai"], result["ai_passages"] = await run_in_threadpool(aidetect.detect, original, language, words)
