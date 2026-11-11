@@ -19,6 +19,7 @@ from starlette.formparsers import MultiPartParser
 import citations
 import corpus
 import fulltext
+import websearch
 import pricing
 import verify
 import extract
@@ -132,7 +133,8 @@ def compare_sources(text, sources, language):
         text, [s.get("fulltext") or s.get("abstract", "") for s in sources], language)
     result, intervals = _measure(q, covered, intervals)
     entries = [_source_entry(e, title=s.get("title", "Untitled"), url=s.get("url", ""), year=s.get("year"),
-                             coverage="fulltext" if s.get("fulltext") else s.get("coverage", "metadata_only"))
+                             coverage="web" if s.get("coverage") == "web" else
+                             "fulltext" if s.get("fulltext") else s.get("coverage", "metadata_only"))
                for s, e in zip(sources, evidence)]
     result.update({"language": language, "method": METHOD + " against open-access full texts and abstracts",
                    "total_chars": len(text), "intervals": intervals, "sources": entries,
@@ -278,7 +280,8 @@ def verify_page(request: Request, ui: str = ""):
 
 @app.get("/health")
 def health():
-    return {"status":"ok","version":VERSION,"corpus_engine_configured":corpus_configured()}
+    return {"status":"ok","version":VERSION,"corpus_engine_configured":corpus_configured(),
+            "web_search":websearch.settings()[0]}
 
 
 QUOTES = {}
@@ -326,7 +329,8 @@ def home():
 async def check(request:Request, submission:UploadFile=File(...),
                 reference:UploadFile|None=File(None),reference_text:str=Form(""),
                 language:str=Form("uz"),mode:str=Form("reference"),consent:bool=Form(False),
-                exclude_quotes:bool=Form(False),exclude_bibliography:bool=Form(False),min_words:int=Form(7)):
+                exclude_quotes:bool=Form(False),exclude_bibliography:bool=Form(False),min_words:int=Form(7),
+                web_search:bool=Form(False)):
     global active_scans
     purge_reports()
     if language not in ("uz","ru","en"):
@@ -348,13 +352,13 @@ async def check(request:Request, submission:UploadFile=File(...),
     rate_limit(request)
     active_scans += 1
     try:
-        result = await analyse(submission, reference, reference_text, language, mode, options)
+        result = await analyse(submission, reference, reference_text, language, mode, options, web_search)
     finally:
         active_scans -= 1
     return finish(request, result)
 
 
-async def analyse(submission, reference, reference_text, language, mode, options=None):
+async def analyse(submission, reference, reference_text, language, mode, options=None, web_search=False):
     original = await read_file(submission)
     # The menu defaults to Uzbek; when the text clearly is another language, use that
     # (search filter and normalization depend on it) and say so in the result.
@@ -389,9 +393,16 @@ async def analyse(submission, reference, reference_text, language, mode, options
         if enabled and discovery["sources"]:
             # Transient: full texts are compared for this check only and discarded with `discovery`.
             fetched = await run_in_threadpool(fulltext.fetch_fulltexts, discovery["sources"], max_works, seconds, paid)
+        web = {"enabled": False}
+        if web_search and websearch.settings()[0]:
+            # Separate consent: the same excerpts are sent to Yandex; pages are compared once and discarded.
+            web_sources, web = await run_in_threadpool(websearch.run, discovery.get("query_texts") or [], language)
+            known = {s.get("url") for s in discovery["sources"]}
+            discovery["sources"] = discovery["sources"] + [s for s in web_sources if s["url"] not in known]
         result = await run_in_threadpool(compare_sources, original, discovery["sources"], language)
         evaluated = sum(bool(s.get("abstract") or s.get("fulltext")) for s in discovery["sources"])
         result["fulltext"] = fetched
+        result["web"] = web
         if not evaluated:
             result["percent"] = None
             result["not_evaluated_reason"] = "provider_unavailable" if discovery["status"] not in ("searched", "partial") else "no_abstracts"
@@ -402,7 +413,9 @@ async def analyse(submission, reference, reference_text, language, mode, options
                        "queries":discovery["queries"],"search_phrases":discovery.get("query_texts", []),
                        "self_comparison":False,
                        "scope":"OpenAlex discovery; exact matching against open-access full texts fetched for this check "
-                                "(not stored) where available, otherwise abstracts. No web-wide plagiarism check."})
+                                "(not stored) where available, otherwise abstracts. "
+                                + ("Web pages found with Yandex for the same excerpts were also compared (not stored)."
+                                   if web.get("enabled") else "No web-wide plagiarism check.")})
     else:
         try:
             engine_report = await run_check(original, language)

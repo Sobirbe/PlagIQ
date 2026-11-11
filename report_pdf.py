@@ -59,6 +59,7 @@ T = {
     verify="Online verification",
     verify_v="Scan the QR code or open this link to confirm PlagIQ issued report {id} with these figures:",
     verify_none="Not set up on this server (VERIFY_SECRET missing)",
+    cov_web="Web page (compared, not stored)", web_label="Internet search (Yandex)", web_line="{s} searches, {p} pages tried, {c} compared; not available: {r}", web_scope=" Also searched the web with Yandex (pages compared, not stored).",
     pasted="Pasted reference",
     before="Matched before exclusions", applied="Exclusions chosen by the user",
     ex_none="No exclusions — every verified match is counted", ex_q="quotations ({n} words)", ex_b="bibliography ({n} words)",
@@ -110,11 +111,12 @@ T = {
     searches="Запросов в OpenAlex (отрывки до 14 слов)",
     shown_records="Показано {n} из {m} найденных записей, сначала с наибольшим числом совпавших слов.", truncated_records="Список сокращён; процент выше рассчитан по всем записям.",
     lang_detected=" (определён по тексту; выбран: {s})",
-    ft_label="Загрузка полных текстов", ft_line="попыток {a}, сравнено {c}; не удалось: {r}", reasons_tr={"timed out": "истекло время", "blocked by robots.txt": "запрещено robots.txt", "refused by the website (403)": "сайт отказал (403)", "refused by the website (401)": "сайт отказал (401)", "not found (404)": "не найдено (404)", "not a PDF": "не PDF", "no PDF link on page": "на странице нет ссылки на PDF", "scanned PDF (no text)": "скан PDF (без текста)", "website not reachable": "сайт недоступен", "address refused": "адрес отклонён", "file too large": "файл слишком большой", "cost limit": "лимит расходов", "other error": "другая ошибка", "no open-access copy listed": "открытая копия не указана"},
+    ft_label="Загрузка полных текстов", ft_line="попыток {a}, сравнено {c}; не удалось: {r}", reasons_tr={"too little text on page": "на странице слишком мало текста", "timed out": "истекло время", "blocked by robots.txt": "запрещено robots.txt", "refused by the website (403)": "сайт отказал (403)", "refused by the website (401)": "сайт отказал (401)", "not found (404)": "не найдено (404)", "not a PDF": "не PDF", "no PDF link on page": "на странице нет ссылки на PDF", "scanned PDF (no text)": "скан PDF (без текста)", "website not reachable": "сайт недоступен", "address refused": "адрес отклонён", "file too large": "файл слишком большой", "cost limit": "лимит расходов", "other error": "другая ошибка", "no open-access copy listed": "открытая копия не указана"},
     qr_caption="Сканируйте для проверки",
     verify="Онлайн-проверка",
     verify_v="Отсканируйте QR-код или откройте ссылку, чтобы убедиться, что PlagIQ выдал отчёт {id} с этими данными:",
     verify_none="На этом сервере не настроена (нет VERIFY_SECRET)",
+    cov_web="Веб-страница (сравнена, не сохранена)", web_label="Поиск в интернете (Яндекс)", web_line="запросов {s}, страниц {p}, сравнено {c}; не удалось: {r}", web_scope=" Также выполнен поиск в интернете через Яндекс (страницы сравнены, не сохранены).",
     pasted="Вставленный текст источника",
     before="Совпадения до исключений", applied="Исключения, выбранные пользователем",
     ex_none="Нет — учитываются все проверенные совпадения", ex_q="цитаты ({n} слов)", ex_b="список литературы ({n} слов)",
@@ -166,11 +168,12 @@ T = {
     searches="OpenAlex so‘rovlari (14 so‘zgacha parchalar)",
     shown_records="Topilgan {m} ta yozuvdan {n} tasi ko‘rsatilgan, eng ko‘p mos so‘zlilari birinchi.", truncated_records="Ro‘yxat qisqartirilgan; yuqoridagi foiz barcha yozuvlar bo‘yicha hisoblangan.",
     lang_detected=" (matndan aniqlandi; tanlangan: {s})",
-    ft_label="To‘liq matnlarni yuklash", ft_line="{a} ta urinish, {c} tasi solishtirildi; olinmadi: {r}", reasons_tr={"timed out": "vaqt tugadi", "blocked by robots.txt": "robots.txt taqiqlagan", "refused by the website (403)": "sayt rad etdi (403)", "refused by the website (401)": "sayt rad etdi (401)", "not found (404)": "topilmadi (404)", "not a PDF": "PDF emas", "no PDF link on page": "sahifada PDF havolasi yo‘q", "scanned PDF (no text)": "skanerlangan PDF (matnsiz)", "website not reachable": "saytga ulanib bo‘lmadi", "address refused": "manzil rad etildi", "file too large": "fayl juda katta", "cost limit": "xarajat chegarasi", "other error": "boshqa xato", "no open-access copy listed": "ochiq nusxa ko‘rsatilmagan"},
+    ft_label="To‘liq matnlarni yuklash", ft_line="{a} ta urinish, {c} tasi solishtirildi; olinmadi: {r}", reasons_tr={"too little text on page": "sahifada matn juda kam", "timed out": "vaqt tugadi", "blocked by robots.txt": "robots.txt taqiqlagan", "refused by the website (403)": "sayt rad etdi (403)", "refused by the website (401)": "sayt rad etdi (401)", "not found (404)": "topilmadi (404)", "not a PDF": "PDF emas", "no PDF link on page": "sahifada PDF havolasi yo‘q", "scanned PDF (no text)": "skanerlangan PDF (matnsiz)", "website not reachable": "saytga ulanib bo‘lmadi", "address refused": "manzil rad etildi", "file too large": "fayl juda katta", "cost limit": "xarajat chegarasi", "other error": "boshqa xato", "no open-access copy listed": "ochiq nusxa ko‘rsatilmagan"},
     qr_caption="Tekshirish uchun skanerlang",
     verify="Onlayn tekshirish",
     verify_v="PlagIQ {id} raqamli hisobotni shu ma’lumotlar bilan berganini tasdiqlash uchun QR kodni skanerlang yoki havolani oching:",
     verify_none="Bu serverda sozlanmagan (VERIFY_SECRET yo‘q)",
+    cov_web="Veb-sahifa (solishtirildi, saqlanmadi)", web_label="Internetda qidiruv (Yandex)", web_line="{s} ta qidiruv, {p} ta sahifa, {c} tasi solishtirildi; olinmadi: {r}", web_scope=" Internetda Yandex orqali ham qidirildi (sahifalar solishtirildi, saqlanmadi).",
     pasted="Kiritilgan manba matni",
     before="Istisnolargacha moslik", applied="Foydalanuvchi tanlagan istisnolar",
     ex_none="Yo‘q — barcha tasdiqlangan mosliklar hisoblanadi", ex_q="iqtiboslar ({n} so‘z)", ex_b="adabiyotlar ro‘yxati ({n} so‘z)",
@@ -257,6 +260,13 @@ def _qr(url, size):
     return drawing
 
 
+def _scope(t, mode, result):
+    text = t["scopes"].get(mode, result.get("scope", ""))
+    if mode == "academic" and (result.get("web") or {}).get("enabled"):
+        text = text.rsplit(". ", 1)[0] + "." + t["web_scope"]     # replace the "no web search" sentence
+    return text
+
+
 def build_pdf(result, identifier, lang="en", minutes_left=15, verify_url=None):
     t = T.get(lang, T["en"])
     st = _styles()
@@ -294,7 +304,7 @@ def build_pdf(result, identifier, lang="en", minutes_left=15, verify_url=None):
 
     mode = result.get("mode", "reference")
     scope_rows = [(t["mode"], t["modes"].get(mode, mode)), (t["method"], t["methods"].get(mode, result.get("method", ""))),
-                  (t["scope"], t["scopes"].get(mode, result.get("scope", ""))),
+                  (t["scope"], _scope(t, mode, result)),
                   (t["status"], t["states"].get(result.get("database_status"), t["states"]["not_searched"]))]
     pasted = lambda name: t["pasted"] if name == "Pasted reference" else name
     if mode == "reference":
@@ -304,6 +314,11 @@ def build_pdf(result, identifier, lang="en", minutes_left=15, verify_url=None):
         compared = (result.get("fulltext") or {}).get("compared", 0)
         with_abstract = sum(1 for src in result.get("sources") or [] if src.get("coverage") == "abstract")
         scope_rows.append((t["discovered"], f"{result.get('source_count', 0)} / {with_abstract} / {compared}"))
+        wb = result.get("web") or {}
+        if wb.get("enabled"):
+            reasons = ", ".join(f"{t.get('reasons_tr', {}).get(k, k)} ×{v}" for k, v in (wb.get("reasons") or {}).items()) or "—"
+            scope_rows.append((t["web_label"], t["web_line"].format(s=wb.get("searches", 0), p=wb.get("attempted", 0),
+                                                                   c=wb.get("compared", 0), r=reasons)))
         ft = result.get("fulltext") or {}
         if ft.get("attempted"):
             reasons = ", ".join(f"{k} ×{v}" for k, v in (ft.get("reasons") or {}).items()) or "—"
@@ -373,7 +388,7 @@ def build_pdf(result, identifier, lang="en", minutes_left=15, verify_url=None):
             meta.append(f"{t['authors']}: {source['authors']}")
         if source.get("year"):
             meta.append(f"{t['year']}: {source['year']}")
-        coverage = t["cov"].get(source.get("coverage"), t["cov_full"])
+        coverage = t["cov_web"] if source.get("coverage") == "web" else t["cov"].get(source.get("coverage"), t["cov_full"])
         meta.append(f"{t['coverage']}: {coverage}")
         if source.get("rights_basis"):
             meta.append(f"{t['rights']}: {t['rights_v'].get(source['rights_basis'], t['rights_v']['unknown'])}")
