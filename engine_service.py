@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 from contextlib import closing
 import logging
 import re
-from corpus import DEPOSITS, LANGUAGES, connect, corpus_version, deposits, ingest, inventory, remove_deposit, search
+from corpus import DEPOSITS, LANGUAGES, category, connect, corpus_version, deposits, ingest, inventory, remove_deposit, search
 from security import SecurityMiddleware
 import import_job
 import wikipedia_import
@@ -181,12 +181,15 @@ def library():
         rows = inventory(db)
         version = corpus_version(db)
     counts = {lang: sum(m['language'] == lang for m in rows) for lang in LANGUAGES}
+    by_source = {}
+    for m in rows:
+        by_source[category(m)] = by_source.get(category(m), 0) + 1
     allowed = {f'wikipedia-{lang}' for lang in LANGUAGES} | set(LANGUAGES)
     status = {name: {k: v for k, v in info.items() if k in (
                   'finished', 'imported', 'updated', 'failed', 'staged_total', 'failed_total', 'listing_complete',
                   'dump_complete', 'estimated_cost_usd', 'error', 'language_corrected')}
               for name, info in import_job.read_status().items() if name in allowed and isinstance(info, dict)}
-    return {'language_counts': counts, 'total': len(rows), 'corpus_version': version,
+    return {'language_counts': counts, 'by_source': by_source, 'total': len(rows), 'corpus_version': version,
             'auto_import': import_job.settings()[0], 'auto_import_wikipedia': wikipedia_import.settings()[0],
             'imports': status}
 

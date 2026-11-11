@@ -404,16 +404,54 @@ def _insert(db, metadata, text):
     return identifier
 
 
-def _check_capacity(db, new_ids):
-    existing = {row[0] for row in db.execute('SELECT id FROM sources')}
-    if len(existing | set(new_ids)) > max_sources():
-        raise ValueError(f'Index limit is {max_sources()} sources (CORPUS_MAX_SOURCES); '
+def max_deposits():
+    """Separate room for archive deposits, so bulk imports can never block a user's or a
+    university's deposit (and deposits never block imports)."""
+    try:
+        return max(1, int(os.environ.get('ARCHIVE_MAX_SOURCES', '5000')))
+    except ValueError:
+        return 5000
+
+
+def _check_capacity(db, new_ids, deposit=False):
+    marks = ','.join('?' * len(DEPOSITS))
+    if deposit:
+        existing = {row[0] for row in db.execute(
+            f"SELECT id FROM sources WHERE json_extract(metadata, '$.rights_basis') IN ({marks})", DEPOSITS)}
+        limit, name = max_deposits(), 'ARCHIVE_MAX_SOURCES'
+    else:
+        existing = {row[0] for row in db.execute(
+            f"SELECT id FROM sources WHERE json_extract(metadata, '$.rights_basis') NOT IN ({marks})", DEPOSITS)}
+        limit, name = max_sources(), 'CORPUS_MAX_SOURCES'
+    if len(existing | set(new_ids)) > limit:
+        raise ValueError(f'Index limit is {limit} sources ({name}); '
                          'run evaluation/benchmark_corpus.py on the engine before raising it')
+
+
+def category(metadata):
+    """Which collection a source belongs to (for the library summary)."""
+    host = urlsplit(metadata.get('url') or '').hostname or ''
+    if metadata.get('rights_basis') == 'author_deposit':
+        return 'archive'
+    if metadata.get('rights_basis') == 'institution_deposit':
+        return 'university'
+    if metadata.get('source_type') == 'wikipedia' or host.endswith('wikipedia.org'):
+        return 'wikipedia'
+    if host == 'cyberleninka.ru':
+        return 'cyberleninka'
+    if host.endswith('.uz') or 'oai' in (metadata.get('permission_reference') or '').lower():
+        return 'journals'
+    return 'other'
+
+
+def count_category(db, name, language=None):
+    return sum(1 for (raw,) in db.execute('SELECT metadata FROM sources')
+               if category(json.loads(raw)) == name and (language is None or json.loads(raw).get('language') == language))
 
 
 def ingest(db, metadata, text):
     metadata = validate(metadata, text)
-    _check_capacity(db, [hashlib.sha256(text.encode()).hexdigest()])
+    _check_capacity(db, [hashlib.sha256(text.encode()).hexdigest()], metadata['rights_basis'] in DEPOSITS)
     with db:
         return _insert(db, metadata, text)
 
@@ -445,7 +483,9 @@ def load_manifest(manifest):
 
 def import_manifest(db, manifest):
     records = load_manifest(manifest)
-    _check_capacity(db, [r[2] for r in records])
+    deposits_ = [r[2] for r in records if r[0]['rights_basis'] in DEPOSITS]
+    _check_capacity(db, deposits_, True) if deposits_ else None
+    _check_capacity(db, [r[2] for r in records if r[0]['rights_basis'] not in DEPOSITS])
     with db:  # all records or none
         for metadata, text, _, name in records:
             _insert(db, {**metadata, 'source_file': name}, text)

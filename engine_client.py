@@ -268,6 +268,8 @@ async def library():
         finished = [str(v.get("finished"))[:25] for v in imports.values() if isinstance(v, dict) and v.get("finished")]
         return {"language_counts": {lang: _int(counts.get(lang, 0), 0, 10**9) for lang in LANGUAGES},
                 "total": _int(data.get("total", 0), 0, 10**9),
+                "by_source": {k: _int(v, 0, 10**9) for k, v in (data.get("by_source") or {}).items()
+                              if k in ("wikipedia", "cyberleninka", "journals", "archive", "university", "other")},
                 "last_import": max(finished) if finished else None,
                 "auto_import": [l for l in data.get("auto_import") or [] if l in LANGUAGES]}
     except (httpx.HTTPError, EngineError, ValueError, TypeError, AttributeError, KeyError):
