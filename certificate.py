@@ -17,6 +17,7 @@ C = {
         document="Document", date="Checked on", words="Words", language="Language", fingerprint="Document fingerprint (SHA-256)",
         result="Matched within the checked scope", not_evaluated="Not evaluated", before="before exclusions: {p}%",
         sources="Sources compared", src_academic="Full texts: {f} · abstracts: {a}{w}", src_web=" · web pages: {n}",
+        src_ai="Not applicable (AI check only)", scope_ai="AI-writing detector only (Pangram); no plagiarism comparison", ai_row="AI detector (Pangram estimate)", ai_v="AI {a}% · AI-assisted {s}% · human {h}%", ai_unsupported="Not available for Uzbek (not sent)", ai_error="Could not be completed", ai_too_long="Too long for the AI detector (over {n} words)", ai_ring="AI-written or AI-assisted (Pangram estimate)", 
         src_reference="1 reference document", src_corpus="{n} indexed sources",
         exclusions="Exclusions", ex_none="No exclusions", ex_q="quotations", ex_b="bibliography", ex_s="matches under {m} words",
         integrity="AI and manipulation indicators", ind_none="No indicators found", ind_review="Review suggested ({n})",
@@ -28,7 +29,7 @@ C = {
         verify_off="Online verification is not enabled on this server.",
         issued="Issued electronically by PlagIQ", details="Full evidence (every matched passage and source) on the following pages.",
         notice="This certifies the check only. It is not a certificate of originality or of the absence of plagiarism, "
-               "and it gives no AI percentage. A low result does not prove originality; matches need human review."),
+               "and any AI figure is the named provider's estimate, not proof. A low result does not prove originality; matches need human review."),
     "ru": dict(
         title="СЕРТИФИКАТ ПРОВЕРКИ", number="Сертификат №",
         intro="Настоящим подтверждается, что указанный ниже документ проверен PlagIQ в указанную дату "
@@ -36,6 +37,7 @@ C = {
         document="Документ", date="Дата проверки", words="Слов", language="Язык", fingerprint="Отпечаток документа (SHA-256)",
         result="Совпадения в проверенном охвате", not_evaluated="Не оценено", before="до исключений: {p}%",
         sources="Сравнено источников", src_academic="полных текстов {f} · аннотаций {a}{w}", src_web=" · веб-страниц {n}",
+        src_ai="Не применимо (только ИИ-проверка)", scope_ai="Только ИИ-детектор (Pangram); сравнение на плагиат не проводилось", ai_row="ИИ-детектор (оценка Pangram)", ai_v="ИИ {a}% · с помощью ИИ {s}% · человек {h}%", ai_unsupported="Недоступно для узбекского (текст не отправлялся)", ai_error="Не удалось выполнить", ai_too_long="Слишком длинный для ИИ-детектора (более {n} слов)", ai_ring="Написано ИИ или с помощью ИИ (оценка Pangram)", 
         src_reference="1 документ-источник", src_corpus="индексированных источников: {n}",
         exclusions="Исключения", ex_none="Нет", ex_q="цитаты", ex_b="список литературы", ex_s="совпадения короче {m} слов",
         integrity="Индикаторы ИИ и манипуляций", ind_none="Не найдены", ind_review="Рекомендуется проверка ({n})",
@@ -47,7 +49,7 @@ C = {
         verify_off="Онлайн-проверка на этом сервере не настроена.",
         issued="Выдан в электронном виде PlagIQ", details="Полные доказательства (все совпадения и источники) — на следующих страницах.",
         notice="Подтверждается только факт проверки. Это не сертификат оригинальности или отсутствия плагиата, "
-               "и доля ИИ не указывается. Низкий результат не доказывает оригинальность; совпадения требуют проверки человеком."),
+               "а любая оценка ИИ — оценка указанного провайдера, а не доказательство. Низкий результат не доказывает оригинальность; совпадения требуют проверки человеком."),
     "uz": dict(
         title="TEKSHIRUV SERTIFIKATI", number="Sertifikat №",
         intro="Ushbu sertifikat quyidagi hujjat ko‘rsatilgan sanada PlagIQ tomonidan shu sahifada "
@@ -55,6 +57,7 @@ C = {
         document="Hujjat", date="Tekshirilgan sana", words="So‘zlar", language="Til", fingerprint="Hujjat izi (SHA-256)",
         result="Tekshirilgan doiradagi moslik", not_evaluated="Baholanmagan", before="istisnolargacha: {p}%",
         sources="Solishtirilgan manbalar", src_academic="{f} ta to‘liq matn · {a} ta annotatsiya{w}", src_web=" · {n} ta veb-sahifa",
+        src_ai="Qo‘llanilmaydi (faqat AI tekshiruvi)", scope_ai="Faqat AI detektor (Pangram); plagiatga solishtirilmadi", ai_row="AI detektor (Pangram bahosi)", ai_v="AI {a}% · AI yordamida {s}% · inson {h}%", ai_unsupported="O‘zbek tili uchun mavjud emas (yuborilmadi)", ai_error="Bajarib bo‘lmadi", ai_too_long="AI detektor uchun juda uzun ({n} so‘zdan ortiq)", ai_ring="AI yozgan yoki AI yordamida (Pangram bahosi)", 
         src_reference="1 ta manba hujjat", src_corpus="{n} ta indekslangan manba",
         exclusions="Istisnolar", ex_none="Yo‘q", ex_q="iqtiboslar", ex_b="adabiyotlar ro‘yxati", ex_s="{m} so‘zdan qisqa mosliklar",
         integrity="Sun’iy intellekt va manipulyatsiya ko‘rsatkichlari", ind_none="Topilmadi", ind_review="Tekshirish tavsiya etiladi ({n})",
@@ -65,8 +68,8 @@ C = {
         verify="Sertifikatni tekshirish", verify_v="PlagIQ uni aynan shu ma’lumotlar bilan berganini tasdiqlash uchun QR kodni skanerlang yoki havolani oching.",
         verify_off="Bu serverda onlayn tekshirish sozlanmagan.",
         issued="PlagIQ tomonidan elektron shaklda berilgan", details="To‘liq dalillar (barcha mos parchalar va manbalar) keyingi sahifalarda.",
-        notice="Faqat tekshiruv fakti tasdiqlanadi. Bu originallik yoki plagiat yo‘qligi sertifikati emas va sun’iy intellekt "
-               "ulushini ko‘rsatmaydi. Past natija originallikni isbotlamaydi; mosliklarni inson ko‘rib chiqishi kerak."),
+        notice="Faqat tekshiruv fakti tasdiqlanadi. Bu originallik yoki plagiat yo‘qligi sertifikati emas va har qanday AI ko‘rsatkichi "
+               "ko‘rsatilgan provayderning bahosi, isbot emas. Past natija originallikni isbotlamaydi; mosliklarni inson ko‘rib chiqishi kerak."),
 }
 
 TEAL, INK, MUTED, LINE, TINT, PAPER = (colors.HexColor(x) for x in
@@ -88,6 +91,8 @@ def facts(result, lang):
         abstracts = sum(1 for s in result.get("sources") or [] if s.get("coverage") == "abstract")
         sources = t["src_academic"].format(f=(result.get("fulltext") or {}).get("compared", 0), a=abstracts,
                                            w=t["src_web"].format(n=web.get("compared", 0)) if web.get("enabled") else "")
+    elif mode == "ai":
+        sources = t["src_ai"]
     elif mode == "corpus":
         sources = t["src_corpus"].format(n=result.get("source_count") or 0)
     else:
@@ -103,8 +108,15 @@ def facts(result, lang):
     integrity = result.get("integrity") or {}
     signals = len(integrity.get("signals") or [])
     providers = ", ".join(web.get("providers") or [])
-    scope = t["scopes"].get(mode, "").format(w=t["scope_web"].format(p=providers) if web.get("enabled") else "")
-    return [(t["sources"], sources), (t["exclusions"], ", ".join(chosen) or t["ex_none"]),
+    scope = t["scope_ai"] if mode == "ai" else t["scopes"].get(mode, "").format(w=t["scope_web"].format(p=providers) if web.get("enabled") else "")
+    rows = [(t["sources"], sources)] + ([] if mode == "ai" else [(t["exclusions"], ", ".join(chosen) or t["ex_none"])])
+    ai = result.get("ai") or {}
+    if ai.get("status") == "done":
+        rows.append((t["ai_row"], t["ai_v"].format(a=ai["fraction_ai"], s=ai["fraction_ai_assisted"], h=ai["fraction_human"])))
+    elif ai.get("status") in ("unsupported_language", "error", "too_long"):
+        rows.append((t["ai_row"], t["ai_unsupported"] if ai["status"] == "unsupported_language" else
+                     t["ai_too_long"].format(n=ai.get("max_words", "")) if ai["status"] == "too_long" else t["ai_error"]))
+    return rows + [
             (t["integrity"], t["ind_review"].format(n=signals) if integrity.get("status") == "review" else t["ind_none"]),
             (t["scope"], scope)]
 
@@ -193,7 +205,10 @@ class CertificatePage(Flowable):
         # result ring + facts
         ring = 21 * mm
         cx, cy = pad + ring + 4 * mm, y - ring
-        percent = r.get("percent")
+        ai_mode = r.get("mode") == "ai"
+        ai = r.get("ai") or {}
+        percent = r.get("percent") if not ai_mode else (
+            round(min(100.0, ai["fraction_ai"] + ai["fraction_ai_assisted"]), 1) if ai.get("status") == "done" else None)
         c.setLineWidth(7)
         c.setStrokeColor(LINE)
         c.circle(cx, cy, ring, stroke=1, fill=0)
@@ -206,7 +221,7 @@ class CertificatePage(Flowable):
         label = t["not_evaluated"] if percent is None else f"{percent}%"
         c.setFont(self.bold, 22 if percent is not None else 12)
         c.drawCentredString(cx, cy - 7, label)
-        self._para(esc(t["result"]), cx - ring - 4 * mm, cy - ring - 6 * mm, 2 * ring + 8 * mm, 8.5, self.bold, align=1)
+        self._para(esc(t["ai_ring"] if ai_mode else t["result"]), cx - ring - 4 * mm, cy - ring - 6 * mm, 2 * ring + 8 * mm, 8.5, self.bold, align=1)
         citation = r.get("citation") or {}
         if percent is not None and citation.get("percent_all") not in (None, percent):
             self._para(esc(t["before"].format(p=citation["percent_all"])), cx - ring - 4 * mm, cy - ring - 13 * mm,

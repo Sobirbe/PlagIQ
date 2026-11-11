@@ -17,8 +17,9 @@ import re
 from urllib.parse import urlencode
 
 FIELDS = ("r", "d", "h", "m", "p", "w", "n", "l")
-MODES = {"reference": "r", "academic": "a", "corpus": "c"}
-PATTERNS = {"r": r"[0-9a-f]{12}", "d": r"\d{8}T\d{4}", "h": r"[0-9a-f]{16}", "m": r"[rac]", "p": r"NE|\d{1,3}(\.\d{1,2})?",
+OPTIONAL = ("x",)                      # x = AI detector estimate (AI + AI-assisted %), only when it ran
+MODES = {"reference": "r", "academic": "a", "corpus": "c", "ai": "i"}
+PATTERNS = {"r": r"[0-9a-f]{12}", "d": r"\d{8}T\d{4}", "h": r"[0-9a-f]{16}", "m": r"[raci]", "x": r"\d{1,3}(\.\d)?", "p": r"NE|\d{1,3}(\.\d{1,2})?",
             "w": r"\d{1,7}", "n": r"\d{1,7}", "l": r"uz|ru|en"}
 
 
@@ -28,7 +29,7 @@ def secret():
 
 
 def _sign(fields, key):
-    message = "&".join(f"{k}={fields[k]}" for k in FIELDS).encode()
+    message = "&".join(f"{k}={fields[k]}" for k in FIELDS + OPTIONAL if k in fields).encode()
     return base64.urlsafe_b64encode(hmac.new(key, message, hashlib.sha256).digest()[:18]).decode().rstrip("=")
 
 
@@ -46,7 +47,16 @@ def facts(result, identifier):
     return {"r": identifier[:12], "d": re.sub(r"[-:]", "", str(result.get("date", "")))[:13],
             "h": str(result.get("sha256", ""))[:16], "m": MODES.get(mode, "r"),
             "p": "NE" if percent is None else f"{float(percent):g}", "w": str(int(result.get("total_tokens") or 0)),
-            "n": str(int(compared)), "l": result.get("language", "en") if result.get("language") in ("uz", "ru", "en") else "en"}
+            "n": str(int(compared)), "l": result.get("language", "en") if result.get("language") in ("uz", "ru", "en") else "en",
+            **({"x": f"{ai_share(result):g}"} if ai_share(result) is not None else {})}
+
+
+def ai_share(result):
+    """Pangram's AI + AI-assisted share in %, or None when the detector did not run to completion."""
+    ai = result.get("ai") or {}
+    if ai.get("status") != "done":
+        return None
+    return round(min(100.0, float(ai.get("fraction_ai", 0)) + float(ai.get("fraction_ai_assisted", 0))), 1)
 
 
 def link(result, identifier, base_url):
@@ -62,6 +72,7 @@ def check(params):
     """(valid, fields). Valid only with every field well formed and a matching signature."""
     key = secret()
     fields = {k: str(params.get(k, "")) for k in FIELDS}
-    if not key or not all(re.fullmatch(PATTERNS[k], fields[k]) for k in FIELDS):
+    fields.update({k: str(params[k]) for k in OPTIONAL if k in params})
+    if not key or not all(re.fullmatch(PATTERNS[k], fields[k]) for k in fields):
         return False, fields
     return hmac.compare_digest(_sign(fields, key), str(params.get("s", ""))), fields

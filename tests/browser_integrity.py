@@ -34,7 +34,7 @@ try:
             panel = page.locator('#integrity').inner_text()
             for expected in ('AI-writing and manipulation indicators', 'Review suggested', 'Chatbot phrases left in the text: 1',
                              'Unfilled placeholders: 1', 'Hidden characters', 'Words mixing Latin and Cyrillic',
-                             '»Certainly! Here is a revised version«', '⟦U+200B⟧', '⟨а⟩', 'does not calculate an AI percentage',
+                             '»Certainly! Here is a revised version«', '⟦U+200B⟧', '⟨а⟩', 'separate from the optional AI detector',
                              '“Find academic publications” mode'):
                 assert expected in panel, (expected, panel)
             assert 'AI percentage: not calculated' in page.locator('#scope').inner_text()
