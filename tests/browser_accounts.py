@@ -48,11 +48,22 @@ class Pangram(http.server.BaseHTTPRequestHandler):
         self.reply(RESULT)
 
 
-def tg_result(user_id=42):
+def tg_data(user_id=42):
     data = {"id": user_id, "first_name": "Dilnoza", "last_name": "Karimova", "username": "dilnoza", "auth_date": int(time.time())}
     check = "\n".join(f"{k}={data[k]}" for k in sorted(data))
     data["hash"] = hmac.new(hashlib.sha256(TOKEN.encode()).digest(), check.encode(), hashlib.sha256).hexdigest()
-    return base64.urlsafe_b64encode(json.dumps(data, ensure_ascii=False).encode()).decode().rstrip("=")
+    return data
+
+
+def tg_result(user_id=42):
+    return base64.urlsafe_b64encode(json.dumps(tg_data(user_id), ensure_ascii=False).encode()).decode().rstrip("=")
+
+
+def telegram_popup(route):
+    """Stands in for oauth.telegram.org: like Telegram's page, it posts the signed result to the opener and closes."""
+    message = json.dumps({"event": "auth_result", "result": tg_data()})
+    route.fulfill(status=200, content_type="text/html",
+                  body=f"<script>window.opener.postMessage({json.dumps(message)}, '*'); window.close();</script>")
 
 
 fake = http.server.ThreadingHTTPServer(("127.0.0.1", 0), Pangram)
@@ -79,11 +90,17 @@ try:
             page.locator('#consent').check()
             page.locator('button[type=submit]').click()
             assert 'Please sign in with Telegram' in page.locator('#status').inner_text()
-            with page.expect_request(lambda r: r.url.startswith('https://oauth.telegram.org/auth')) as req:
-                page.route('https://oauth.telegram.org/**', lambda route: route.abort())
+            page.context.route('https://oauth.telegram.org/**', telegram_popup)
+            with page.expect_popup() as popup:
                 page.locator('#account button.tg').click()
-            assert 'bot_id=123456789' in req.value.url and 'return_to=http%3A%2F%2F127.0.0.1%3A8146%2Flogin' in req.value.url
-            page.goto('http://127.0.0.1:8146/login#tgAuthResult=' + tg_result())
+            assert popup.value.url.startswith('https://oauth.telegram.org/auth?bot_id=123456789&origin=http%3A%2F%2F127.0.0.1%3A8146')
+            page.wait_for_selector('#account summary')                              # PlagIQ tab stays open
+            assert 'Dilnoza Karimova' in page.locator('#account summary').inner_text()
+            assert page.locator('#status').inner_text() == ''                        # "sign in first" message cleared
+            page.locator('#account summary').click()
+            page.locator('#account .menu button', has_text='Sign out').click()
+            page.wait_for_selector('#account button.tg')
+            page.goto('http://127.0.0.1:8146/login#tgAuthResult=' + tg_result())    # redirect fallback still works
             page.wait_for_selector('#account summary')
             assert 'Dilnoza Karimova' in page.locator('#account summary').inner_text() and page.url.endswith('/')
             assert page.locator('#login-note').is_hidden()
