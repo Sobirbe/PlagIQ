@@ -246,3 +246,22 @@ def test_latin_uzbek_quoting_russian_is_accepted(tmp_path):
     with connect(tmp_path / 'i.db') as db:
         ingest(db, meta('uz'), text)
         assert db.execute('SELECT count(*) FROM sources').fetchone()[0] == 1
+
+
+def test_number_runs_are_not_matches():
+    """Chart ticks, year rows and table digits coincide across unrelated papers (seen in a live report)."""
+    import corpus
+    ticks = "8 -6 -4 -2 0 2 4 6 8 and 2003! 2004! 2005! 2006! 2007! 2008! 2009! 2010! 2011! 2012"
+    _, evidence, covered, _ = corpus.compare_texts("Figure 3 shows " + ticks + " here.", ["Chart " + ticks + " end"], "en")
+    assert evidence == [None] and not covered
+    table = "Table 2 1.2 3.4 5.6 7.8 9.1 2.3 4.5 6.7 8.9 GDP"
+    assert corpus.compare_texts("See " + table, [table + " more"], "en")[2] == set()
+
+
+def test_sentences_with_numbers_still_match():
+    import corpus
+    sentence = "Real GDP grew by 5 percent in 2003 and 2004 according to the national statistics committee"
+    _, evidence, covered, _ = corpus.compare_texts("Intro. " + sentence + ".", [sentence], "en")
+    assert evidence[0]["matched_words"] == 16 and len(covered) == 16
+    uz = "2020 yilda 15 foiz o‘sish 3 ta viloyatda kuzatildi va bu 2021 yilda davom etdi"
+    assert corpus.compare_texts(uz, [uz], "uz")[1][0]["matched_words"] == len(uz.split())
