@@ -313,7 +313,8 @@ async def analyse(submission, reference, reference_text, language, mode, options
         result["matched_source_count"] = sum(1 for e in result["sources"] if e["matched_tokens"])
         result.update({"mode":"academic","reference":"None","source_count":len(discovery["sources"]),
                        "database_status":discovery["status"],"database_message":discovery["message"],
-                       "queries":discovery["queries"],"self_comparison":False,
+                       "queries":discovery["queries"],"search_phrases":discovery.get("query_texts", []),
+                       "self_comparison":False,
                        "scope":"OpenAlex metadata discovery, and exact token matching against returned abstracts only. NO full-text publisher corpus or web-wide plagiarism check."})
     else:
         try:
@@ -378,6 +379,10 @@ def highlight(text, segments):
     return "".join(out).replace("\n", "<br>")
 
 
+# Manuscript text shown to the user once, never kept in the report cache or PDF.
+PRIVATE_FIELDS = ("highlight_html", "search_phrases")
+
+
 def finish(request, result):
     identifier = uuid.uuid4().hex
     while len(results) >= MAX_REPORTS:
@@ -386,7 +391,7 @@ def finish(request, result):
     response = JSONResponse({"report_id":identifier, **result})
     # Do not retain manuscript highlights or raw text in the report cache.
     results[identifier] = {"owner": owner, "expires": time.monotonic() + REPORT_TTL,
-                           "result": {k:v for k,v in result.items() if k != "highlight_html"}}
+                           "result": {k:v for k,v in result.items() if k not in PRIVATE_FIELDS}}
     response.set_cookie("plagiq_session", owner, max_age=REPORT_TTL,
                         httponly=True, secure=request.url.scheme == "https" or bool(os.getenv("PUBLIC_ORIGIN", "").startswith("https://")), samesite="strict")
     return response
