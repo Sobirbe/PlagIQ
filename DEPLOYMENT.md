@@ -180,6 +180,16 @@ Put the keys in Railway Variables on the engine service as `OPENALEX_API_KEY` an
 
 **How much is available** (OpenAlex counts, November 2026, using OpenAlex's own language labels): Uzbek-language works with a reusable licence 110,482 (47,734 with an OpenAlex PDF copy); Russian-language 460,073; Russian-language by Uzbekistan-based authors 13,914; English by Uzbekistan-based authors 103,155. At about 0.17 MB of index per article, 100,000 articles would need roughly 17 GB; this size has not been benchmarked yet, so raise `CORPUS_MAX_SOURCES` in steps and re-run the benchmark.
 
+## Part 3f — QR code verification on PDF reports
+
+Every PDF report can carry a QR code. A supervisor or editor scans it and sees a PlagIQ page confirming the report's date, result, number of words, sources compared, language and the start of the document's fingerprint (SHA-256). If anyone changes those figures, the page says **not valid**.
+
+- **No storage needed.** The facts are signed with a secret only your server knows, so the codes keep working after the report itself is deleted (15 minutes) and after restarts. The link contains no file name and no text of the manuscript.
+- **To switch it on:** website service → **Variables** → add `VERIFY_SECRET` = a random secret of at least 40 characters (use your password manager's generator) → redeploy. Make sure `PUBLIC_ORIGIN` is your real address (e.g. `https://plagiq-production.up.railway.app`) so the QR code points there.
+- **Keep the secret unchanged.** Changing it makes all earlier QR codes show "not valid". Never share it.
+- Without `VERIFY_SECRET`, reports say "Online verification: not set up on this server".
+- The verification page works even when the private-pilot login is on, because it shows only the signed facts.
+
 ## Part 3e — Full-text comparison during academic checks (on by default)
 
 In **Find academic publications** mode, PlagIQ now downloads the free full texts (PDFs) of the most relevant papers it finds and compares the manuscript against the **whole articles**, not only their abstracts. The texts are used for that one check and then discarded; they are not stored. Your lawyer has confirmed this use.
