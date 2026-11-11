@@ -89,6 +89,40 @@ def suggest_queries(text, max_queries=MAX_QUERIES):
     return unique[:max_queries]
 
 
+# Very common words that make an OpenAlex phrase search needlessly strict.
+STOPWORDS = frozenset("""
+va bilan uchun hamda ham bu ushbu esa yoki ekan bo'lib bo'yicha qilish kerak orqali sifatida bo'lgan
+bir har shu ular uning ularning qilingan etilgan
+и в во на для с со по от до из к ко о об что как это а но или также при не
+the of and in to is for with that are on as by this from an be at or which its their
+""".split())
+MIN_RESULTS = 3
+
+
+def keywords(query, n):
+    """The first n meaningful words of an excerpt (4+ letters, not a common function word)."""
+    words = re.findall(r"[^\W\d_]+(?:['’ʻʼ‘][^\W\d_]+)*", query)
+    norm = lambda w: re.sub(r"['’ʻʼ‘]", "'", w.lower())
+    return " ".join([w for w in words if len(w) >= 4 and norm(w) not in STOPWORDS][:n])
+
+
+def _search_relaxed(query, language, max_results):
+    """OpenAlex requires every search word to match, so a long sentence often
+    finds nothing. If fewer than MIN_RESULTS come back, retry with its 6, then
+    4, most meaningful words. Returns (results, phrase actually used)."""
+    results, used = _search(query, language, max_results), query
+    for n in (6, 4):
+        if len(results) >= MIN_RESULTS:
+            break
+        shorter = keywords(query, n)
+        if len(shorter.split()) < 2 or shorter.lower() == used.lower():
+            continue
+        retry = _search(shorter, language, max_results)
+        if len(retry) > len(results):
+            results, used = retry, shorter
+    return results, used
+
+
 def _search(query, language, max_results):
     params = {"search": query, "per_page": str(min(max_results, 10)),
               "select": "id,display_name,doi,publication_year,abstract_inverted_index,primary_location,"
@@ -116,7 +150,9 @@ def discover(text, max_results=8, language=None):
     if not queries:
         return {"status": "no_query", "sources": [], "queries": 0, "message": "No search phrase could be extracted"}
     with ThreadPoolExecutor(max_workers=len(queries)) as pool:
-        outcomes = list(pool.map(lambda q: _safe(_search, q, language, max_results), queries))
+        outcomes = list(pool.map(lambda q: _safe(_search_relaxed, q, language, max_results), queries))
+    used = [o[1] if not isinstance(o, Exception) else q for o, q in zip(outcomes, queries)]
+    outcomes = [o[0] if not isinstance(o, Exception) else o for o in outcomes]
     failures = [o for o in outcomes if isinstance(o, Exception)]
     if len(failures) == len(outcomes):
         return {"status": "unavailable", "sources": [], "queries": len(queries), "query_texts": queries,
@@ -139,7 +175,7 @@ def discover(text, max_results=8, language=None):
                             "abstract": abstract[:20000], "coverage": "abstract" if abstract else "metadata_only",
                             "access": open_access_links(work)})
     status = "partial" if failures else "searched"
-    return {"status": status, "sources": sources, "queries": len(queries), "query_texts": queries,
+    return {"status": status, "sources": sources, "queries": len(queries), "query_texts": used,
             "failed_queries": len(failures),
             "message": (f"{len(failures)} of {len(queries)} OpenAlex searches failed; " if failures else "")
                        + "OpenAlex metadata searched; only returned abstracts can be text-compared"}
