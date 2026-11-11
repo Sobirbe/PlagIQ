@@ -297,6 +297,12 @@ async def check(request:Request, submission:UploadFile=File(...),
 
 async def analyse(submission, reference, reference_text, language, mode, options=None):
     original = await read_file(submission)
+    # The menu defaults to Uzbek; when the text clearly is another language, use that
+    # (search filter and normalization depend on it) and say so in the result.
+    chosen = language
+    detected = await run_in_threadpool(corpus.detect_language, original)
+    if detected and detected != chosen:
+        language = detected
     require_tokens(original, language, "too_short",
                    "At least 7 words of readable text are needed for seven-word matching.")
     if mode == "reference":
@@ -367,6 +373,8 @@ async def analyse(submission, reference, reference_text, language, mode, options
             "sources_truncated":summary["sources_truncated"],
             "intervals":summary["intervals"] if evaluated else [],
         }
+    if detected and detected != chosen:
+        result["language_note"] = {"selected": chosen, "detected": detected}
     intervals = result.pop("intervals", [])
     result["highlight_html"] = ""
     if result.get("percent") is not None:

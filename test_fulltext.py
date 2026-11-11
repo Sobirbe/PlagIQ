@@ -33,6 +33,7 @@ def publisher():
 
         def do_GET(self):
             routes = {'/article.pdf': (200, 'application/pdf', pdf(ARTICLE)),
+                      '/content/works/W7.pdf': (200, 'application/pdf', pdf(ARTICLE)),
                       '/landing': (200, 'text/html', b'<html><head><meta name="citation_pdf_url" content="/article.pdf"></head></html>'),
                       '/broken.pdf': (200, 'application/pdf', b'not a pdf'),
                       '/robots.txt': (404, 'text/plain', b'')}
@@ -65,7 +66,8 @@ def test_fetch_counts_successes_failures_and_timeouts(publisher):
     sources = [source(1, publisher, ['/article.pdf']), source(2, publisher, pages=['/landing']),
                source(3, publisher, ['/broken.pdf']), source(4, publisher, ['/slow.pdf']), source(5, publisher)]
     stats = fulltext.fetch_fulltexts(sources, max_works=8, seconds=1.5, fetcher_factory=local_fetcher)
-    assert stats == {'attempted': 4, 'compared': 2, 'failed': 1, 'timed_out': 1}
+    assert stats == {'attempted': 4, 'compared': 2, 'failed': 1, 'timed_out': 1,
+                     'reasons': {'not a PDF': 1, 'timed out': 1}}
     assert sources[0]['fulltext_via'] == 'pdf' and sources[1]['fulltext_via'] == 'article page'
     assert BODY.split()[3] in sources[0]['fulltext'] and 'fulltext' not in sources[4]
 
@@ -107,3 +109,44 @@ def test_settings_bounded(monkeypatch):
     monkeypatch.setenv('FULLTEXT_SECONDS', '1')
     monkeypatch.setenv('FULLTEXT_OPENALEX_PDF', '1')
     assert fulltext.settings() == (True, 20, 5, True)
+
+
+def test_doi_style_pdf_link_leading_to_html_page(publisher):
+    """OpenAlex often lists a doi.org link as 'pdf_url'; it leads to the article page, which names the PDF."""
+    sources = [source(1, publisher, ['/landing'])]
+    stats = fulltext.fetch_fulltexts(sources, seconds=5, fetcher_factory=local_fetcher)
+    assert stats['compared'] == 1 and sources[0]['fulltext_via'] == 'pdf'
+
+
+def test_openalex_copy_first_when_allowed(publisher, monkeypatch):
+    s = source(7, publisher, ['/broken.pdf'])
+    s['access']['openalex_pdf'] = True
+    stats = fulltext.fetch_fulltexts([s], seconds=5, allow_paid=True, content_base=publisher + '/content',
+                                     fetcher_factory=local_fetcher)
+    assert stats['compared'] == 1 and s['fulltext_via'] == 'OpenAlex copy'
+
+
+def test_reason_labels():
+    from harvest import HarvestError
+    assert fulltext.reason(HarvestError('robots.txt disallows x')) == 'blocked by robots.txt'
+    assert fulltext.reason(OSError('The read operation timed out')) == 'timed out'
+    assert fulltext.reason(Exception('HTTP Error 403: Forbidden')) == 'refused by the website (403)'
+
+
+def test_language_detected_from_text_and_reported(monkeypatch):
+    import pymupdf
+    monkeypatch.setattr(web, 'discover', lambda text, *a: dict(sources=[], status='searched', message='', queries=1,
+                                                               query_texts=['q'], language_used=a[1] if len(a) > 1 else None))
+    calls = []
+    real = web.discover
+    monkeypatch.setattr(web, 'discover', lambda text, n, lang: calls.append(lang) or real(text, n, lang))
+    web.RATE.clear(); web.results.clear()
+    english = ('The quality of higher education is assessed with the help of new indicators for the region and the country. ' * 8)
+    client = TestClient(web.app)
+    data = client.post('/api/check', data={'mode': 'academic', 'language': 'uz', 'consent': 'true'},
+                       files={'submission': ('m.txt', english.encode())}).json()
+    assert calls == ['en'] and data['language'] == 'en' and data['language_note'] == {'selected': 'uz', 'detected': 'en'}
+    pdf = client.get(f"/api/report/{data['report_id']}.pdf?lang=uz").content
+    with pymupdf.open(stream=pdf, filetype='pdf') as doc:
+        text = ' '.join(''.join(p.get_text() for p in doc).split())
+    assert 'EN (matndan aniqlandi; tanlangan: UZ)' in text
