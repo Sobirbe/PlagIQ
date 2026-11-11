@@ -190,11 +190,17 @@ Every PDF report can carry a QR code. A supervisor or editor scans it and sees a
 - Without `VERIFY_SECRET`, reports say "Online verification: not set up on this server".
 - The verification page works even when the private-pilot login is on, because it shows only the signed facts.
 
-## Part 3g — Internet search with Yandex (optional, off until you add a key)
+## Part 3g — Internet search with Yandex and/or Brave (optional, off until you add a key)
 
-Antiplagiat-style services also search the open web. With a Yandex key, PlagIQ can do the same for **Russian and Uzbek web pages** (and English through Yandex's international search). The user must tick a separate box, "Also search the web with Yandex"; it is off by default and appears only in **Find academic publications** mode.
+Antiplagiat-style services also search the open web. With a Yandex key, PlagIQ can do the same for **Russian and Uzbek web pages** (and English through Yandex's international search). **Brave Search API** is simpler to set up and covers English well. You can use either one or both. The user must tick a separate box, "Also search the web with …" (it names the services you set up); it is off by default and appears only in **Find academic publications** mode.
 
-**What happens:** the same 3 short excerpts (at most 14 words each) already sent to OpenAlex are searched in Yandex, first as an exact phrase in quotes, then without quotes if nothing is found. Up to 6 result pages (web pages or PDFs) are downloaded, compared word by word with the same seven-word matcher, and discarded. The report marks them "Web page (compared, not stored)" and shows a line such as "Web (Yandex): 2 searches, 6 pages tried, 4 compared".
+**What happens:** the same 3 short excerpts (at most 14 words each) already sent to OpenAlex are searched, first as an exact phrase in quotes, then without quotes if nothing is found. With both services set up, Russian and Uzbek manuscripts go to Yandex first and English ones to Brave first; the other service is used for an excerpt only if the first one fails (for example, a rate limit). Up to 6 result pages (web pages or PDFs) are downloaded, compared word by word with the same seven-word matcher, and discarded. The report marks them "Web page (compared, not stored)" and shows a line such as "Web (Yandex): 2 searches, 6 pages tried, 4 compared".
+
+**Set-up for Brave (about 5 minutes):**
+1. Sign up at api-dashboard.search.brave.com and choose a **Search** plan (check its current price and monthly request limit there). Each PlagIQ check makes **at most 6 searches**.
+2. **API keys → Add API key**; copy it once. It is a secret.
+3. Railway → **website** service → **Variables**: add `BRAVE_API_KEY` = the key → redeploy.
+4. If your plan allows more than one request per second, you may set `BRAVE_INTERVAL=0`; the default `1` keeps to the basic plan's limit (a check then takes up to ~6 seconds longer).
 
 **Set-up in Yandex Cloud (about 15 minutes):**
 1. Sign in at console.yandex.cloud and create a **billing account** (Yandex Search API is a paid service; check the current price per 1,000 requests on its pricing page). Each PlagIQ check makes **at most 6 searches**.
@@ -202,17 +208,19 @@ Antiplagiat-style services also search the open web. With a Yandex key, PlagIQ c
 3. **Service accounts → Create**: name `plagiq-search`, role **`search-api.webSearch.user`**.
 4. Open the service account → **Create new key → API key**, scope **`yc.search-api.execute`**. Copy the key once; it is a secret.
 5. Railway → **website** service → **Variables**: add `YANDEX_API_KEY` = the key and `YANDEX_FOLDER_ID` = the folder ID → redeploy.
-6. Check `https://<your site>/health` shows `"web_search": true`, then run an academic check with the box ticked.
+6. Check `https://<your site>/health` shows `"web_search": true` and the services in `"web_providers"`, then run an academic check with the box ticked.
 
 | Name (website service) | Default | Meaning |
 |---|---|---|
+| `BRAVE_API_KEY` | — | Brave Search API key (secret; only in Railway Variables) |
+| `BRAVE_INTERVAL` | `1` | seconds between Brave requests (0–5) |
 | `YANDEX_API_KEY` | — | service-account API key (secret; only in Railway Variables) |
 | `YANDEX_FOLDER_ID` | — | Yandex Cloud folder ID |
 | `WEB_SEARCH` | `1` | `0` hides the option even when a key is set |
 | `WEB_MAX_PAGES` | `6` | result pages downloaded per check (1–15) |
 | `WEB_SECONDS` | `20` | time limit for those downloads (5–60) |
 
-**Privacy note:** tell users (as the tick box does) that excerpts go to Yandex as well as OpenAlex. Do not tick it for confidential manuscripts.
+**Privacy note:** the tick box tells users that excerpts go to the named search services as well as OpenAlex. Do not tick it for confidential manuscripts.
 
 ## Part 3h — AI-writing and manipulation indicators (on by default)
 

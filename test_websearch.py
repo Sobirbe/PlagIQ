@@ -3,6 +3,8 @@ import base64
 import http.server
 import json
 import threading
+import time
+from urllib.parse import parse_qs, urlsplit
 
 import pytest
 from fastapi.testclient import TestClient
@@ -18,6 +20,8 @@ PAGE_RU = ("<html><head><meta charset='windows-1251'><script>var hidden = 'не 
            + "</p><p>Денежные переводы мигрантов меняют бюджеты сельских домохозяйств Ферганской долины.</p></body></html>")
 PAGE_EN = "<html><body><article><p>" + "Background on household economics. " * 40 + COPIED + "</p></article></body></html>"
 
+BRAVE = []                                                   # Brave requests seen by the simulated API
+
 
 def xml(urls, error=None):
     if error:
@@ -31,7 +35,8 @@ def xml(urls, error=None):
 
 @pytest.fixture()
 def site(monkeypatch):
-    calls = []
+    calls, brave = [], BRAVE
+    brave.clear()
 
     class Handler(http.server.BaseHTTPRequestHandler):
         def log_message(self, *a):
@@ -53,6 +58,19 @@ def site(monkeypatch):
             self.wfile.write(json.dumps({'rawData': base64.b64encode(raw).decode()}).encode())
 
         def do_GET(self):
+            if self.path.startswith('/brave'):
+                query = parse_qs(urlsplit(self.path).query)
+                brave.append((self.headers['X-Subscription-Token'], query, time.monotonic()))
+                q = query['q'][0]
+                if 'limited' in q:
+                    self.send_response(429); self.end_headers(); return
+                results = [] if q.startswith('"') else [{'url': base + '/en', 'title': 'Household &amp; economics'},
+                                                        {'url': 'javascript:alert(1)', 'title': 'x'}, {'title': 'no url'}]
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({'type': 'search', 'web': {'results': results}}).encode())
+                return
             routes = {'/en': ('text/html; charset=utf-8', PAGE_EN.encode()),
                       '/ru': ('text/html', PAGE_RU.encode('windows-1251')),
                       '/short': ('text/html', b'<p>Too short.</p>'), '/robots.txt': ('text/plain', b'')}
@@ -68,6 +86,9 @@ def site(monkeypatch):
     monkeypatch.setenv('YANDEX_API_KEY', 'test-key')
     monkeypatch.setenv('YANDEX_FOLDER_ID', 'b1gtestfolder')
     monkeypatch.setenv('YANDEX_SEARCH_URL', base + '/v2/web/search')
+    monkeypatch.setenv('BRAVE_SEARCH_URL', base + '/brave')
+    monkeypatch.setenv('BRAVE_INTERVAL', '0')
+    monkeypatch.delenv('BRAVE_API_KEY', raising=False)
     monkeypatch.delenv('WEB_SEARCH', raising=False)
     yield base, calls
     server.shutdown()
@@ -78,7 +99,7 @@ def local_fetcher():
 
 
 def test_settings_require_key_and_folder(monkeypatch):
-    for name in ('YANDEX_API_KEY', 'YANDEX_FOLDER_ID', 'WEB_SEARCH'):
+    for name in ('YANDEX_API_KEY', 'YANDEX_FOLDER_ID', 'WEB_SEARCH', 'BRAVE_API_KEY'):
         monkeypatch.delenv(name, raising=False)
     assert websearch.settings() == (False, 6, 20)
     monkeypatch.setenv('YANDEX_API_KEY', 'k')
@@ -100,15 +121,15 @@ def test_parse_results_and_errors():
 
 def test_search_exact_phrase_then_unquoted_and_dedupe(site):
     base, calls = site
-    found, searches, errors = websearch.search(['household budgets Fergana valley'], 'ru')
-    assert searches == 2 and not errors
+    found, searches, errors, used = websearch.search(['household budgets Fergana valley'], 'ru')
+    assert searches == 2 and not errors and used == ['Yandex']
     assert [u for u, _ in found] == [base + '/en', base + '/ru', base + '/short']    # '#top' duplicate removed
     auth, body = calls[0]
     assert auth == 'Api-Key test-key' and body['folderId'] == 'b1gtestfolder'
     assert body['query']['queryText'] == '"household budgets Fergana valley"'
     assert body['query']['searchType'] == 'SEARCH_TYPE_RU' and calls[1][1]['query']['queryText'] == 'household budgets Fergana valley'
-    _, _, errors = websearch.search(['broken query'], 'en')
-    assert errors == ['search refused (403)']
+    _, _, errors, _ = websearch.search(['broken query'], 'en')
+    assert errors == ['Yandex: search refused (403)']
 
 
 def test_page_text_decodes_windows_1251_and_skips_scripts(site):
@@ -142,8 +163,66 @@ def test_check_uses_web_only_with_consent_and_keeps_no_page_text(site, monkeypat
     assert calls == [] and without['web'] == {'enabled': False} and without['percent'] is None
     data = check({'web_search': 'true'})
     assert data['web']['compared'] == 2 and data['percent'] > 50
-    top = data['sources'][0]
+    top = max(data['sources'], key=lambda s: s['matched_tokens'])           # page order depends on download timing
     assert top['coverage'] == 'web' and top['url'] == base + '/en' and top['passages']
     assert 'Yandex' in data['scope']
     assert 'Background on household economics' not in repr(web.results[data['report_id']])
     assert TestClient(web.app).get('/health').json()['web_search'] is True
+
+
+def test_provider_order_by_language(monkeypatch):
+    monkeypatch.delenv('WEB_SEARCH', raising=False)
+    monkeypatch.setenv('YANDEX_API_KEY', 'k'); monkeypatch.setenv('YANDEX_FOLDER_ID', 'f')
+    monkeypatch.setenv('BRAVE_API_KEY', 'b')
+    assert websearch.providers('en') == ['Brave', 'Yandex']
+    assert websearch.providers('ru') == websearch.providers('uz') == ['Yandex', 'Brave']
+    monkeypatch.delenv('YANDEX_API_KEY')
+    assert websearch.providers('ru') == ['Brave'] and websearch.settings()[0]
+
+
+def test_parse_brave_ignores_bad_items():
+    data = {'web': {'results': [{'url': 'https://a.uz/x', 'title': 'A &amp; B'}, {'url': 'ftp://x'}, 'junk', {'title': 't'}]}}
+    assert websearch.parse_brave(data) == [('https://a.uz/x', 'A & B')]
+    assert websearch.parse_brave({'type': 'search'}) == [] and websearch.parse_brave([]) == []
+
+
+def test_brave_search_english_first_and_request_format(site, monkeypatch):
+    base, calls = site
+    monkeypatch.setenv('BRAVE_API_KEY', 'brave-token')
+    found, searches, errors, used = websearch.search(['household budgets'], 'en')
+    assert used == ['Brave'] and calls == [] and searches == 2 and not errors        # Yandex not needed
+    assert found == [(base + '/en', 'Household & economics')]
+    token, query, _ = BRAVE[0]
+    assert token == 'brave-token' and query['q'] == ['"household budgets"'] and query['search_lang'] == ['en']
+    BRAVE.clear()
+    websearch.search(['household budgets'], 'uz')                                    # Yandex first for Uzbek
+    assert calls and not BRAVE
+
+
+def test_falls_back_to_second_provider_and_spaces_brave_requests(site, monkeypatch):
+    base, calls = site
+    monkeypatch.setenv('BRAVE_API_KEY', 'brave-token')
+    found, _, errors, used = websearch.search(['limited query'], 'en')               # Brave 429 -> Yandex
+    assert errors == ['Brave: search refused (429)'] and used == ['Yandex'] and found
+    monkeypatch.delenv('YANDEX_API_KEY')
+    monkeypatch.setenv('BRAVE_INTERVAL', '0.3')
+    BRAVE.clear()
+    websearch.search(['one', 'two'], 'en')
+    times = [t for _, _, t in BRAVE]
+    assert len(times) == 4 and min(b - a for a, b in zip(times, times[1:])) >= 0.25
+
+
+def test_check_with_brave_reports_provider(site, monkeypatch):
+    base, _ = site
+    monkeypatch.delenv('YANDEX_API_KEY')
+    monkeypatch.setenv('BRAVE_API_KEY', 'brave-token')
+    monkeypatch.setattr(web, 'discover', lambda text, *a: dict(sources=[], status='searched', message='', queries=1,
+                                                               query_texts=['household budgets']))
+    monkeypatch.setattr(websearch.fulltext, 'make_fetcher', local_fetcher)
+    web.RATE.clear(); web.results.clear()
+    manuscript = 'My own introduction to the topic of this essay. ' + COPIED + 'My own conclusion follows here.'
+    data = TestClient(web.app).post('/api/check', data={'mode': 'academic', 'language': 'en', 'consent': 'true', 'web_search': 'true'},
+                                    files={'submission': ('m.txt', manuscript.encode())}).json()
+    assert data['web']['providers'] == ['Brave'] and data['web']['compared'] == 1 and data['percent'] > 50
+    assert 'Brave' in data['scope'] and data['sources'][0]['coverage'] == 'web'
+    assert TestClient(web.app).get('/health').json()['web_providers'] == ['Brave']
