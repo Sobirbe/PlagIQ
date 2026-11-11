@@ -514,6 +514,24 @@ def remove_deposit(db, identifier, owner):
         return remove(db, identifier)
 
 
+def restore_deposits(db, path):
+    """Load a deposit backup (plagiq-archive.jsonl.gz from /admin) back into the index.
+    Existing identical deposits are replaced; returns how many were restored."""
+    import gzip
+    restored = 0
+    with gzip.open(path, 'rt', encoding='utf-8') as handle:
+        for line in handle:
+            if not line.strip():
+                continue
+            item = json.loads(line)
+            metadata = {k: v for k, v in item['metadata'].items() if k not in ('sha256', 'imported_at', 'words')}
+            if metadata.get('rights_basis') not in DEPOSITS:
+                raise ValueError('Backup contains a non-deposit record; refusing to restore it')
+            ingest(db, metadata, item['text'])
+            restored += 1
+    return restored
+
+
 def inventory(db):
     rows = [json.loads(raw) for (raw,) in db.execute('SELECT metadata FROM sources')]
     return sorted(rows, key=lambda m: (m['language'], m.get('title', '')))
@@ -530,6 +548,9 @@ def _cli(args, parser):
             records = import_manifest(db, args.manifest)
             print(f'Imported {len(records)} authorized sources. No remote content downloaded. '
                   f'Corpus version {corpus_version(db)}.')
+    if getattr(args, 'restore_archive', None):
+        with closing(connect(args.db)) as db:
+            print(f'Restored {restore_deposits(db, args.restore_archive)} deposit(s).')
     if args.remove:
         with closing(connect(args.db)) as db, db:
             removed = remove(db, args.remove)
@@ -542,7 +563,7 @@ def _cli(args, parser):
                       f"{m['sha256'][:12]}  {m.get('title', '')[:70]}")
             counts = {lang: sum(m['language'] == lang for m in rows) for lang in LANGUAGES}
             print(f"Total {len(rows)} (uz {counts['uz']}, ru {counts['ru']}, en {counts['en']}); corpus version {corpus_version(db)}")
-    if not (args.manifest or args.list or args.remove):
+    if not (args.manifest or args.list or args.remove or getattr(args, 'restore_archive', None)):
         parser.print_help()
 
 
@@ -553,6 +574,7 @@ if __name__ == '__main__':
     parser.add_argument('--check', action='store_true', help='validate the manifest only; write nothing')
     parser.add_argument('--list', action='store_true', help='list indexed sources and coverage by language')
     parser.add_argument('--remove', metavar='SHA256', help='remove one source by its SHA-256 identifier')
+    parser.add_argument('--restore-archive', metavar='FILE', type=Path, help='restore deposits from plagiq-archive.jsonl.gz')
     args = parser.parse_args()
     try:
         _cli(args, parser)

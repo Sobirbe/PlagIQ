@@ -119,6 +119,32 @@ def read(cookie, now=None):
     return {"id": int(data["id"]), "name": str(data.get("name", "")), "username": str(data.get("username", ""))}
 
 
+def is_owner(user):
+    """Site owners (OWNER_TELEGRAM_IDS, comma-separated Telegram user IDs) see /admin."""
+    ids = {x.strip() for x in os.environ.get("OWNER_TELEGRAM_IDS", "").split(",") if x.strip().isdigit()}
+    return bool(user) and str(user["id"]) in ids
+
+
+def stats():
+    """Counts for the owner dashboard (no personal data)."""
+    try:
+        with _lock, _connect() as db:
+            users = db.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+            day = time.strftime("%Y-%m-%d", time.gmtime())
+            week = time.strftime("%Y-%m-%d", time.gmtime(time.time() - 7 * 86400))
+            checks = db.execute("SELECT COUNT(*), SUM(date >= ?), SUM(date >= ?) FROM checks", (day, week)).fetchone()
+            modes = dict(db.execute("SELECT mode, COUNT(*) FROM checks WHERE date >= ? GROUP BY mode", (week,)).fetchall())
+    except sqlite3.Error:
+        return None
+    return {"users": users, "checks_total": checks[0] or 0, "checks_today": checks[1] or 0,
+            "checks_week": checks[2] or 0, "modes_week": modes, "db_path": _db_path(),
+            "on_volume": _db_path().startswith("/data/") and Path("/data").is_dir()}
+
+
+def db_file():
+    return _db_path()
+
+
 def owner_id(user):
     """Stable, non-reversible owner label for a user's archive deposits ("" when signed out)."""
     if not user:

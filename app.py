@@ -24,6 +24,8 @@ import integrity
 import aidetect
 import auth
 import institutions
+import admin
+from fastapi.responses import FileResponse, StreamingResponse
 import pricing
 import verify
 import extract
@@ -295,6 +297,11 @@ def _secure(request):
     return request.url.scheme == "https" or os.getenv("PUBLIC_ORIGIN", "").startswith("https://")
 
 
+@app.get("/privacy", response_class=HTMLResponse)
+def privacy_page():
+    return HTMLResponse(Path(__file__).with_name("privacy.html").read_text("utf-8"))
+
+
 @app.get("/login", response_class=HTMLResponse)
 def login_page():
     """Telegram returns here with #tgAuthResult=...; the page script finishes sign-in."""
@@ -453,7 +460,52 @@ async def library_counts():
     if time.monotonic() - LIBRARY_CACHE["at"] > 60:
         LIBRARY_CACHE.update(at=time.monotonic(), data=await engine_library())
     data = LIBRARY_CACHE["data"]
-    return {"configured": corpus_configured(), "available": data is not None, **(data or {})}
+    public = {k: v for k, v in (data or {}).items() if k not in ("disk", "imports")}    # owner-only details
+    return {"configured": corpus_configured(), "available": data is not None, **public}
+
+
+def owner(request):
+    user = auth.read(request.cookies.get(auth.COOKIE))
+    if not auth.is_owner(user):
+        raise ApiError(404, "report_unavailable", "Not found")       # the page does not exist for others
+    return user
+
+
+@app.get("/admin", response_class=HTMLResponse)
+async def admin_page(request: Request):
+    owner(request)
+    data = await engine_library() if corpus_configured() else None
+    return HTMLResponse(admin.page({"available": data is not None, **(data or {})}), headers={"Cache-Control": "no-store"})
+
+
+@app.get("/admin/backup/archive.jsonl.gz")
+async def admin_backup_archive(request: Request):
+    owner(request)
+    if not corpus_configured():
+        raise ApiError(503, "engine_not_configured", "Private PlagIQ corpus engine is not configured.")
+    try:
+        body = await engine_client.export_archive()
+    except EngineError as exc:
+        raise ApiError(503, exc.code, str(exc))
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%d")
+    return StreamingResponse(body, media_type="application/gzip",
+                             headers={"Content-Disposition": f'attachment; filename="plagiq-archive-{stamp}.jsonl.gz"'})
+
+
+@app.get("/admin/backup/accounts.sqlite3")
+def admin_backup_accounts(request: Request):
+    owner(request)
+    path = auth.db_file()
+    if not os.path.exists(path):
+        raise ApiError(404, "report_unavailable", "No accounts database yet")
+    import sqlite3, tempfile
+    copy = tempfile.NamedTemporaryFile(suffix=".sqlite3", delete=False).name
+    with sqlite3.connect(path) as source, sqlite3.connect(copy) as target:
+        source.backup(target)                       # consistent copy while the site is running
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%d")
+    from starlette.background import BackgroundTask
+    return FileResponse(copy, media_type="application/vnd.sqlite3", filename=f"plagiq-accounts-{stamp}.sqlite3",
+                        background=BackgroundTask(os.unlink, copy))
 
 
 @app.get("/api/pricing")

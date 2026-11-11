@@ -1,0 +1,107 @@
+"""Owner dashboard (/admin): what is switched on, what is missing, library and usage.
+
+Only Telegram accounts listed in OWNER_TELEGRAM_IDS can open it. It shows no secrets
+(only whether a setting is present) and no manuscript text or personal data beyond
+counts. Each missing item names the setting and the DEPLOYMENT.md section to follow.
+"""
+import html
+import os
+
+import aidetect
+import auth
+import institutions
+import verify
+import websearch
+from engine_client import configured as engine_configured
+
+
+def checklist(library):
+    """[(area, ok, detail, how-to)]"""
+    origin = os.environ.get("PUBLIC_ORIGIN", "")
+    stats = auth.stats() if auth.enabled() else None
+    providers = websearch.providers()
+    rows = [
+        ("Telegram sign-in", auth.enabled(), "on, @" + auth.public_config()["bot_username"] if auth.enabled() else "off",
+         "TELEGRAM_BOT_TOKEN and TELEGRAM_BOT_USERNAME on the website (Part 3i)"),
+        ("Accounts kept across deploys", bool(stats and stats["on_volume"]),
+         "stored on the /data volume" if stats and stats["on_volume"] else "not on a volume: accounts are lost at each deploy",
+         "attach a volume at /data to the website service (Part 3i)"),
+        ("QR verification", bool(verify.secret()) and origin.startswith("https://"),
+         "on" if verify.secret() else "VERIFY_SECRET missing" if origin else "VERIFY_SECRET and PUBLIC_ORIGIN missing",
+         "VERIFY_SECRET (40+ characters) and PUBLIC_ORIGIN on the website (Part 3f)"),
+        ("OpenAlex key", bool(os.environ.get("OPENALEX_API_KEY")), "set" if os.environ.get("OPENALEX_API_KEY") else "missing",
+         "OPENALEX_API_KEY on the website (Part 3c)"),
+        ("More full texts (OpenAlex PDF copy)", os.environ.get("FULLTEXT_OPENALEX_PDF") == "1",
+         "on (about $0.01 per paper)" if os.environ.get("FULLTEXT_OPENALEX_PDF") == "1" else "off: many publisher sites block downloads",
+         "FULLTEXT_OPENALEX_PDF=1 on the website (Part 3e)"),
+        ("Private engine connected", engine_configured() and bool(library and library.get("available")),
+         "connected" if library and library.get("available") else
+         "ENGINE_URL / ENGINE_API_KEY missing on the website" if not engine_configured() else "configured but not answering",
+         "create the engine service and add ENGINE_URL and ENGINE_API_KEY to the website (Part 2)"),
+        ("Web search", bool(providers), ", ".join(providers) if providers else "no key",
+         "YANDEX_API_KEY + YANDEX_FOLDER_ID and/or BRAVE_API_KEY on the website (Part 3g)"),
+        ("AI detector", aidetect.configured(), "Pangram" if aidetect.configured() else "no key",
+         "PANGRAM_API_KEY on the website (Part 3j)"),
+        ("Protected archive", engine_configured() and auth.enabled(), "on" if engine_configured() and auth.enabled() else "needs the engine and sign-in",
+         "engine (Part 2) and Telegram sign-in (Part 3i); privacy notice reviewed (Part 3k)"),
+        ("Partner universities", bool(institutions.configured()) or None, ", ".join(institutions.configured()) or "none yet (optional)",
+         "INSTITUTIONS on the website (Part 3l)"),
+    ]
+    return rows
+
+
+def _size(n):
+    return f"{n / 1024 ** 3:.2f} GB" if n >= 1024 ** 3 else f"{n / 1024 ** 2:.0f} MB"
+
+
+def page(library):
+    esc = html.escape
+    mark = lambda ok: "✅" if ok else "➖" if ok is None else "❌"          # None = optional, not set
+    rows = "".join(f'<tr><td>{mark(ok)}</td><th>{esc(a)}</th><td>{esc(d)}</td><td class="h">{"" if ok else esc(h)}</td></tr>'
+                   for a, ok, d, h in checklist(library))
+    lib = "<p>The engine is not connected, so there is no library yet.</p>"
+    if library and library.get("available"):
+        names = {"journals": "Uzbek and other journals", "cyberleninka": "CyberLeninka", "wikipedia": "Wikipedia",
+                 "university": "University archives", "archive": "Authors' archive", "other": "Other (OpenAlex etc.)"}
+        by = library.get("by_source") or {}
+        lib = "<table>" + "".join(f"<tr><th>{esc(names.get(k, k))}</th><td>{v:,}</td></tr>" for k, v in by.items())
+        lib += f"<tr><th>Total</th><td><b>{library.get('total', 0):,}</b></td></tr></table>"
+        disk = library.get("disk")
+        if disk and disk.get("total_bytes"):
+            used = 1 - disk["free_bytes"] / disk["total_bytes"]
+            warn = ' class="warn"' if used > 0.66 else ""
+            lib += (f"<p{warn}>Engine disk: library file {_size(disk['db_bytes'])}; volume {used:.0%} used "
+                    f"({_size(disk['free_bytes'])} free of {_size(disk['total_bytes'])}). "
+                    + ("Over two thirds used: do not raise CORPUS_MAX_SOURCES; enlarge the volume first." if used > 0.66 else
+                       "Room to raise CORPUS_MAX_SOURCES step by step.") + "</p>")
+        imports = library.get("imports") or {}
+        if imports:
+            lib += "<h3>Automatic imports</h3><table><tr><th>Import</th><th>Last run</th><th>Imported</th><th>Problem</th></tr>"
+            lib += "".join(f"<tr><td>{esc(k)}</td><td>{esc(str(v.get('finished') or '—'))[:19]}</td>"
+                           f"<td>{esc(str(v.get('imported') if v.get('imported') is not None else '—'))}</td>"
+                           f"<td>{esc(str(v.get('error') or ''))[:160]}</td></tr>" for k, v in sorted(imports.items()))
+            lib += "</table>"
+        else:
+            lib += "<p>No automatic import has run yet (AUTO_IMPORT… settings on the engine, Parts 2, 3m, 3n).</p>"
+    stats = auth.stats() if auth.enabled() else None
+    use = "<p>Sign-in is off, so usage is not counted.</p>"
+    if stats:
+        modes = ", ".join(f"{k} {v}" for k, v in sorted((stats["modes_week"] or {}).items())) or "—"
+        use = (f"<table><tr><th>Accounts</th><td>{stats['users']:,}</td></tr><tr><th>Checks today</th><td>{stats['checks_today']:,}</td></tr>"
+               f"<tr><th>Checks in the last 7 days</th><td>{stats['checks_week']:,} ({esc(modes)})</td></tr>"
+               f"<tr><th>Checks in total</th><td>{stats['checks_total']:,}</td></tr></table>")
+    backup = ('<ul><li><a href="/admin/backup/archive.jsonl.gz">Download the archive deposits</a> (students\' and universities\' '
+              'works: the only library content that cannot be downloaded again). Restore with '
+              '<code>python corpus.py --db /data/corpus.sqlite3 --restore-archive FILE</code> in the engine shell.</li>'
+              '<li><a href="/admin/backup/accounts.sqlite3">Download the accounts database</a> (Telegram names and check log).</li></ul>'
+              '<p>Keep backups encrypted (for example in a password-protected archive) in a place only you control. '
+              'Also turn on Railway volume backups for the engine and the website (DEPLOYMENT.md, Part 5b).</p>')
+    return (f'<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+            f'<title>PlagIQ owner dashboard</title><style>body{{font-family:system-ui,sans-serif;margin:0;background:#f7f9f7;color:#122a32}}'
+            f'main{{max-width:980px;margin:24px auto;padding:0 16px}}section{{background:#fff;border:1px solid #dce6e5;border-radius:14px;padding:18px;margin:0 0 16px;overflow-x:auto}}'
+            f'h1{{font-size:24px}}h2{{font-size:18px;margin:0 0 10px}}h3{{font-size:15px}}table{{border-collapse:collapse;width:100%;font-size:14px}}'
+            f'th,td{{text-align:left;padding:7px 8px;border-bottom:1px solid #e6eeed;vertical-align:top}}td.h{{color:#7a4a00;font-size:13px}}'
+            f'.warn{{color:#9b2c16;font-weight:700}}code{{background:#f2f4f4;padding:1px 4px;border-radius:4px}}</style></head><body><main>'
+            f'<h1>PlagIQ owner dashboard</h1><section><h2>Setup checklist</h2><table>{rows}</table></section>'
+            f'<section><h2>Library</h2>{lib}</section><section><h2>Usage</h2>{use}</section>'
+            f'<section><h2>Backups</h2>{backup}</section></main></body></html>')
