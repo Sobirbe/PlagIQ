@@ -50,7 +50,7 @@ def test_pdf_has_qr_and_link_and_verify_page_confirms(monkeypatch):
         page = doc[0]
         text = ' '.join(''.join(p.get_text() for p in doc).split())
         assert len(page.get_drawings()) > 100                             # QR modules drawn as vector squares
-    assert 'Onlayn tekshirish' in text and 'Tekshirish uchun skanerlang' in text
+    assert 'Onlayn tekshirish' in text and 'Sertifikatni tekshirish' in text and 'TEKSHIRUV SERTIFIKATI' in text
     with fitz.open(stream=pdf, filetype='pdf') as doc:
         url = next(l['uri'] for l in doc[0].get_links() if '/verify?' in l.get('uri', ''))
     assert data['report_id'][:12] in url and 'm.txt' not in url and TEXT.split()[0] not in url.split('?')[1]

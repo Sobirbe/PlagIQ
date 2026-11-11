@@ -182,6 +182,10 @@ Put the keys in Railway Variables on the engine service as `OPENALEX_API_KEY` an
 
 ## Part 3f — QR code verification on PDF reports
 
+Every PDF report now opens with a one-page **Certificate of check** (in Uzbek, Russian or English). It shows the certificate number, the document name, date, words, language, fingerprint, the result, the sources compared, any exclusions, the AI and manipulation indicators, the scope, and a large QR code. It certifies that PlagIQ checked the document with that result, **not** that the work is original. The evidence pages follow it.
+
+**The QR code appears only after you set `VERIFY_SECRET`** (below). Until then the certificate shows an empty box and "Online verification is not enabled on this server".
+
 Every PDF report can carry a QR code. A supervisor or editor scans it and sees a PlagIQ page confirming the report's date, result, number of words, sources compared, language and the start of the document's fingerprint (SHA-256). If anyone changes those figures, the page says **not valid**.
 
 - **No storage needed.** The facts are signed with a secret only your server knows, so the codes keep working after the report itself is deleted (15 minutes) and after restarts. The link contains no file name and no text of the manuscript.
