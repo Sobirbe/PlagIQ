@@ -119,6 +119,13 @@ def read(cookie, now=None):
     return {"id": int(data["id"]), "name": str(data.get("name", "")), "username": str(data.get("username", ""))}
 
 
+def owner_id(user):
+    """Stable, non-reversible owner label for a user's archive deposits ("" when signed out)."""
+    if not user:
+        return ""
+    return "user:" + hashlib.sha256(b"plagiq-owner|" + str(user["id"]).encode()).hexdigest()[:24]
+
+
 # ------------------------------------------------------------- account store
 
 def _db_path():
@@ -165,7 +172,8 @@ def history(user, limit=20):
 
 
 def forget(user):
-    """Delete the account and its check log (the user's right to erasure)."""
+    """Delete the account and its check log (the user's right to erasure). Archive deposits
+    are removed separately through the engine (see app.delete_me)."""
     with _lock, _connect() as db:
         db.execute("DELETE FROM checks WHERE user=?", (user["id"],))
         db.execute("DELETE FROM users WHERE id=?", (user["id"],))
