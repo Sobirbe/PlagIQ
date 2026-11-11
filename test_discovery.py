@@ -38,7 +38,7 @@ def test_results_are_merged_without_duplicates(monkeypatch):
     calls = []
     def fake(query, language, max_results):
         calls.append((query, language))
-        return [work(1), work(len(calls) + 1)]
+        return [work(1), work(len(calls) + 1), work(len(calls) + 50)]             # enough: no shorter retry
     monkeypatch.setattr(discovery, '_search', fake)
     result = discovery.discover(BODY, language='uz')
     assert result['status'] == 'searched' and result['queries'] == len(calls)
@@ -98,3 +98,28 @@ def test_search_phrases_shown_but_never_cached(monkeypatch):
                                     files={'submission': ('m.txt', text.encode())}).json()
     assert data['search_phrases'] == ['Household financial vulnerability', 'Second phrase here']
     assert 'search_phrases' not in web.results[data['report_id']]['result']
+
+
+def test_keywords_skip_function_words():
+    assert discovery.keywords("Ushbu maqolada davlat qarzi va bo‘yicha tahlil qilingan", 4) == 'maqolada davlat qarzi tahlil'
+    assert discovery.keywords("The role of remittances in the household welfare of Uzbekistan", 6) == \
+        'role remittances household welfare Uzbekistan'
+
+
+def test_long_phrase_relaxed_when_too_few_results(monkeypatch):
+    seen = []
+    def fake(query, language, max_results):
+        seen.append(query)
+        return [work(i) for i in range(5)] if len(query.split()) <= 6 else []
+    monkeypatch.setattr(discovery, '_search', fake)
+    long_sentence = 'Davlat qarzining yalpi ichki mahsulotga nisbati o‘sib borayotgani iqtisodiy xavfsizlik uchun muhim'
+    results, used = discovery._search_relaxed(long_sentence, 'uz', 8)
+    assert len(results) == 5 and used == 'Davlat qarzining yalpi ichki mahsulotga nisbati'
+    assert seen == [long_sentence, used]                                     # one retry only
+
+
+def test_no_retry_when_enough_results(monkeypatch):
+    calls = []
+    monkeypatch.setattr(discovery, '_search', lambda q, l, m: calls.append(q) or [work(i) for i in range(4)])
+    discovery._search_relaxed('A long enough phrase about remittance flows and household welfare', 'en', 8)
+    assert len(calls) == 1
