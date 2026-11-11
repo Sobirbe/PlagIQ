@@ -222,6 +222,20 @@ Antiplagiat-style services also search the open web. With a Yandex key, PlagIQ c
 
 **Privacy note:** the tick box tells users that excerpts go to the named search services as well as OpenAlex. Do not tick it for confidential manuscripts.
 
+## Part 3h — AI-writing and manipulation indicators (on by default)
+
+Every report now has a section **"AI-writing and manipulation indicators"**. It does **not** give an AI percentage, because no tool can measure that reliably, least of all in Uzbek. Instead it lists checkable signs, each with the exact place in the text:
+
+- chatbot phrases left in the text ("As an AI language model", "Certainly! Here is…", also in Russian and Uzbek);
+- unfilled placeholders ("[Insert citation]", "(Author, Year)");
+- hidden characters and look-alike letter swaps (Latin "a" ↔ Cyrillic "а"), which "humanizer" tools use to fool checkers;
+- leftover chat formatting (##, **);
+- in **Find academic publications** mode, with the user's consent: reference-list DOIs that do not exist or that belong to a different work. Only the DOIs are sent, to OpenAlex (free) and doi.org.
+
+The result is "Review suggested" or "No indicators found". Neither is a verdict: a supervisor should look at the listed places. On 900 human-written Wikipedia articles, 3 were flagged (details in `evaluation/INTEGRITY.md`). The text excerpts appear only on the results page; the PDF shows counts and DOIs.
+
+To switch the DOI lookups off, set `INTEGRITY_DOI_CHECK=0` on the website service.
+
 ## Part 3e — Full-text comparison during academic checks (on by default)
 
 In **Find academic publications** mode, PlagIQ now downloads the free full texts (PDFs) of the most relevant papers it finds and compares the manuscript against the **whole articles**, not only their abstracts. The texts are used for that one check and then discarded; they are not stored. Your lawyer has confirmed this use.

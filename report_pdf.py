@@ -69,7 +69,7 @@ T = {
     detected="Detected structure", bib_yes="bibliography from heading “{h}”", bib_no="no bibliography heading",
     quotes_v="{n} quotation(s), {c} with a reference marker within 80 characters",
     rules="Quotations, references and the bibliography are located by fixed rules (quotation marks, markers such as [3] or (Author, 2020), a references heading). The rules do not judge whether a citation is correct or sufficient.",
-    ai="AI-writing detection", ai_v="Not performed",
+    ai="AI percentage", ai_v="Not calculated (no reliable method); see the indicators section",
     no_sources="No matching source with comparable text was found in the stated scope. This does not establish originality.",
     shown="Showing {n} of {m} sources.", truncated="The source list is truncated; totals above include all matches.",
     authors="Authors", year="Year", rights="Rights basis", coverage="Coverage", passage="Passage {i}",
@@ -126,7 +126,7 @@ T = {
     detected="Обнаруженная структура", bib_yes="список литературы по заголовку «{h}»", bib_no="заголовок списка литературы не найден",
     quotes_v="цитат: {n}, из них {c} с меткой ссылки в пределах 80 символов",
     rules="Цитаты, ссылки и список литературы определяются фиксированными правилами (кавычки, метки вида [3] или (Автор, 2020), заголовок списка литературы). Правила не оценивают правильность или достаточность цитирования.",
-    ai="Определение текста ИИ", ai_v="Не проводилось",
+    ai="Доля текста ИИ", ai_v="Не рассчитывается (надёжного метода нет); см. раздел индикаторов",
     no_sources="В указанном охвате не найдено совпадающих источников с текстом для сравнения. Это не доказывает оригинальность.",
     shown="Показано {n} из {m} источников.", truncated="Список источников сокращён; итоги выше учитывают все совпадения.",
     authors="Авторы", year="Год", rights="Основание прав", coverage="Охват", passage="Фрагмент {i}",
@@ -183,7 +183,7 @@ T = {
     detected="Aniqlangan tuzilma", bib_yes="“{h}” sarlavhasi bo‘yicha adabiyotlar ro‘yxati", bib_no="adabiyotlar sarlavhasi topilmadi",
     quotes_v="{n} ta iqtibos, ulardan {c} tasida 80 belgi ichida havola belgisi bor",
     rules="Iqtiboslar, havolalar va adabiyotlar ro‘yxati qat’iy qoidalar bilan aniqlanadi (qo‘shtirnoq, [3] yoki (Muallif, 2020) kabi belgilar, adabiyotlar sarlavhasi). Qoidalar iqtibosning to‘g‘ri yoki yetarli ekanini baholamaydi.",
-    ai="Sun’iy intellekt matnini aniqlash", ai_v="Bajarilmagan",
+    ai="Sun’iy intellekt ulushi", ai_v="Hisoblanmaydi (ishonchli usul yo‘q); ko‘rsatkichlar bo‘limiga qarang",
     no_sources="Ko‘rsatilgan doirada solishtiriladigan matnli mos manba topilmadi. Bu originallikni isbotlamaydi.",
     shown="{m} ta manbadan {n} tasi ko‘rsatilgan.", truncated="Manbalar ro‘yxati qisqartirilgan; yuqoridagi jami barcha mosliklarni o‘z ichiga oladi.",
     authors="Mualliflar", year="Yil", rights="Huquqiy asos", coverage="Qamrov", passage="Parcha {i}",
@@ -272,6 +272,58 @@ def _scope(t, mode, result):
     if mode == "academic" and (result.get("web") or {}).get("enabled"):
         text = text.rsplit(". ", 1)[0] + "." + t["web_scope"].format(p=_providers(t, result))     # replace the "no web search" sentence
     return text
+
+
+INTEGRITY_T = {
+    "en": dict(title="AI-writing and manipulation indicators", status="Status", review="Review suggested",
+               none="No indicators found", dois="References with DOIs", dois_v="{d} found, {c} checked, {u} could not be checked",
+               dois_off="Not checked (only in academic-publication mode, with consent)", not_found="DOI does not exist",
+               mismatch="DOI belongs to a different work", note="These are checkable signs that deserve a closer look, not proof "
+               "of AI use, and finding none does not prove human authorship. PlagIQ does not calculate an AI percentage. "
+               "The text excerpts behind each indicator are shown on the results page only and are not kept.",
+               labels=dict(chatbot_phrases="Chatbot phrases left in the text", placeholders="Unfilled placeholders",
+                           hidden_characters="Hidden characters (zero-width or direction controls)",
+                           mixed_script="Words mixing Latin and Cyrillic look-alike letters",
+                           markdown="Leftover chat formatting (##, **, ```)", doi_not_found="DOIs that do not exist",
+                           doi_mismatch="DOIs pointing to a different work")),
+    "ru": dict(title="Индикаторы ИИ-текста и манипуляций", status="Статус", review="Рекомендуется проверка",
+               none="Индикаторы не найдены", dois="Ссылки с DOI", dois_v="найдено {d}, проверено {c}, не удалось проверить {u}",
+               dois_off="Не проверялись (только в режиме научных публикаций, с согласия)", not_found="DOI не существует",
+               mismatch="DOI относится к другой работе", note="Это проверяемые признаки, требующие внимания, а не доказательство "
+               "использования ИИ; их отсутствие не доказывает авторство человека. PlagIQ не рассчитывает долю ИИ. "
+               "Фрагменты текста для каждого индикатора показываются только на странице результата и не сохраняются.",
+               labels=dict(chatbot_phrases="Оставшиеся фразы чат-бота", placeholders="Незаполненные шаблоны",
+                           hidden_characters="Скрытые символы (нулевой ширины или управления направлением)",
+                           mixed_script="Слова со смешением похожих латинских и кириллических букв",
+                           markdown="Остатки разметки чата (##, **, ```)", doi_not_found="Несуществующие DOI",
+                           doi_mismatch="DOI, ведущие на другую работу")),
+    "uz": dict(title="Sun’iy intellekt va manipulyatsiya ko‘rsatkichlari", status="Holat", review="Tekshirish tavsiya etiladi",
+               none="Ko‘rsatkichlar topilmadi", dois="DOI ko‘rsatilgan manbalar", dois_v="{d} ta topildi, {c} tasi tekshirildi, {u} tasini tekshirib bo‘lmadi",
+               dois_off="Tekshirilmadi (faqat ilmiy nashrlar rejimida, rozilik bilan)", not_found="DOI mavjud emas",
+               mismatch="DOI boshqa ishga tegishli", note="Bular e’tibor talab qiladigan tekshiriladigan belgilar, sun’iy intellekt "
+               "ishlatilganining isboti emas; ularning yo‘qligi ham inson muallifligini isbotlamaydi. PlagIQ sun’iy intellekt "
+               "ulushini hisoblamaydi. Har bir ko‘rsatkichga oid matn parchalari faqat natija sahifasida ko‘rsatiladi va saqlanmaydi.",
+               labels=dict(chatbot_phrases="Matnda qolgan chatbot iboralari", placeholders="To‘ldirilmagan shablon joylari",
+                           hidden_characters="Yashirin belgilar (nol kenglikdagi yoki yo‘nalish belgilari)",
+                           mixed_script="Lotin va kirill o‘xshash harflari aralashgan so‘zlar",
+                           markdown="Qolib ketgan chat formatlash belgilari (##, **, ```)", doi_not_found="Mavjud bo‘lmagan DOI",
+                           doi_mismatch="Boshqa ishga tegishli DOI")),
+}
+
+
+def integrity_section(data, lang, st, table):
+    if not data:
+        return []
+    t = INTEGRITY_T.get(lang, INTEGRITY_T["en"])
+    rows = [(t["status"], t["review"] if data.get("status") == "review" else t["none"])]
+    rows += [(t["labels"].get(s["id"], s["id"]), str(s["count"])) for s in data.get("signals") or []]
+    refs = data.get("references")
+    rows.append((t["dois"], t["dois_v"].format(d=refs["dois"], c=refs["checked"], u=refs["unchecked"]) if refs else t["dois_off"]))
+    for doi in (refs or {}).get("not_found") or []:
+        rows.append((t["not_found"], doi))
+    for item in (refs or {}).get("mismatch") or []:
+        rows.append((t["mismatch"], f"{item['doi']} → {item.get('title') or '—'}"))
+    return [Paragraph(html.escape(t["title"]), st["h"]), table(rows), Paragraph(html.escape(t["note"]), st["small"])]
 
 
 def build_pdf(result, identifier, lang="en", minutes_left=15, verify_url=None):
@@ -372,6 +424,8 @@ def build_pdf(result, identifier, lang="en", minutes_left=15, verify_url=None):
               table(result_rows)]
     if c:
         story.append(Paragraph(esc(t["rules"]), st["small"]))
+
+    story += integrity_section(result.get("integrity"), lang, st, table)
 
     story.append(Paragraph(t["s_sources"], st["h"]))
     sources = result.get("sources") or []

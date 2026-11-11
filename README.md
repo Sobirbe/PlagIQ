@@ -35,7 +35,7 @@ Every matched word is located by fixed, tested rules (`citations.py`): inside qu
 
 `python evaluation/run_eval.py` regenerates [evaluation/RESULTS.md](evaluation/RESULTS.md): seeded synthetic cases with known copied locations in Uzbek Latin, Uzbek Cyrillic, Russian and English, covering script changes, Unicode forms, PDF hyphenation and deliberately unsupported edits. `pytest` runs a small version of it. These are algorithm checks on synthetic text, not accuracy claims for real manuscripts; real-world false-positive rates need licensed real test collections.
 
-The uploaded stack document is background reading, not an instruction to install models or an independently verified benchmark. AI detection remains **Not performed**; additional models require license review and language-specific evaluation.
+The uploaded stack document is background reading, not an instruction to install models or an independently verified benchmark. No AI percentage is produced. `integrity.py` reports checkable writing-integrity indicators instead (chatbot phrases, placeholders, hidden characters, look-alike letters, chat formatting, non-existent or mismatched reference DOIs); see `evaluation/INTEGRITY.md`. Detector models would require license review and language-specific evaluation.
 
 ## Local use and tests
 

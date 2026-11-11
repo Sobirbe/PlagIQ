@@ -163,7 +163,7 @@ def test_check_uses_web_only_with_consent_and_keeps_no_page_text(site, monkeypat
     assert calls == [] and without['web'] == {'enabled': False} and without['percent'] is None
     data = check({'web_search': 'true'})
     assert data['web']['compared'] == 2 and data['percent'] > 50
-    top = data['sources'][0]
+    top = max(data['sources'], key=lambda s: s['matched_tokens'])           # page order depends on download timing
     assert top['coverage'] == 'web' and top['url'] == base + '/en' and top['passages']
     assert 'Yandex' in data['scope']
     assert 'Background on household economics' not in repr(web.results[data['report_id']])
