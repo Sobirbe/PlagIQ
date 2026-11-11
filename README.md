@@ -70,6 +70,7 @@ See [DEPLOYMENT.md](DEPLOYMENT.md) for owner-friendly Railway instructions, priv
 - `corpus.py`: owner-run local importer and SQLite fingerprint index.
 - `textfold.py`: Uzbek script folding with original offsets.
 - `discovery.py`: bounded OpenAlex metadata/abstract discovery.
+- `verify.py`: signed, storage-free QR verification links for PDF reports (`/verify` page).
 - `pricing.py`: word count and planned price tiers (display only, configurable with `PRICING_TIERS`; no payments).
 - `citations.py`: quotation, reference-marker and bibliography detection; optional exclusions.
 - `harvest.py`: owner-run OAI-PMH harvester for open-licence journal articles (staging only).

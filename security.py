@@ -16,7 +16,8 @@ class SecurityMiddleware:
             return await self.app(scope, receive, send)
         headers = dict(scope.get('headers', []))
         pilot_user, pilot_password = os.getenv('PRIVATE_PILOT_USER', ''), os.getenv('PRIVATE_PILOT_PASSWORD', '')
-        if (pilot_user or pilot_password) and scope['path'] != '/health':
+        # /verify only shows signed report facts, so QR codes work for supervisors without the pilot login.
+        if (pilot_user or pilot_password) and scope['path'] not in ('/health', '/verify'):
             expected = b'Basic ' + base64.b64encode((pilot_user + ':' + pilot_password).encode())
             if (not pilot_user or len(pilot_password) < 16 or
                     not secrets.compare_digest(headers.get(b'authorization', b''), expected)):

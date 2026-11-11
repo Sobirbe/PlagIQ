@@ -55,6 +55,10 @@ T = {
     shown_records="Showing {n} of {m} discovered records, most matched words first.", truncated_records="The list is shortened; the percentage above uses all records.",
     lang_detected=" (detected from the text; selected: {s})",
     ft_label="Full-text downloads", ft_line="{a} tried, {c} compared; not available: {r}",
+    qr_caption="Scan to verify",
+    verify="Online verification",
+    verify_v="Scan the QR code or open this link to confirm PlagIQ issued report {id} with these figures:",
+    verify_none="Not set up on this server (VERIFY_SECRET missing)",
     pasted="Pasted reference",
     before="Matched before exclusions", applied="Exclusions chosen by the user",
     ex_none="No exclusions — every verified match is counted", ex_q="quotations ({n} words)", ex_b="bibliography ({n} words)",
@@ -107,6 +111,10 @@ T = {
     shown_records="Показано {n} из {m} найденных записей, сначала с наибольшим числом совпавших слов.", truncated_records="Список сокращён; процент выше рассчитан по всем записям.",
     lang_detected=" (определён по тексту; выбран: {s})",
     ft_label="Загрузка полных текстов", ft_line="попыток {a}, сравнено {c}; не удалось: {r}", reasons_tr={"timed out": "истекло время", "blocked by robots.txt": "запрещено robots.txt", "refused by the website (403)": "сайт отказал (403)", "refused by the website (401)": "сайт отказал (401)", "not found (404)": "не найдено (404)", "not a PDF": "не PDF", "no PDF link on page": "на странице нет ссылки на PDF", "scanned PDF (no text)": "скан PDF (без текста)", "website not reachable": "сайт недоступен", "address refused": "адрес отклонён", "file too large": "файл слишком большой", "cost limit": "лимит расходов", "other error": "другая ошибка", "no open-access copy listed": "открытая копия не указана"},
+    qr_caption="Сканируйте для проверки",
+    verify="Онлайн-проверка",
+    verify_v="Отсканируйте QR-код или откройте ссылку, чтобы убедиться, что PlagIQ выдал отчёт {id} с этими данными:",
+    verify_none="На этом сервере не настроена (нет VERIFY_SECRET)",
     pasted="Вставленный текст источника",
     before="Совпадения до исключений", applied="Исключения, выбранные пользователем",
     ex_none="Нет — учитываются все проверенные совпадения", ex_q="цитаты ({n} слов)", ex_b="список литературы ({n} слов)",
@@ -159,6 +167,10 @@ T = {
     shown_records="Topilgan {m} ta yozuvdan {n} tasi ko‘rsatilgan, eng ko‘p mos so‘zlilari birinchi.", truncated_records="Ro‘yxat qisqartirilgan; yuqoridagi foiz barcha yozuvlar bo‘yicha hisoblangan.",
     lang_detected=" (matndan aniqlandi; tanlangan: {s})",
     ft_label="To‘liq matnlarni yuklash", ft_line="{a} ta urinish, {c} tasi solishtirildi; olinmadi: {r}", reasons_tr={"timed out": "vaqt tugadi", "blocked by robots.txt": "robots.txt taqiqlagan", "refused by the website (403)": "sayt rad etdi (403)", "refused by the website (401)": "sayt rad etdi (401)", "not found (404)": "topilmadi (404)", "not a PDF": "PDF emas", "no PDF link on page": "sahifada PDF havolasi yo‘q", "scanned PDF (no text)": "skanerlangan PDF (matnsiz)", "website not reachable": "saytga ulanib bo‘lmadi", "address refused": "manzil rad etildi", "file too large": "fayl juda katta", "cost limit": "xarajat chegarasi", "other error": "boshqa xato", "no open-access copy listed": "ochiq nusxa ko‘rsatilmagan"},
+    qr_caption="Tekshirish uchun skanerlang",
+    verify="Onlayn tekshirish",
+    verify_v="PlagIQ {id} raqamli hisobotni shu ma’lumotlar bilan berganini tasdiqlash uchun QR kodni skanerlang yoki havolani oching:",
+    verify_none="Bu serverda sozlanmagan (VERIFY_SECRET yo‘q)",
     pasted="Kiritilgan manba matni",
     before="Istisnolargacha moslik", applied="Foydalanuvchi tanlagan istisnolar",
     ex_none="Yo‘q — barcha tasdiqlangan mosliklar hisoblanadi", ex_q="iqtiboslar ({n} so‘z)", ex_b="adabiyotlar ro‘yxati ({n} so‘z)",
@@ -235,7 +247,17 @@ def _numbered_canvas(t, identifier):
     return NumberedCanvas
 
 
-def build_pdf(result, identifier, lang="en", minutes_left=15):
+def _qr(url, size):
+    from reportlab.graphics.barcode.qr import QrCodeWidget
+    from reportlab.graphics.shapes import Drawing
+    widget = QrCodeWidget(url, barLevel="M")
+    x1, y1, x2, y2 = widget.getBounds()
+    drawing = Drawing(size, size, transform=[size / (x2 - x1), 0, 0, size / (y2 - y1), 0, 0])
+    drawing.add(widget)
+    return drawing
+
+
+def build_pdf(result, identifier, lang="en", minutes_left=15, verify_url=None):
     t = T.get(lang, T["en"])
     st = _styles()
     esc = lambda value: html.escape(str(value))
@@ -250,7 +272,14 @@ def build_pdf(result, identifier, lang="en", minutes_left=15):
             ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 5)]))
         return tbl
 
-    story = [Paragraph("PlagIQ", st["title"]), Paragraph(t["subtitle"], st["subtitle"]),
+    heading = [Paragraph("PlagIQ", st["title"]), Paragraph(t["subtitle"], st["subtitle"])]
+    if verify_url:
+        head = Table([[heading, [_qr(verify_url, 27 * mm), Paragraph(esc(t["qr_caption"]), st["small"])]]],
+                     colWidths=[None, 30 * mm], hAlign="LEFT")
+        head.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                                  ("RIGHTPADDING", (0, 0), (-1, -1), 0), ("ALIGN", (1, 0), (1, 0), "CENTER")]))
+        heading = [head]
+    story = heading + [
              Paragraph(esc(t["disclaimer"]), st["notice"])]
 
     story += [Paragraph(t["s_document"], st["h"]), table([
@@ -258,7 +287,10 @@ def build_pdf(result, identifier, lang="en", minutes_left=15):
         (t["language"], str(result.get("language", "")).upper() + (t["lang_detected"].format(
             s=result["language_note"]["selected"].upper()) if result.get("language_note") else "")),
         (t["sha"], result.get("sha256", "")),
-        (t["expiry"], t["expiry_v"].format(m=minutes_left))])]
+        (t["expiry"], t["expiry_v"].format(m=minutes_left)),
+        (t["verify"], t["verify_v"].format(id=identifier[:12]) if verify_url else t["verify_none"])])]
+    if verify_url:
+        story.append(Paragraph(f'<link href="{esc(verify_url)}" color="#006D70">{esc(verify_url)}</link>', st["small"]))
 
     mode = result.get("mode", "reference")
     scope_rows = [(t["mode"], t["modes"].get(mode, mode)), (t["method"], t["methods"].get(mode, result.get("method", ""))),

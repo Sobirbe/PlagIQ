@@ -20,6 +20,7 @@ import citations
 import corpus
 import fulltext
 import pricing
+import verify
 import extract
 from discovery import discover
 import html
@@ -215,6 +216,64 @@ def require_tokens(text, language, code, message):
     if count < MIN_TOKENS:
         raise ApiError(400, code, message)
     return count
+
+
+VERIFY_TEXT = {
+    "en": dict(title="PlagIQ report verification", ok="Valid: PlagIQ issued a report with these figures.",
+               bad="Not valid: this link was changed or was not issued by this PlagIQ server.",
+               off="Verification is not set up on this server.", rid="Report ID", date="Checked (UTC)",
+               hash="Document SHA-256 begins with", mode="Comparison", result="Matched portion within scope",
+               words="Words in the document", sources="Sources compared", lang="Document language",
+               modes={"r": "Your own reference", "a": "OpenAlex (open-access full texts and abstracts)", "c": "Private authorized corpus"},
+               ne="Not evaluated",
+               note="Compare the first 16 characters of the SHA-256 printed in the report with the value above. This page confirms the "
+                    "figures of a PlagIQ evidence report; it is not a certificate of originality and keeps no copy of the document."),
+    "ru": dict(title="Проверка отчёта PlagIQ", ok="Действителен: PlagIQ выдал отчёт с этими данными.",
+               bad="Недействителен: ссылка изменена или выдана не этим сервером PlagIQ.",
+               off="Проверка на этом сервере не настроена.", rid="Номер отчёта", date="Проверено (UTC)",
+               hash="SHA-256 документа начинается с", mode="Сравнение", result="Доля совпадений в охвате",
+               words="Слов в документе", sources="Сравнено источников", lang="Язык документа",
+               modes={"r": "Ваш источник", "a": "OpenAlex (открытые полные тексты и аннотации)", "c": "Внутренний разрешённый корпус"},
+               ne="Не оценено",
+               note="Сравните первые 16 символов SHA-256 из отчёта со значением выше. Страница подтверждает данные отчёта PlagIQ; "
+                    "это не сертификат оригинальности, копия документа не хранится."),
+    "uz": dict(title="PlagIQ hisobotini tekshirish", ok="Haqiqiy: PlagIQ shu ma’lumotlar bilan hisobot bergan.",
+               bad="Haqiqiy emas: havola o‘zgartirilgan yoki bu PlagIQ serveri tomonidan berilmagan.",
+               off="Bu serverda tekshirish sozlanmagan.", rid="Hisobot raqami", date="Tekshirilgan (UTC)",
+               hash="Hujjat SHA-256 boshlanishi", mode="Solishtirish", result="Doira ichidagi moslik ulushi",
+               words="Hujjatdagi so‘zlar", sources="Solishtirilgan manbalar", lang="Hujjat tili",
+               modes={"r": "O‘z manbangiz", "a": "OpenAlex (ochiq to‘liq matnlar va annotatsiyalar)", "c": "Ruxsat berilgan ichki korpus"},
+               ne="Baholanmagan",
+               note="Hisobotdagi SHA-256 ning birinchi 16 belgisini yuqoridagi qiymat bilan solishtiring. Bu sahifa PlagIQ dalillar "
+                    "hisobotidagi ma’lumotlarni tasdiqlaydi; originallik sertifikati emas va hujjat nusxasini saqlamaydi."),
+}
+
+
+@app.get("/verify", response_class=HTMLResponse)
+def verify_page(request: Request, ui: str = ""):
+    lang = ui if ui in VERIFY_TEXT else next((l for l in ("uz", "ru") if l in request.headers.get("accept-language", "")[:5]), "en")
+    t = VERIFY_TEXT[lang]
+    valid, f = verify.check(request.query_params)
+    status = t["off"] if not verify.secret() else (t["ok"] if valid else t["bad"])
+    rows = ""
+    if valid:
+        d = f["d"]
+        when = f"{d[0:4]}-{d[4:6]}-{d[6:8]} {d[9:11]}:{d[11:13]}"
+        result = t["ne"] if f["p"] == "NE" else f["p"] + "%"
+        rows = "".join(f"<tr><th>{html.escape(k)}</th><td>{html.escape(v)}</td></tr>" for k, v in (
+            (t["rid"], f["r"]), (t["date"], when), (t["hash"], f["h"]), (t["mode"], t["modes"][f["m"]]),
+            (t["result"], result), (t["words"], f["w"]), (t["sources"], f["n"]), (t["lang"], f["l"].upper())))
+    links = " · ".join(f'<a href="?{html.escape(str(request.query_params))}&amp;ui={l}">{l.upper()}</a>' for l in VERIFY_TEXT)
+    colour = "#0b6a64" if valid else "#9b2c16"
+    page = (f'<!doctype html><html lang="{lang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+            f'<title>{html.escape(t["title"])}</title><style>body{{font-family:system-ui,sans-serif;margin:0;background:#f7f9f7;color:#122a32}}'
+            f'main{{max-width:640px;margin:40px auto;background:#fff;border:1px solid #dce6e5;border-radius:18px;padding:28px}}'
+            f'h1{{font-size:22px;margin:0 0 6px}}.st{{font-weight:750;color:{colour};margin:14px 0}}table{{width:100%;border-collapse:collapse;font-size:14px}}'
+            f'th,td{{text-align:left;padding:8px;border-bottom:1px solid #e6eeed;vertical-align:top}}th{{color:#46606a;width:45%}}'
+            f'p.n{{font-size:13px;color:#51676a;line-height:1.6}}.l{{font-size:13px}}@media(max-width:600px){{main{{margin:0;border-radius:0}}}}</style></head>'
+            f'<body><main><div class="l">{links}</div><h1>{html.escape(t["title"])}</h1><p class="st">{html.escape(status)}</p>'
+            f'<table>{rows}</table>' + (f'<p class="n">{html.escape(t["note"])}</p>' if valid else '') + '</main></body></html>')
+    return HTMLResponse(page, headers={"Cache-Control": "no-store"})
 
 
 @app.get("/health")
@@ -439,7 +498,9 @@ def owned(identifier, request):
 def report(identifier:str, request:Request, lang:str="en"):
     entry = owned(identifier, request)
     remaining = max(0, int((entry["expires"] - time.monotonic()) // 60))
-    content = build_pdf(entry["result"], identifier, lang if lang in ("uz", "ru", "en") else "en", remaining)
+    base = os.getenv("PUBLIC_ORIGIN", "").strip() or str(request.base_url)
+    content = build_pdf(entry["result"], identifier, lang if lang in ("uz", "ru", "en") else "en", remaining,
+                        verify.link(entry["result"], identifier, base))
     return Response(content, media_type="application/pdf",
         headers={"Content-Disposition":'attachment; filename="PlagIQ-scope-report.pdf"'})
 
