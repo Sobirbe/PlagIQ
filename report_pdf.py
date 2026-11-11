@@ -62,7 +62,7 @@ T = {
     verify="Online verification",
     verify_v="Scan the QR code or open this link to confirm PlagIQ issued report {id} with these figures:",
     verify_none="Not set up on this server (VERIFY_SECRET missing)",
-    cov_web="Web page (compared, not stored)", web_label="Internet search ({p})", web_line="{s} searches, {p} pages tried, {c} compared; not available: {r}", web_scope=" Also searched the web with {p} (pages compared, not stored).", and_=" and ",
+    cov_web="Web page (compared, not stored)", web_label="Internet search ({p})", web_line="{e} excerpts, {s} searches, {p} pages tried, {c} compared; not available: {r}", web_scope=" Also searched the web with {p} (pages compared, not stored).", and_=" and ",
     pasted="Pasted reference",
     before="Matched before exclusions", applied="Exclusions chosen by the user",
     ex_none="No exclusions — every verified match is counted", ex_q="quotations ({n} words)", ex_b="bibliography ({n} words)",
@@ -120,7 +120,7 @@ T = {
     verify="Онлайн-проверка",
     verify_v="Отсканируйте QR-код или откройте ссылку, чтобы убедиться, что PlagIQ выдал отчёт {id} с этими данными:",
     verify_none="На этом сервере не настроена (нет VERIFY_SECRET)",
-    cov_web="Веб-страница (сравнена, не сохранена)", web_label="Поиск в интернете ({p})", web_line="запросов {s}, страниц {p}, сравнено {c}; не удалось: {r}", web_scope=" Также выполнен поиск в интернете через {p} (страницы сравнены, не сохранены).", and_=" и ",
+    cov_web="Веб-страница (сравнена, не сохранена)", web_label="Поиск в интернете ({p})", web_line="отрывков {e}, запросов {s}, страниц {p}, сравнено {c}; не удалось: {r}", web_scope=" Также выполнен поиск в интернете через {p} (страницы сравнены, не сохранены).", and_=" и ",
     pasted="Вставленный текст источника",
     before="Совпадения до исключений", applied="Исключения, выбранные пользователем",
     ex_none="Нет — учитываются все проверенные совпадения", ex_q="цитаты ({n} слов)", ex_b="список литературы ({n} слов)",
@@ -178,7 +178,7 @@ T = {
     verify="Onlayn tekshirish",
     verify_v="PlagIQ {id} raqamli hisobotni shu ma’lumotlar bilan berganini tasdiqlash uchun QR kodni skanerlang yoki havolani oching:",
     verify_none="Bu serverda sozlanmagan (VERIFY_SECRET yo‘q)",
-    cov_web="Veb-sahifa (solishtirildi, saqlanmadi)", web_label="Internetda qidiruv ({p})", web_line="{s} ta qidiruv, {p} ta sahifa, {c} tasi solishtirildi; olinmadi: {r}", web_scope=" Internetda {p} orqali ham qidirildi (sahifalar solishtirildi, saqlanmadi).", and_=" va ",
+    cov_web="Veb-sahifa (solishtirildi, saqlanmadi)", web_label="Internetda qidiruv ({p})", web_line="{e} ta parcha, {s} ta qidiruv, {p} ta sahifa, {c} tasi solishtirildi; olinmadi: {r}", web_scope=" Internetda {p} orqali ham qidirildi (sahifalar solishtirildi, saqlanmadi).", and_=" va ",
     pasted="Kiritilgan manba matni",
     before="Istisnolargacha moslik", applied="Foydalanuvchi tanlagan istisnolar",
     ex_none="Yo‘q — barcha tasdiqlangan mosliklar hisoblanadi", ex_q="iqtiboslar ({n} so‘z)", ex_b="adabiyotlar ro‘yxati ({n} so‘z)",
@@ -482,7 +482,7 @@ def build_pdf(result, identifier, lang="en", minutes_left=15, verify_url=None):
         wb = result.get("web") or {}
         if wb.get("enabled"):
             reasons = ", ".join(f"{t.get('reasons_tr', {}).get(k, k)} ×{v}" for k, v in (wb.get("reasons") or {}).items()) or "—"
-            scope_rows.append((t["web_label"].format(p=_providers(t, result)), t["web_line"].format(s=wb.get("searches", 0), p=wb.get("attempted", 0),
+            scope_rows.append((t["web_label"].format(p=_providers(t, result)), t["web_line"].format(e=wb.get("excerpts", 0), s=wb.get("searches", 0), p=wb.get("attempted", 0),
                                                                    c=wb.get("compared", 0), r=reasons)))
         ft = result.get("fulltext") or {}
         if ft.get("attempted"):

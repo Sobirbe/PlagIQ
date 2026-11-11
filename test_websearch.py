@@ -101,12 +101,12 @@ def local_fetcher():
 def test_settings_require_key_and_folder(monkeypatch):
     for name in ('YANDEX_API_KEY', 'YANDEX_FOLDER_ID', 'WEB_SEARCH', 'BRAVE_API_KEY'):
         monkeypatch.delenv(name, raising=False)
-    assert websearch.settings() == (False, 6, 20)
+    assert websearch.settings() == (False, 10, 20)
     monkeypatch.setenv('YANDEX_API_KEY', 'k')
     assert websearch.settings()[0] is False                       # folder ID missing
     monkeypatch.setenv('YANDEX_FOLDER_ID', 'f')
     monkeypatch.setenv('WEB_MAX_PAGES', '99'); monkeypatch.setenv('WEB_SECONDS', '1')
-    assert websearch.settings() == (True, 15, 5)
+    assert websearch.settings() == (True, 20, 5)
     monkeypatch.setenv('WEB_SEARCH', '0')
     assert websearch.settings()[0] is False
 
@@ -226,3 +226,40 @@ def test_check_with_brave_reports_provider(site, monkeypatch):
     assert data['web']['providers'] == ['Brave'] and data['web']['compared'] == 1 and data['percent'] > 50
     assert 'Brave' in data['scope'] and data['sources'][0]['coverage'] == 'web'
     assert TestClient(web.app).get('/health').json()['web_providers'] == ['Brave']
+
+
+def test_excerpts_spread_over_the_whole_document(monkeypatch):
+    import discovery
+    for name in ('WEB_MAX_QUERIES', 'WEB_WORDS_PER_EXCERPT'):
+        monkeypatch.delenv(name, raising=False)
+    assert websearch.excerpt_count(400) == 3 and websearch.excerpt_count(5000) == 10
+    assert websearch.excerpt_count(60000) == 20
+    monkeypatch.setenv('WEB_MAX_QUERIES', '8')
+    assert websearch.excerpt_count(60000) == 8
+    sections = [f"Section {i}. The distinctive phrase number{i} describes irrigation reforms affecting cotton "
+                f"cooperatives across Khorezm province during reconstruction period{i}. " * 3 for i in range(10)]
+    text = "Water policy in Khorezm\n" + " ".join(sections) + "\nReferences\n1. Karimov A. Irrigation number99 policy and reconstruction."
+    excerpts = discovery.spread_excerpts(text, 10)
+    assert excerpts[0] == "Water policy in Khorezm" and len(excerpts) == 10
+    covered = {i for i in range(10) if any(f"number{i} " in e for e in excerpts)}
+    assert len(covered) == 9 and {0, 9} <= covered and not any("number99" in e for e in excerpts)  # start to end; no bibliography
+    assert all(len(e.split()) <= 14 for e in excerpts)
+
+
+def test_pages_found_by_several_excerpts_come_first_and_retries_are_limited(monkeypatch):
+    calls = []
+
+    def fake(query, language):
+        calls.append(query)
+        plain = query.strip('"')
+        return {'"a"': [('https://x.uz/1', 'one')], '"b"': [('https://x.uz/2', 'two'), ('https://x.uz/3', 'three')],
+                '"c"': [('https://x.uz/3', 'three')], '"d"': [('https://x.uz/3/', 'three')]}.get(query, []) if query.startswith('"') else []
+    monkeypatch.setattr(websearch, '_yandex', fake)
+    monkeypatch.setenv('YANDEX_API_KEY', 'k'); monkeypatch.setenv('YANDEX_FOLDER_ID', 'f')
+    monkeypatch.delenv('BRAVE_API_KEY', raising=False); monkeypatch.delenv('WEB_SEARCH', raising=False)
+    found, searches, errors, used = websearch.search(['a', 'b', 'c', 'd', 'e', 'f'], 'ru')
+    assert [u for u, _ in found] == ['https://x.uz/3', 'https://x.uz/1', 'https://x.uz/2']   # x.uz/3 found 3 times
+    assert calls == ['"a"', '"b"', '"c"', '"d"', '"e"', '"f"'] and searches == 6           # no unquoted retry needed/allowed
+    calls.clear()
+    websearch.search(['zz1', 'zz2', 'zz3', 'zz4'], 'ru')
+    assert calls == ['"zz1"', 'zz1', '"zz2"', 'zz2', '"zz3"', 'zz3', '"zz4"']             # retry only for the first 3

@@ -18,7 +18,7 @@ RESULT = {"report_id": "a" * 32, "mode": "academic", "language": "en", "percent"
           "source_count": 1, "matched_source_count": 1, "evaluated_sources": 1, "database_status": "searched",
           "database_message": "", "queries": 1, "search_phrases": [EXCERPT], "reference": "None", "filename": "paper.txt",
           "fulltext": {"attempted": 0, "compared": 0, "failed": 0, "timed_out": 0},
-          "web": {"enabled": True, "providers": ["Brave"], "searches": 2, "results": 3, "attempted": 3, "compared": 2, "failed": 1, "timed_out": 0,
+          "web": {"enabled": True, "providers": ["Brave"], "excerpts": 2, "searches": 2, "results": 3, "attempted": 3, "compared": 2, "failed": 1, "timed_out": 0,
                   "reasons": {"too little text on page": 1}, "errors": []},
           "sources": [{"title": "Household economics notes", "url": "https://example.org/notes", "year": None,
                        "coverage": "web", "matched_tokens": 14, "percent": 41.2,
@@ -45,7 +45,7 @@ try:
             page.route('**/api/check', fake)
             page.goto('http://127.0.0.1:8144')
             page.wait_for_function("() => !document.getElementById('web-opt').hidden")
-            assert 'with Yandex and Brave' in page.locator('#web-label').inner_text()
+            assert 'with Yandex and Brave: up to 20 short excerpts' in page.locator('#web-label').inner_text()
             assert not page.locator('#web_search').is_checked()                  # off by default
             page.locator('#web_search').check()
             page.locator('input[name=mode][value=reference]').check()
@@ -63,7 +63,7 @@ try:
             page.locator('button[type=submit]').click()
             page.wait_for_function("() => document.body.innerText.includes('Web (Brave)')")
             body = page.locator('body').inner_text()
-            assert 'Web (Brave): 2 searches, 3 pages tried, 2 compared' in body, body
+            assert 'Web (Brave): 2 excerpts, 2 searches, 3 pages tried, 2 compared' in body, body
             assert 'Web page (compared, not stored)' in body
             assert 'name="web_search"' in posted[0] and 'true' in posted[0].split('name="web_search"')[1][:20]
             if SHOTS:
