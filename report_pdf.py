@@ -76,8 +76,9 @@ T = {
     passages_more="{n} further passage(s) for this source are not listed.",
     loc="Your text: characters {qs}–{qe} · Source: characters {ss}–{se}",
     loc_note="Character positions are zero-based, end-exclusive, counted in the extracted text.",
+    limit_web="Only the scope named above was searched; the web search covered only the top pages found for 3 short excerpts. No translation or paraphrase screening was performed.",
     limits=["Only the scope named above was searched. No web-wide, translation or paraphrase screening was performed.",
-            "Metadata-only records were discovered but not text-compared.",
+            "Records with metadata only (no abstract and no full text) were listed but not text-compared.",
             "A low or zero result does not show that a document is original.",
             "Text extraction from PDF/DOC/DOCX can omit headers, footnotes, text boxes or images."],
     footer="PlagIQ · Scope-limited evidence · not a certificate", page="Page {p} of {n}",
@@ -133,8 +134,9 @@ T = {
     passages_more="Ещё {n} фрагмент(ов) этого источника не показаны.",
     loc="Ваш текст: символы {qs}–{qe} · Источник: символы {ss}–{se}",
     loc_note="Позиции символов считаются с нуля, конец не включается, по извлечённому тексту.",
+    limit_web="Проверен только указанный охват; поиск в интернете охватил только первые страницы, найденные по 3 коротким отрывкам. Проверка перевода и перефразирования не проводилась.",
     limits=["Проверен только указанный охват. Поиск по интернету, переводу и перефразированию не проводился.",
-            "Записи только с метаданными найдены, но текст не сравнивался.",
+            "Записи только с метаданными (без аннотации и полного текста) указаны, но текст не сравнивался.",
             "Низкий или нулевой результат не доказывает оригинальность.",
             "Извлечение текста из PDF/DOC/DOCX может пропускать колонтитулы, сноски, надписи и изображения."],
     footer="PlagIQ · Доказательства в ограниченном охвате · не сертификат", page="Стр. {p} из {n}",
@@ -190,8 +192,9 @@ T = {
     passages_more="Bu manba bo‘yicha yana {n} ta parcha ko‘rsatilmagan.",
     loc="Sizning matn: {qs}–{qe} belgilar · Manba: {ss}–{se} belgilar",
     loc_note="Belgi o‘rinlari noldan sanaladi, oxirgisi kirmaydi, ajratilgan matn bo‘yicha.",
+    limit_web="Faqat yuqorida ko‘rsatilgan doira tekshirildi; internet qidiruvi faqat 3 ta qisqa parcha bo‘yicha topilgan birinchi sahifalarni qamradi. Tarjima yoki parafraz tekshiruvi bajarilmadi.",
     limits=["Faqat yuqorida ko‘rsatilgan doira tekshirildi. Internet, tarjima yoki parafraz tekshiruvi bajarilmadi.",
-            "Faqat metadata yozuvlari topildi, lekin matni solishtirilmadi.",
+            "Faqat metama’lumoti bor (annotatsiyasi ham, to‘liq matni ham yo‘q) yozuvlar matn bo‘yicha solishtirilmadi.",
             "Past yoki nol natija hujjat original ekanini isbotlamaydi.",
             "PDF/DOC/DOCX’dan matn ajratishda sarlavhalar, izohlar, matn bloklari yoki rasmlar tushib qolishi mumkin."],
     footer="PlagIQ · Cheklangan doiradagi dalillar · sertifikat emas", page="{n} sahifadan {p}",
@@ -473,7 +476,13 @@ def build_pdf(result, identifier, lang="en", minutes_left=15, verify_url=None):
             story.append(Paragraph(esc(t["passages_more"].format(n=hidden)), st["small"]))
 
     story += [Paragraph(t["s_limits"], st["h"])]
-    story += [Paragraph("• " + esc(item), st["body"]) for item in t["limits"]]
+    limits = list(t["limits"])
+    if mode == "academic" and (result.get("web") or {}).get("enabled"):
+        limits[0] = t["limit_web"]
+    metadata_only = (result.get("source_count") or 0) - (result.get("evaluated_sources") or 0)
+    if mode != "academic" or metadata_only <= 0:
+        limits.pop(1)                                       # no metadata-only records in this report
+    story += [Paragraph("• " + esc(item), st["body"]) for item in limits]
 
     out = io.BytesIO()
     doc = SimpleDocTemplate(out, pagesize=A4, leftMargin=18 * mm, rightMargin=18 * mm, topMargin=16 * mm,
