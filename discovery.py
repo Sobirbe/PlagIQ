@@ -89,6 +89,29 @@ def suggest_queries(text, max_queries=MAX_QUERIES):
     return unique[:max_queries]
 
 
+def spread_excerpts(text, n):
+    """Up to n excerpts of at most 14 words for web search: the title-like first line,
+    then the most distinctive sentence of each of n-1 equal parts of the body
+    (bibliography excluded), so copying anywhere in the document can be found."""
+    from citations import bibliography_span
+    bib = bibliography_span(text)
+    body = text[:bib[0]] if bib else text
+    excerpts = [_first_line_query(body)]
+    sentences = [(m.start(), re.sub(r"\s+", " ", m.group()).strip()) for m in SENTENCE.finditer(body)]
+    sentences = [(start, c) for start, c in sentences if 8 <= len(c.split()) <= 80 and _distinctive(c) >= 4]
+    parts = max(1, n - 1)
+    size = max(1, len(body) // parts + 1)
+    for part in range(parts):
+        candidates = [c for start, c in sentences if start // size == part]
+        if candidates:
+            excerpts.append(" ".join(max(candidates, key=_distinctive).split()[:QUERY_WORDS])[:220])
+    unique = []
+    for excerpt in excerpts:
+        if excerpt.strip() and excerpt.lower() not in (u.lower() for u in unique):
+            unique.append(excerpt)
+    return unique[:n]
+
+
 # Very common words that make an OpenAlex phrase search needlessly strict.
 STOPWORDS = frozenset("""
 va bilan uchun hamda ham bu ushbu esa yoki ekan bo'lib bo'yicha qilish kerak orqali sifatida bo'lgan
