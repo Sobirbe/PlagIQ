@@ -13,7 +13,11 @@ from fastapi import Depends, FastAPI, Header, HTTPException
 from pydantic import BaseModel, Field
 from contextlib import closing
 import logging
+import gzip
+import json
 import re
+import shutil
+from fastapi.responses import StreamingResponse
 from corpus import DEPOSITS, LANGUAGES, category, connect, corpus_version, deposits, ingest, inventory, remove_deposit, search
 from security import SecurityMiddleware
 import import_job
@@ -192,6 +196,21 @@ def delete_deposit(identifier: str, owner: str):
     return {'deleted': True}
 
 
+@app.get('/v1/archive/export', dependencies=[Depends(authorize)])
+def export_deposits():
+    """Backup of every deposit (metadata and text) as gzip-compressed JSON lines. Deposits are the
+    only library content that cannot be downloaded again from its source."""
+    def lines():
+        with closing(connect()) as db:
+            for identifier, raw, text in db.execute('SELECT id, metadata, text FROM sources'):
+                metadata = json.loads(raw)
+                if metadata.get('rights_basis') in DEPOSITS:
+                    yield gzip.compress((json.dumps({'id': identifier, 'metadata': metadata, 'text': text},
+                                                    ensure_ascii=False) + '\n').encode(), mtime=0)
+    return StreamingResponse(lines(), media_type='application/gzip',
+                             headers={'Content-Disposition': 'attachment; filename="plagiq-archive.jsonl.gz"'})
+
+
 @app.get('/v1/library', dependencies=[Depends(authorize)])
 def library():
     """Indexed sources per language and the latest import status (no texts, no permission records)."""
@@ -208,7 +227,14 @@ def library():
                   'dump_complete', 'estimated_cost_usd', 'error', 'language_corrected', 'staged', 'skipped',
                   'journals', 'downloaded', 'surveyed', 'approved')}
               for name, info in import_job.read_status().items() if name in allowed and isinstance(info, dict)}
-    return {'language_counts': counts, 'by_source': by_source, 'total': len(rows), 'corpus_version': version,
+    db_path = os.environ.get('CORPUS_DB', 'corpus.sqlite3')
+    try:
+        usage = shutil.disk_usage(os.path.dirname(os.path.abspath(db_path)))
+        disk = {'db_bytes': os.path.getsize(db_path) if os.path.exists(db_path) else 0,
+                'free_bytes': usage.free, 'total_bytes': usage.total}
+    except OSError:
+        disk = None
+    return {'language_counts': counts, 'by_source': by_source, 'total': len(rows), 'corpus_version': version, 'disk': disk,
             'auto_import': import_job.settings()[0], 'auto_import_wikipedia': wikipedia_import.settings()[0],
             'imports': status}
 

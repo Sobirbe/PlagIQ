@@ -386,6 +386,25 @@ To change the plans, add a `PRICING_TIERS` variable to the website service in Ra
 
 Keep the ids `free`, `researcher`, `extended` and `thesis`, which have names and descriptions in all three languages. Change only the numbers. If the value is invalid, the site quietly uses the defaults. Before charging real money, measure the real cost per check and add a payment provider (Payme, Click or Uzum) in a separate, reviewed change.
 
+## Part 5a — Owner dashboard (/admin)
+
+Website service → **Variables**: add `OWNER_TELEGRAM_IDS` = your Telegram user ID (get it from @userinfobot; separate several IDs with commas). Sign in with Telegram, then open `https://<your site>/admin`. Anyone else gets "Not found".
+
+The dashboard shows:
+- **Setup checklist:** each feature as ✅ on, ❌ missing (with the exact setting and DEPLOYMENT section), or ➖ optional.
+- **Library:** counts by source, the engine's disk use (a red warning above two thirds full) and every automatic import's last run and problem.
+- **Usage:** accounts and checks.
+- **Backup downloads.**
+
+No secrets are shown, only whether each setting is present.
+
+## Part 5b — Backups
+
+The library's imported texts can be downloaded again from their sources. **Students' and universities' archive deposits and the accounts cannot.**
+1. **Download** both from `/admin` → Backups, weekly to start with. Keep them encrypted, for example in a password-protected 7-Zip archive, somewhere only you control. They contain personal data.
+2. **Restore** deposits into an engine with: `python corpus.py --db /data/corpus.sqlite3 --restore-archive plagiq-archive-YYYYMMDD.jsonl.gz` (engine shell). To restore accounts, put the downloaded file back on the website volume at `/data/plagiq-users.sqlite3`.
+3. **Railway volume backups:** in Railway, open each volume (engine and website), go to **Backups**, and turn on a schedule (daily or weekly) if your plan offers it. Check what your plan includes.
+
 ## Part 4 — Checks before you approve the pull request
 
 Use only harmless sample text. Tick each item:

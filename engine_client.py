@@ -252,6 +252,25 @@ async def remove_deposit(identifier: str, owner: str) -> bool:
     return response.status_code == 200
 
 
+async def export_archive():
+    """Stream the engine's deposit backup (gzip JSON lines)."""
+    client = _client()
+    request = client.build_request("GET", "/v1/archive/export")
+    response = await client.send(request, stream=True)
+    if response.status_code != 200:
+        await response.aclose(); await client.aclose()
+        raise EngineError("Archive export failed (" + str(response.status_code) + ").")
+
+    async def body():
+        try:
+            async for chunk in response.aiter_raw():
+                yield chunk
+        finally:
+            await response.aclose()
+            await client.aclose()
+    return body()
+
+
 async def library():
     """Library counts from the private engine for the public page; None if unavailable."""
     if not configured():
@@ -268,6 +287,11 @@ async def library():
         finished = [str(v.get("finished"))[:25] for v in imports.values() if isinstance(v, dict) and v.get("finished")]
         return {"language_counts": {lang: _int(counts.get(lang, 0), 0, 10**9) for lang in LANGUAGES},
                 "total": _int(data.get("total", 0), 0, 10**9),
+                "disk": {k: _int((data.get("disk") or {}).get(k, 0), 0, 10**15) for k in ("db_bytes", "free_bytes", "total_bytes")}
+                        if isinstance(data.get("disk"), dict) else None,
+                "imports": {str(k)[:40]: {f: v.get(f) for f in ("finished", "imported", "error", "staged", "journals", "downloaded")
+                                          if isinstance(v.get(f), (int, str, type(None)))}
+                            for k, v in (data.get("imports") or {}).items() if isinstance(v, dict)},
                 "by_source": {k: _int(v, 0, 10**9) for k, v in (data.get("by_source") or {}).items()
                               if k in ("wikipedia", "cyberleninka", "journals", "archive", "university", "other")},
                 "last_import": max(finished) if finished else None,
