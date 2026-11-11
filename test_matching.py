@@ -238,3 +238,11 @@ def test_docx_reading_order_tables_and_text_boxes():
     assert text.startswith('HOUSEHOLD FINANCIAL VULNERABILITY IN UZBEKISTAN')      # table kept in place
     assert text.count('Boxed copied sentence.') == 1                               # text box read once
     assert text.index('Body sentence one.') < text.index('Line one')
+
+
+def test_latin_uzbek_quoting_russian_is_accepted(tmp_path):
+    text = ("Abdurauf Fitrat oʻzbek adabiyoti va tilshunosligi rivojiga katta hissa qoʻshgan olim boʻlib, "
+            "uning asarlari bugungi kunda ham oʻrganilmoqda. ") * 12 + "Rus manbasida shunday yozilgan: «Это был выдающийся учёный, который был известен»."
+    with connect(tmp_path / 'i.db') as db:
+        ingest(db, meta('uz'), text)
+        assert db.execute('SELECT count(*) FROM sources').fetchone()[0] == 1

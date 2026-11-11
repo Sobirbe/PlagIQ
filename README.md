@@ -73,6 +73,8 @@ See [DEPLOYMENT.md](DEPLOYMENT.md) for owner-friendly Railway instructions, priv
 - `pricing.py`: word count and planned price tiers (display only, configurable with `PRICING_TIERS`; no payments).
 - `citations.py`: quotation, reference-marker and bibliography detection; optional exclusions.
 - `harvest.py`: owner-run OAI-PMH harvester for open-licence journal articles (staging only).
+- `wikipedia_import.py`: Wikipedia (CC BY-SA 4.0) import from official Wikimedia dumps, with attribution; run by the engine when `AUTO_IMPORT_WIKIPEDIA` is set.
+- `import_job.py`: unattended OpenAlex import run by the engine when `AUTO_IMPORT` is set (no shell needed on Railway).
 - `oa_import.py`: owner-run OpenAlex/CORE open-licence full-text staging with cost cap.
 - `extract.py`: bounded TXT/DOCX/PDF text extraction shared by website and importer.
 - `evaluation/`: ground-truth evaluations and the corpus scaling benchmark.

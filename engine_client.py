@@ -194,3 +194,25 @@ def highlight_html(text: str, intervals) -> str:
         pos=end
     out.append(html.escape(text[pos:]))
     return "".join(out).replace("\n","<br>")
+
+
+async def library():
+    """Library counts from the private engine for the public page; None if unavailable."""
+    if not configured():
+        return None
+    try:
+        async with httpx.AsyncClient(base_url=engine_base_url(), timeout=httpx.Timeout(10.0), trust_env=False,
+                                     follow_redirects=False,
+                                     headers={"Authorization": "Bearer " + os.environ["ENGINE_API_KEY"]}) as client:
+            response = await client.get("/v1/library")
+            response.raise_for_status()
+            data = response.json()
+        counts = data.get("language_counts") or {}
+        imports = data.get("imports") or {}
+        finished = [str(v.get("finished"))[:25] for v in imports.values() if isinstance(v, dict) and v.get("finished")]
+        return {"language_counts": {lang: _int(counts.get(lang, 0), 0, 10**9) for lang in LANGUAGES},
+                "total": _int(data.get("total", 0), 0, 10**9),
+                "last_import": max(finished) if finished else None,
+                "auto_import": [l for l in data.get("auto_import") or [] if l in LANGUAGES]}
+    except (httpx.HTTPError, EngineError, ValueError, TypeError, AttributeError, KeyError):
+        return None

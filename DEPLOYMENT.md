@@ -30,24 +30,86 @@ You do not need to write code to follow this guide. Every step happens in the Ra
 
 **At this point the "Indexed academic corpus" option is greyed out.** That is expected: the private engine is not set up yet. Your own-reference and OpenAlex checks work without it.
 
-## Part 2 — Add the private corpus engine (optional, about 20 minutes)
+## Part 2 — Set up the private engine and the automatic import (about 20 minutes)
 
-The engine holds the authorized full texts. It must **never** be reachable from the internet.
+The engine is a second copy of PlagIQ that holds the library of full texts. Visitors never reach it directly; only your website talks to it. Once set up, it collects open-licence Uzbek works from OpenAlex by itself, a batch each day. **No command line is needed.**
 
-1. In Staging, click **+ New** → *GitHub Repo* → same repository and branch. Name the service **engine**.
-2. Engine → *Settings* → *Deploy* → **Custom Start Command**:
-
+**A. Create the engine service**
+1. Open your Railway project and choose the environment (**production**, or **Staging** if you want to try it there first).
+2. Click **+ New** (or **Create**) → **GitHub Repo** → `Sobirbe/PlagIQ`, branch **main**.
+3. Click the new service → **Settings** → rename it to exactly `engine`.
+4. **Settings → Deploy → Custom Start Command**, paste:
    ```sh
    sh -c 'uvicorn engine_service:app --host :: --port ${PORT:-8000} --workers 1'
    ```
+5. **Settings → Networking**: if there is a public domain, delete it. The engine must have **no public domain**.
+6. Right-click the engine (or **+ New → Volume**) → **Volume**, attach it to `engine`, mount path `/data`. On the Hobby plan this is a few GB, which is enough for thousands of articles; see "Disk space" below.
 
-   Keep **one replica** for each service. Reports and limits are kept in memory.
-3. Engine → *Settings* → *Networking*: make sure there is **no public domain**. Delete one if Railway created it.
-4. Generate a random secret of at least 32 characters in your password manager. Add it as `ENGINE_API_KEY` on **both** the engine and the website (the same value).
-5. Engine → right-click → **Attach volume** → mount path `/data`. Add the engine variable `CORPUS_DB=/data/corpus.sqlite3` and, if needed, `PORT=8000`.
-6. On the website service, add `ENGINE_URL=http://engine.railway.internal:8000`. Use the engine's real private hostname (shown under the engine's *Networking*) and its port.
-7. Optional website settings: `ENGINE_TIMEOUT=120` (15–180 seconds) and `SCAN_CONCURRENCY=2` (1–8; higher needs more memory).
-8. Redeploy the engine, then the website. `/health` now shows `"corpus_engine_configured": true`. This only means the settings exist. The synthetic test in Part 4 proves the connection works.
+**B. Engine variables** (engine → **Variables** → **New Variable** for each)
+
+| Name | Value |
+|---|---|
+| `ENGINE_API_KEY` | a random secret of at least 32 characters (use your password manager's generator) |
+| `PORT` | `8000` |
+| `CORPUS_DB` | `/data/corpus.sqlite3` |
+| `OPENALEX_API_KEY` | your OpenAlex key (the same one as on the website) |
+| `AUTO_IMPORT` | `uz` (later `uz,ru,en` for all three languages) |
+| `AUTO_IMPORT_BATCH` | `300` (new works per language per day; raise later) |
+| `CORPUS_MAX_SOURCES` | `5000` to start |
+
+Optional:
+- `AUTO_IMPORT_MAX_COST`: OpenAlex spending cap per language per day, default `0.20` (USD).
+- `AUTO_IMPORT_OPENALEX_PDF=1`: if a PDF can't be downloaded from the journal, use OpenAlex's copy (about $0.01 each, always within the cap).
+- `UNPAYWALL_EMAIL`: your email, to double-check every licence with Unpaywall.
+- `AUTO_IMPORT_HOURS`: hours between runs, default `24`.
+
+**C. Website variables** (website service → **Variables**)
+
+| Name | Value (type exactly; Railway fills in the engine's values itself) |
+|---|---|
+| `ENGINE_API_KEY` | `${{engine.ENGINE_API_KEY}}` |
+| `ENGINE_URL` | `http://${{engine.RAILWAY_PRIVATE_DOMAIN}}:8000` |
+
+**D. Deploy and check**
+1. Deploy the engine first, then the website (Railway shows **Deploy** or **Apply changes** after variable edits).
+2. Engine → **Logs**: within a few minutes you should see lines like `import uz: 37 imported, 4 failed, corpus 37 sources`. The first run starts right after deployment.
+3. On your website, in "What PlagIQ checks", the **PlagIQ library** card now shows e.g. "Currently indexed: UZ 37 · RU 0 · EN 0 · total 37 · last import 2026-11-11".
+4. The **Indexed academic corpus** option in the checker is no longer greyed out. Try it with a sentence copied from one of the imported Uzbek articles: it should find the article, quote the passage and link to it.
+
+**What the automatic import does (and doesn't)**
+- **Accepts** only works whose licence OpenAlex lists as CC BY, CC BY-SA, CC0 or public domain. Non-commercial and no-derivatives works are skipped.
+- **Downloads** each PDF from the publisher's link, or from the PDF that the journal's article page names (after checking the page doesn't show a different licence).
+- **Checks** each text with the importer's rules: language from the text itself, a minimum length, required details.
+- **Indexes** the text, then deletes the PDF to save disk space.
+- **Remembers** where it stopped, and continues the next day.
+- **Never** indexes users' manuscripts.
+- A failed article is skipped with its reason; it doesn't stop the others.
+
+**Turning it off:** delete `AUTO_IMPORT` (or set it empty) and redeploy. Imported texts stay in the library.
+
+**E. Add Wikipedia (recommended)**
+Students often copy from Wikipedia. Its text is licensed CC BY-SA 4.0, which allows indexing and quoting short excerpts with attribution. PlagIQ records "Wikipedia contributors", the article link, the revision and the licence for every article. On the engine, add:
+
+| Name | Value |
+|---|---|
+| `AUTO_IMPORT_WIKIPEDIA` | `uz` |
+| `WIKIPEDIA_BATCH` | `2000` (articles per day) |
+| `WIKIPEDIA_MIN_WORDS` | `300` (shorter "stub" articles are skipped) |
+
+- **How it works:** the engine streams Wikimedia's official download file. It never sends many requests to Wikipedia's live site.
+- **Measured (November 2026):** 500 Uzbek articles imported in about 30 seconds with no failures. A passage copied from one of them was traced to the correct article.
+- **Coverage:** Uzbek Wikipedia's file is about 300 MB, and many of its articles are short stubs. Russian (`ru`) and English (`en`) work too, but their files are many gigabytes and each daily run reads from the start of the file. Use them only with a larger volume and a higher `CORPUS_MAX_SOURCES`.
+- **Updates:** changed articles replace their older version the next time the file is read through. Progress appears in the PlagIQ library card.
+- **Shared limit:** Wikipedia articles and OpenAlex works count towards the same `CORPUS_MAX_SOURCES`. Uzbek Wikipedia alone has tens of thousands of articles over 300 words, so it can fill a 5,000-source library within a few days. When the limit is reached, imports stop and the logs say so. Raise the limit or `WIKIPEDIA_MIN_WORDS` to balance the two.
+
+**Disk space and limits** (measured on a test machine, article-sized sources; see `evaluation/BENCHMARKS.md`):
+
+| Sources | Disk | Search (repeated) | Memory |
+|---|---|---|---|
+| 1,000 | about 170 MB | about 0.05 s | about 38 MB |
+| 5,000 | about 860 MB | about 0.07 s | about 38 MB |
+
+`CORPUS_MAX_SOURCES=5000` fits a 1 GB volume with room to spare. Raise it, and `AUTO_IMPORT_BATCH`, step by step, while watching the volume usage on the engine's **Metrics** tab.
 
 **Upgrading an existing engine:** v0.5 changes the index format (7× smaller) and improves Unicode handling. On first start, the engine automatically rebuilds the index from the texts already stored in its database. It downloads nothing. Measured at about 0.1–0.2 s per source. Back up the volume first.
 

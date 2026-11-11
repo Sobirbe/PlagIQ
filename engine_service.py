@@ -12,8 +12,42 @@ import uuid
 from fastapi import Depends, FastAPI, Header, HTTPException
 from pydantic import BaseModel, Field
 from contextlib import closing
-from corpus import connect, search
+import logging
+from corpus import LANGUAGES, connect, corpus_version, inventory, search
 from security import SecurityMiddleware
+import import_job
+import wikipedia_import
+
+log = logging.getLogger("plagiq.import")
+import_stop = threading.Event()
+
+
+def import_loop():
+    """Background OpenAlex import when AUTO_IMPORT is set. Runs, then sleeps AUTO_IMPORT_HOURS."""
+    while not import_stop.is_set():
+        langs, batch, hours, cost = import_job.settings()
+        for language in langs:
+            if import_stop.is_set():
+                return
+            try:
+                status = import_job.run(language, batch, cost)
+                log.warning("import %s: %s imported, %s failed, corpus %s sources, error=%s", language,
+                            status["imported"], status["failed"], status["corpus_sources"], status["error"])
+            except Exception as exc:                     # never let the import stop the engine
+                log.warning("import %s failed: %s", language, type(exc).__name__)
+                import_job.write_status(import_job.staging_root(), language,
+                                        {"language": language, "error": type(exc).__name__ + ": " + str(exc)[:200]})
+        wiki_langs, wiki_batch, min_words = wikipedia_import.settings()
+        for language in wiki_langs:
+            if import_stop.is_set():
+                return
+            try:
+                status = wikipedia_import.run(language, wiki_batch, min_words)
+                log.warning("wikipedia %s: %s new, %s updated, corpus %s sources, error=%s", language,
+                            status["imported"], status["updated"], status["corpus_sources"], status["error"])
+            except Exception as exc:
+                log.warning("wikipedia %s failed: %s", language, type(exc).__name__)
+        import_stop.wait(hours * 3600)
 
 @asynccontextmanager
 async def lifespan(app):
@@ -30,9 +64,15 @@ async def lifespan(app):
             finally:
                 lock.release()
     task = asyncio.create_task(cleanup())
+    connect().close()                                    # run any index upgrade before serving or importing
+    worker = None
+    if import_job.settings()[0] or wikipedia_import.settings()[0]:
+        worker = threading.Thread(target=import_loop, name="auto-import", daemon=True)
+        worker.start()
     try:
         yield
     finally:
+        import_stop.set()
         task.cancel()
         try:
             await task
@@ -81,6 +121,23 @@ def check(query: Query):
         return {'status_url': f'/v1/checks/{identifier}', 'report_url': f'/v1/checks/{identifier}/report'}
     finally:
         lock.release()
+
+
+@app.get('/v1/library', dependencies=[Depends(authorize)])
+def library():
+    """Indexed sources per language and the latest import status (no texts, no permission records)."""
+    with closing(connect()) as db:
+        rows = inventory(db)
+        version = corpus_version(db)
+    counts = {lang: sum(m['language'] == lang for m in rows) for lang in LANGUAGES}
+    allowed = {f'wikipedia-{lang}' for lang in LANGUAGES} | set(LANGUAGES)
+    status = {name: {k: v for k, v in info.items() if k in (
+                  'finished', 'imported', 'updated', 'failed', 'staged_total', 'failed_total', 'listing_complete',
+                  'dump_complete', 'estimated_cost_usd', 'error', 'language_corrected')}
+              for name, info in import_job.read_status().items() if name in allowed and isinstance(info, dict)}
+    return {'language_counts': counts, 'total': len(rows), 'corpus_version': version,
+            'auto_import': import_job.settings()[0], 'auto_import_wikipedia': wikipedia_import.settings()[0],
+            'imports': status}
 
 
 @app.get('/v1/checks/{identifier}', dependencies=[Depends(authorize)])

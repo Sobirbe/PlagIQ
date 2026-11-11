@@ -22,7 +22,7 @@ import pricing
 import extract
 from discovery import discover
 import html
-from engine_client import EngineError, configured as corpus_configured, run_check, summarize
+from engine_client import EngineError, configured as corpus_configured, library as engine_library, run_check, summarize
 from report_pdf import build_pdf
 from security import SecurityMiddleware, MAX_REQUEST
 
@@ -221,6 +221,18 @@ def health():
 
 QUOTES = {}
 QUOTE_LIMIT = 60
+
+
+LIBRARY_CACHE = {"at": -1e9, "data": None}
+
+
+@app.get("/api/library")
+async def library_counts():
+    """Public, cached summary of the private library: sources per language only."""
+    if time.monotonic() - LIBRARY_CACHE["at"] > 60:
+        LIBRARY_CACHE.update(at=time.monotonic(), data=await engine_library())
+    data = LIBRARY_CACHE["data"]
+    return {"configured": corpus_configured(), "available": data is not None, **(data or {})}
 
 
 @app.get("/api/pricing")
