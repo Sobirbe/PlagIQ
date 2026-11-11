@@ -80,7 +80,21 @@ def test_short_titles_and_headers():
     q = discovery._first_line_query
     assert q('HOUSEHOLD FINANCIAL VULNERABILITY IN UZBEKISTAN\nShukurov S.\nAbstract\nThis paper studies households.') \
         == 'HOUSEHOLD FINANCIAL VULNERABILITY IN UZBEKISTAN'
+    assert q('HOUSEHOLD FINANCIAL VULNERABILITY IN UZBEKISTAN\tShukurov S.\nAbstract') == 'HOUSEHOLD FINANCIAL VULNERABILITY IN UZBEKISTAN'
     assert q('УДК 336.7\nЦифровизация высшего образования в Узбекистане\nАннотация. Текст статьи.') \
         == 'Цифровизация высшего образования в Узбекистане'
     assert q("Vol. 5 No. 2 (2025)\nISSN 2181-1234\nOliy ta'lim sifatini baholash usullari\nKalit so'zlar: ta'lim") \
         == "Oliy ta'lim sifatini baholash usullari"
+
+
+def test_search_phrases_shown_but_never_cached(monkeypatch):
+    import app as web
+    from fastapi.testclient import TestClient
+    monkeypatch.setattr(web, 'discover', lambda text, *a: dict(sources=[], status='searched', message='', queries=2,
+                                                             query_texts=['Household financial vulnerability', 'Second phrase here']))
+    web.RATE.clear(); web.results.clear()
+    text = 'one two three four five six seven eight nine ten'
+    data = TestClient(web.app).post('/api/check', data={'mode': 'academic', 'language': 'en', 'consent': 'true'},
+                                    files={'submission': ('m.txt', text.encode())}).json()
+    assert data['search_phrases'] == ['Household financial vulnerability', 'Second phrase here']
+    assert 'search_phrases' not in web.results[data['report_id']]['result']

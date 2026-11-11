@@ -49,7 +49,7 @@ def _looks_like_title(line):
 
 def _first_line_query(text):
     """The title is usually among the first lines; many real titles have only 3-5 words."""
-    lines = [re.sub(r"\s+", " ", line).strip() for line in text.splitlines()]
+    lines = [re.sub(r"\s+", " ", line).strip() for line in re.split(r"[\n\t]", text)]   # table cells separately
     lines = [line for line in lines if line]
     titles = [line for line in lines[:15] if _looks_like_title(line)]
     if not titles:
@@ -118,7 +118,7 @@ def discover(text, max_results=8, language=None):
         outcomes = list(pool.map(lambda q: _safe(_search, q, language, max_results), queries))
     failures = [o for o in outcomes if isinstance(o, Exception)]
     if len(failures) == len(outcomes):
-        return {"status": "unavailable", "sources": [], "queries": len(queries),
+        return {"status": "unavailable", "sources": [], "queries": len(queries), "query_texts": queries,
                 "message": "OpenAlex unavailable or rate limited (" + type(failures[0]).__name__ + ")"}
     sources, seen = [], set()
     for results in outcomes:
@@ -137,7 +137,8 @@ def discover(text, max_results=8, language=None):
             sources.append({"title": title[:300], "url": url[:500], "year": year if type(year) is int else None,
                             "abstract": abstract[:20000], "coverage": "abstract" if abstract else "metadata_only"})
     status = "partial" if failures else "searched"
-    return {"status": status, "sources": sources, "queries": len(queries), "failed_queries": len(failures),
+    return {"status": status, "sources": sources, "queries": len(queries), "query_texts": queries,
+            "failed_queries": len(failures),
             "message": (f"{len(failures)} of {len(queries)} OpenAlex searches failed; " if failures else "")
                        + "OpenAlex metadata searched; only returned abstracts can be text-compared"}
 

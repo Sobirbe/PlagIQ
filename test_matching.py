@@ -213,6 +213,33 @@ def test_detect_language_from_text():
     assert detect_language('short') is None
 
 
+def test_docx_reading_order_tables_and_text_boxes():
+    import io as _io
+    from docx import Document
+    from docx.oxml import parse_xml
+    from extract import extract_text as ex
+    doc = Document()
+    table = doc.add_table(rows=1, cols=2)
+    table.cell(0, 0).text = 'HOUSEHOLD FINANCIAL VULNERABILITY IN UZBEKISTAN'
+    table.cell(0, 1).text = 'Author Name'
+    para = doc.add_paragraph('Body sentence one.')
+    ns = ('xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" '
+          'xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" '
+          'xmlns:wps="http://schemas.microsoft.com/office/word/2010/wordprocessingShape"')
+    para._p.append(parse_xml(
+        f'<w:r {ns}><mc:AlternateContent><mc:Choice Requires="wps"><w:drawing><wps:txbx><w:txbxContent>'
+        '<w:p><w:r><w:t>Boxed copied sentence.</w:t></w:r></w:p></w:txbxContent></wps:txbx></w:drawing></mc:Choice>'
+        '<mc:Fallback><w:pict><w:txbxContent><w:p><w:r><w:t>Boxed copied sentence.</w:t></w:r></w:p></w:txbxContent>'
+        '</w:pict></mc:Fallback></mc:AlternateContent></w:r>'))
+    doc.add_paragraph('Line one').add_run().add_break()
+    buf = _io.BytesIO()
+    doc.save(buf)
+    text = ex('a.docx', buf.getvalue())
+    assert text.startswith('HOUSEHOLD FINANCIAL VULNERABILITY IN UZBEKISTAN')      # table kept in place
+    assert text.count('Boxed copied sentence.') == 1                               # text box read once
+    assert text.index('Body sentence one.') < text.index('Line one')
+
+
 def test_latin_uzbek_quoting_russian_is_accepted(tmp_path):
     text = ("Abdurauf Fitrat oʻzbek adabiyoti va tilshunosligi rivojiga katta hissa qoʻshgan olim boʻlib, "
             "uning asarlari bugungi kunda ham oʻrganilmoqda. ") * 12 + "Rus manbasida shunday yozilgan: «Это был выдающийся учёный, который был известен»."
