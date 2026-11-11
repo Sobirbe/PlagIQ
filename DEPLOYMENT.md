@@ -269,6 +269,19 @@ The **AI detector** mode, plus an optional "Also check with the AI detector" box
 
 **Before going live,** read Pangram's terms on data use and retention, add them to your privacy notice, and have your lawyer confirm that sending full manuscripts abroad is acceptable under Law ZRU-547.
 
+## Part 3k — Protected archive of checked works (opt-in)
+
+Signed-in users can tick **"Add this document to the PlagIQ protected archive"** when they run a check. The full text then goes into the private library, so **later copies of it are found**, even though it was never published. This is what antiplag.uz calls its "internal archive".
+
+- **Who sees what:** other users see only the title, author and year of an archived work, plus the matching passage in *their own* document. They never see the archived text.
+- **Self-checks:** checking the identical document again does not match itself. If the author checks a document that copies their own archived work, it is labelled "Your own archived work".
+- **Removal:** users see their works in the menu under their name ("My archived works") and can remove them at any time. Deleting the account removes them too.
+- **Consent:** the user must confirm they are the author or have the author's permission. That confirmation and its time are stored with the work.
+- **Requirements:** the private engine (Part 2) and Telegram sign-in (Part 3i). Without both, the option is hidden.
+- **Academic checks** now also search the private library (imported publications and the archive) when the engine is set up, so archived works are found in the default mode, not only in "PlagIQ library" mode.
+
+**Before switching it on publicly,** add the archive to your privacy notice (what is kept, why, for how long, how to remove it), and have your lawyer confirm the consent text under ZRU-547. The archive grows with use, so watch the engine volume's size (see `evaluation/BENCHMARKS.md`; 5,000 sources ≈ 0.9 GB) and raise `CORPUS_MAX_SOURCES` when needed.
+
 ## Part 3e — Full-text comparison during academic checks (on by default)
 
 In **Find academic publications** mode, PlagIQ now downloads the free full texts (PDFs) of the most relevant papers it finds and compares the manuscript against the **whole articles**, not only their abstracts. The texts are used for that one check and then discarded; they are not stored. Your lawyer has confirmed this use.
