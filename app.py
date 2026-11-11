@@ -20,6 +20,7 @@ import citations
 import corpus
 import fulltext
 import websearch
+import integrity
 import pricing
 import verify
 import extract
@@ -456,6 +457,9 @@ async def analyse(submission, reference, reference_text, language, mode, options
         result["percent_all"] = review["percent_all"]
         result["percent"] = review["percent_counted"]
         result["matched_tokens_counted"] = review["matched_words_counted"]
+    # Writing-integrity signals (not AI detection). DOIs are looked up only with the academic consent.
+    result["integrity"], result["integrity_examples"] = await run_in_threadpool(
+        integrity.assess, original, mode == "academic")
     result["plan"] = pricing.quote(pricing.count_words(original))
     result.update({"document":clean_filename(submission.filename, "Document"),
                    "date":datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -482,7 +486,7 @@ def highlight(text, segments):
 
 
 # Manuscript text shown to the user once, never kept in the report cache or PDF.
-PRIVATE_FIELDS = ("highlight_html", "search_phrases")
+PRIVATE_FIELDS = ("highlight_html", "search_phrases", "integrity_examples")
 
 
 def finish(request, result):
