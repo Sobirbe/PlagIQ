@@ -5,7 +5,18 @@ can change them in Railway without code changes, e.g.
 
   [{"id": "free", "max_words": 1000, "price_uzs": 0},
    {"id": "researcher", "max_words": 3500, "price_uzs": 15000},
-   {"id": "extended", "max_words": 15000, "price_uzs": 45000}]
+   {"id": "extended", "max_words": 15000, "price_uzs": 25000},
+   {"id": "thesis", "max_words": 40000, "price_uzs": 35000}]
+
+Other services (also display only):
+  AI_PRICE_PER_WORD=3      AI detector, so'm per word
+  AI_MIN_PRICE=6000        AI detector minimum per document
+  PRICING_PACKAGES         JSON list, e.g. [{"checks": 10, "bonus": 2}, {"checks": 20, "bonus": 5}]
+The certificate of check with QR code is included in every check.
+
+Cost note: Pangram's list price is $0.05 per 100 words (about 6 so'm per word at
+12,500 so'm/$). 3 so'm per word covers the cost only with Pangram's Professional
+plan ($65/month including $200 of API credits, about 2 so'm per word when used up).
 
 Prices are labelled "planned" until real per-check costs are measured and a
 payment provider is integrated; checks stay free during the pilot.
@@ -17,8 +28,10 @@ import re
 DEFAULT_TIERS = [
     {"id": "free", "max_words": 1000, "price_uzs": 0},
     {"id": "researcher", "max_words": 3500, "price_uzs": 15000},
-    {"id": "extended", "max_words": 15000, "price_uzs": 45000},
+    {"id": "extended", "max_words": 15000, "price_uzs": 25000},
+    {"id": "thesis", "max_words": 40000, "price_uzs": 35000},
 ]
+DEFAULT_PACKAGES = [{"checks": 10, "bonus": 2}, {"checks": 20, "bonus": 5}]
 # A word: letters/digits, with apostrophes inside (Uzbek ta'lim, o‘qish; English don't).
 WORD = re.compile(r"[^\W_]+(?:['’ʼʻ‘`][^\W_]+)*")
 
@@ -56,5 +69,33 @@ def quote(words):
     return {"id": "contact", "max_words": None, "price_uzs": None, "words": words, "fits": False}
 
 
+def _int_env(name, default):
+    try:
+        value = int(os.environ.get(name, default))
+        return value if value >= 0 else default
+    except ValueError:
+        return default
+
+
+def ai_price(words):
+    """Planned AI-detector price for a document of `words` words."""
+    return max(_int_env("AI_MIN_PRICE", 6000), _int_env("AI_PRICE_PER_WORD", 3) * words)
+
+
+def packages():
+    raw = os.environ.get("PRICING_PACKAGES", "").strip()
+    if not raw:
+        return DEFAULT_PACKAGES
+    try:
+        data = [{"checks": int(p["checks"]), "bonus": int(p["bonus"])} for p in json.loads(raw)]
+        if all(1 <= p["checks"] <= 1000 and 0 <= p["bonus"] <= p["checks"] for p in data):
+            return data
+    except (ValueError, TypeError, KeyError):
+        pass
+    return DEFAULT_PACKAGES
+
+
 def public_config():
-    return {"currency": "UZS", "payments_enabled": False, "status": "planned", "tiers": tiers()}
+    return {"currency": "UZS", "payments_enabled": False, "status": "planned", "tiers": tiers(),
+            "ai": {"per_word": _int_env("AI_PRICE_PER_WORD", 3), "minimum": _int_env("AI_MIN_PRICE", 6000)},
+            "certificate": 0, "packages": packages()}

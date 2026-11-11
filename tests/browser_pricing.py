@@ -22,13 +22,13 @@ try:
             errors = []
             page.on('pageerror', lambda e: errors.append(str(e)))
             page.goto('http://127.0.0.1:8143')
-            page.wait_for_function("() => document.querySelectorAll('#price-cards .price').length === 3")
+            page.wait_for_function("() => document.querySelectorAll('#price-cards .price').length === 4")
             cards = page.locator('#price-cards').inner_text()
-            assert 'Free' in cards and '15,000' in cards and '45,000' in cards and 'Up to 1,000 words' in cards and 'Up to 3,500 words' in cards, cards
+            assert 'Free' in cards and '15,000' in cards and '25,000' in cards and '35,000' in cards and 'Up to 1,000 words' in cards and 'Up to 3,500 words' in cards, cards
             assert 'not charged' in page.locator('#pilot-bar').inner_text()
             page.locator('#calc-words').fill('1001')
             assert 'Researcher' in page.locator('#calc-out').inner_text() and 'free during the pilot' in page.locator('#calc-out').inner_text()
-            page.locator('#calc-words').fill('15001')
+            page.locator('#calc-words').fill('40001')
             assert 'contact us' in page.locator('#calc-out').inner_text()
             page.locator('#submission').set_input_files({'name': 'paper.txt', 'mimeType': 'text/plain', 'buffer': ('word ' * 2500).encode()})
             page.wait_for_function("() => document.querySelector('#quote').textContent.includes('2,500')")

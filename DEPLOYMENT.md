@@ -240,6 +240,35 @@ The result is "Review suggested" or "No indicators found". Neither is a verdict:
 
 To switch the DOI lookups off, set `INTEGRITY_DOI_CHECK=0` on the website service.
 
+## Part 3i — Sign-in with Telegram
+
+Users sign in with their Telegram account before running a check. PlagIQ stores only their Telegram ID, name, username and a list of their checks (date, mode, word count, result and AI estimate). It never stores documents or file names. Users can delete their account from the menu.
+
+1. In Telegram, open **@BotFather** and send `/newbot`. Name it, for example `PlagIQ`, with a username such as `plagiq_uz_bot`. BotFather replies with a **token**, which is a secret.
+2. Still in @BotFather, send `/setdomain`, choose your bot, and send your site address without `https://`, for example `plagiq-production.up.railway.app`. Without this step Telegram refuses the sign-in.
+3. Railway → **website** service → **Settings → Volumes** → add a volume mounted at **`/data`**. Accounts are kept there, so they survive redeploys. Without a volume, accounts are lost at each deploy.
+4. Railway → **website** service → **Variables**: add `TELEGRAM_BOT_TOKEN` = the token, and `TELEGRAM_BOT_USERNAME` = the bot username without @. Deploy.
+5. Open the site. "Sign in with Telegram" appears at the top. Checks need sign-in by default; set `LOGIN_REQUIRED=0` to make it optional.
+
+The QR verification page (`/verify`) stays public, so supervisors can scan certificates without an account.
+
+## Part 3j — AI detector ("Hujjatni AI detektoriga tekshirish")
+
+The **AI detector** mode, plus an optional "Also check with the AI detector" box in the other modes, sends the **full text** to Pangram (USA), with its own consent tick. It shows Pangram's estimate of the AI-written, AI-assisted and human shares, with flagged passages. **Russian and English only:** Pangram does not support Uzbek, so Uzbek texts are not sent and nothing is charged. The page, PDF and certificate present the figures as Pangram's estimate, not proof.
+
+1. Sign up at **pangram.com**, open the **API dashboard**, create an **API key** and add credits. Consider the Professional plan (see Part 3d on costs).
+2. Railway → **website** service → **Variables**: add `PANGRAM_API_KEY` = the key. Deploy.
+3. `/health` should show `"ai_detector": {"enabled": true, ...}`, and "Hujjatni AI detektoriga tekshirish" appears among the modes.
+
+| Name | Default | Meaning |
+|---|---|---|
+| `PANGRAM_API_KEY` | — | secret; turns the AI detector on |
+| `AI_MAX_WORDS` | `15000` | longest document sent (cost cap; one 15,000-word check costs about $7.50 at the list price) |
+| `AI_SECONDS` | `90` | time limit per check |
+| `PANGRAM_MODEL` | `pangram-4` | model selector |
+
+**Before going live,** read Pangram's terms on data use and retention, add them to your privacy notice, and have your lawyer confirm that sending full manuscripts abroad is acceptable under Law ZRU-547.
+
 ## Part 3e — Full-text comparison during academic checks (on by default)
 
 In **Find academic publications** mode, PlagIQ now downloads the free full texts (PDFs) of the most relevant papers it finds and compares the manuscript against the **whole articles**, not only their abstracts. The texts are used for that one check and then discarded; they are not stored. Your lawyer has confirmed this use.
@@ -265,13 +294,19 @@ A check now takes a little longer (usually a few seconds, at most `FULLTEXT_SECO
 
 The website shows the word count and the **planned** price as soon as a file is chosen, plus a price table and calculator. **No money is taken.** There is no payment system, and the page says checks are free during the pilot.
 
-Default plans: Free up to 1,000 words (0 UZS), Researcher 1,001–3,500 words (15,000 UZS), Extended 3,501–15,000 words (45,000 UZS). Larger documents are shown as "contact us". To change them, add a `PRICING_TIERS` variable to the website service in Railway, for example:
+Default plans: Free up to 1,000 words (0 UZS), Researcher 1,001–3,500 words (15,000 UZS), Extended 3,501–15,000 words (25,000 UZS), Thesis 15,001–40,000 words (35,000 UZS). Larger documents are shown as "contact us". Other services shown: AI detector 3 UZS per word (minimum 6,000), certificate with QR code included free, packages "10 checks → +2 free" and "20 checks → +5 free". For comparison, antiplag.uz (November 2026) charges 46,000 UZS per plagiarism check, 4 UZS per word for its AI detector (minimum 10,000), 6,000 UZS for a certificate, and gives +1 free for 10 checks and +3 for 20.
+
+**AI detector cost:** Pangram's list price is $0.05 per 100 words, which is about 6 UZS per word at 12,500 UZS/$. At 3 UZS per word you cover the cost only with Pangram's **Professional** plan ($65 a month including $200 of API credits, so about 2 UZS per word while those credits last). On the pay-as-you-go price, every AI check loses money. Set `AI_PRICE_PER_WORD` and `AI_MIN_PRICE` to your own figures, and check the current exchange rate.
+
+To change the plans, add a `PRICING_TIERS` variable to the website service in Railway, for example:
 
 ```json
-[{"id":"free","max_words":1000,"price_uzs":0},{"id":"researcher","max_words":3500,"price_uzs":15000},{"id":"extended","max_words":15000,"price_uzs":45000}]
+[{"id":"free","max_words":1000,"price_uzs":0},{"id":"researcher","max_words":3500,"price_uzs":15000},{"id":"extended","max_words":15000,"price_uzs":25000},{"id":"thesis","max_words":40000,"price_uzs":35000}]
 ```
 
-Keep the ids `free`, `researcher` and `extended`, which have names and descriptions in all three languages. Change only the numbers. If the value is invalid, the site quietly uses the defaults. Before charging real money, measure the real cost per check and add a payment provider (Payme, Click or Uzum) in a separate, reviewed change.
+`PRICING_PACKAGES` changes the packages, for example `[{"checks":10,"bonus":2},{"checks":20,"bonus":5}]`.
+
+Keep the ids `free`, `researcher`, `extended` and `thesis`, which have names and descriptions in all three languages. Change only the numbers. If the value is invalid, the site quietly uses the defaults. Before charging real money, measure the real cost per check and add a payment provider (Payme, Click or Uzum) in a separate, reviewed change.
 
 ## Part 4 — Checks before you approve the pull request
 

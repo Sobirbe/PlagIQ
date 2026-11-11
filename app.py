@@ -374,7 +374,8 @@ async def price_quote(request: Request, submission: UploadFile = File(...)):
     if len(QUOTES) > 3000:
         QUOTES.clear()
     text = await read_file(submission)
-    return {**pricing.quote(pricing.count_words(text)), "characters": len(text),
+    words = pricing.count_words(text)
+    return {**pricing.quote(words), "ai_price_uzs": pricing.ai_price(words), "characters": len(text),
             "currency": "UZS", "payments_enabled": False}
 
 
