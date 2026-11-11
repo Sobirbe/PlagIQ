@@ -1,4 +1,5 @@
-"""Scope-limited evidence report (PDF). Never an originality certificate.
+"""PDF report: a certificate of the check (certificate.py) followed by the scope-limited evidence.
+Never an originality certificate.
 
 Rendered from the cached report summary only: it contains source excerpts
 from the authorized corpus, never the manuscript text itself.
@@ -14,7 +15,9 @@ from reportlab.lib.units import mm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen import canvas as pdfcanvas
-from reportlab.platypus import KeepTogether, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import KeepTogether, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+
+from certificate import CertificatePage
 
 PDF_SOURCES = 15
 FONT_DIR = Path("/usr/share/fonts/truetype/dejavu")
@@ -81,7 +84,7 @@ T = {
             "Records with metadata only (no abstract and no full text) were listed but not text-compared.",
             "A low or zero result does not show that a document is original.",
             "Text extraction from PDF/DOC/DOCX can omit headers, footnotes, text boxes or images."],
-    footer="PlagIQ · Scope-limited evidence · not a certificate", page="Page {p} of {n}",
+    footer="PlagIQ · Certificate of check and evidence report", page="Page {p} of {n}",
     modes=dict(reference="Your own reference", academic="OpenAlex discovery (open-access full texts and abstracts)", corpus="Private authorized corpus"),
     states=dict(partial="Partly searched (some searches failed)", searched="Searched", unavailable="Unavailable", no_query="No search phrase", not_searched="Not searched"),
     rights_v=dict(written_permission="Written permission", open_license="Open licence", public_domain="Public domain", unknown="Unknown"),
@@ -139,7 +142,7 @@ T = {
             "Записи только с метаданными (без аннотации и полного текста) указаны, но текст не сравнивался.",
             "Низкий или нулевой результат не доказывает оригинальность.",
             "Извлечение текста из PDF/DOC/DOCX может пропускать колонтитулы, сноски, надписи и изображения."],
-    footer="PlagIQ · Доказательства в ограниченном охвате · не сертификат", page="Стр. {p} из {n}",
+    footer="PlagIQ · Сертификат проверки и отчёт с доказательствами", page="Стр. {p} из {n}",
     modes=dict(reference="Ваш источник", academic="Поиск OpenAlex (открытые полные тексты и аннотации)", corpus="Внутренний разрешённый корпус"),
     states=dict(partial="Поиск выполнен частично (часть запросов не удалась)", searched="Поиск выполнен", unavailable="Недоступно", no_query="Нет поисковой фразы", not_searched="Поиск не проводился"),
     rights_v=dict(written_permission="Письменное разрешение", open_license="Открытая лицензия", public_domain="Общественное достояние", unknown="Неизвестно"),
@@ -197,7 +200,7 @@ T = {
             "Faqat metama’lumoti bor (annotatsiyasi ham, to‘liq matni ham yo‘q) yozuvlar matn bo‘yicha solishtirilmadi.",
             "Past yoki nol natija hujjat original ekanini isbotlamaydi.",
             "PDF/DOC/DOCX’dan matn ajratishda sarlavhalar, izohlar, matn bloklari yoki rasmlar tushib qolishi mumkin."],
-    footer="PlagIQ · Cheklangan doiradagi dalillar · sertifikat emas", page="{n} sahifadan {p}",
+    footer="PlagIQ · Tekshiruv sertifikati va dalillar hisoboti", page="{n} sahifadan {p}",
     modes=dict(reference="O‘z manbangiz", academic="OpenAlex qidiruvi (ochiq to‘liq matnlar va annotatsiyalar)", corpus="Ruxsat berilgan ichki korpus"),
     states=dict(partial="Qisman qidirildi (ayrim so‘rovlar bajarilmadi)", searched="Qidirildi", unavailable="Mavjud emas", no_query="Qidiruv iborasi yo‘q", not_searched="Qidirilmagan"),
     rights_v=dict(written_permission="Yozma ruxsat", open_license="Ochiq litsenziya", public_domain="Jamoat mulki", unknown="Noma’lum"),
@@ -344,13 +347,8 @@ def build_pdf(result, identifier, lang="en", minutes_left=15, verify_url=None):
             ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 5)]))
         return tbl
 
-    heading = [Paragraph("PlagIQ", st["title"]), Paragraph(t["subtitle"], st["subtitle"])]
-    if verify_url:
-        head = Table([[heading, [_qr(verify_url, 27 * mm), Paragraph(esc(t["qr_caption"]), st["small"])]]],
-                     colWidths=[None, 30 * mm], hAlign="LEFT")
-        head.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), ("LEFTPADDING", (0, 0), (-1, -1), 0),
-                                  ("RIGHTPADDING", (0, 0), (-1, -1), 0), ("ALIGN", (1, 0), (1, 0), "CENTER")]))
-        heading = [head]
+    heading = [CertificatePage(result, identifier, lang, verify_url, _qr, (REGULAR, BOLD)), PageBreak(),
+               Paragraph("PlagIQ", st["title"]), Paragraph(t["subtitle"], st["subtitle"])]
     story = heading + [
              Paragraph(esc(t["disclaimer"]), st["notice"])]
 

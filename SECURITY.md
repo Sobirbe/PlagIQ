@@ -48,7 +48,7 @@
 - No AI percentage or AI-authorship verdict is produced. The report lists checkable indicators (chatbot phrases, placeholders, hidden characters, look-alike letters, chat formatting, non-existent or mismatched DOIs). "No indicators found" does not mean human-written. See `evaluation/INTEGRITY.md`.
 - No paraphrase or translation detection. Web search (optional, Yandex and/or Brave) covers only the top pages found for 3 short excerpts, not the whole web. Matching is exact seven-word overlap after normalization, including between Uzbek Latin and Cyrillic.
 - Quotations and the bibliography are excluded only if the user chooses, using tested rules; the report shows both figures. The rules do not judge whether a citation is adequate.
-- The PDF is a scope-limited evidence report, not an accredited originality certificate.
+- The PDF opens with a "Certificate of check" that certifies the check (document fingerprint, date, scope, result) and is verifiable by QR code. It is not an accredited certificate of originality or of the absence of plagiarism, and it says so on the page.
 - No payment processing is included or changed.
 
 Report vulnerabilities privately to the repository owner; do not open a public issue with exploit details.
