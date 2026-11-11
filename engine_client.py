@@ -161,6 +161,7 @@ def summarize(report: dict, max_sources=25) -> dict:
                 "url": url if urlsplit(url).scheme == "https" else "",
                 "coverage": "archive" if deposit else "indexed full-text source",
                 "owner": str(src.get("owner") or "")[:40] if deposit else "",
+                "collection": str(src.get("collection") or "")[:120] if src.get("rights_basis") == "institution_deposit" else "",
                 "matched_chars": matched_chars,
                 "matched_tokens": matched_words,
                 "authors": str(src.get("authors") or "")[:300],

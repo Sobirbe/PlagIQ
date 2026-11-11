@@ -23,6 +23,7 @@ import websearch
 import integrity
 import aidetect
 import auth
+import institutions
 import pricing
 import verify
 import extract
@@ -371,6 +372,67 @@ async def remove_from_archive(identifier: str, request: Request):
         raise ApiError(404, "report_unavailable", "Not found")
     try:
         removed = await engine_client.remove_deposit(identifier, auth.owner_id(user))
+    except EngineError as exc:
+        raise ApiError(503, exc.code, str(exc))
+    if not removed:
+        raise ApiError(404, "report_unavailable", "Not found")
+    return {"deleted": True}
+
+
+@app.get("/api/institution")
+def my_institutions(request: Request):
+    user = auth.read(request.cookies.get(auth.COOKIE))
+    return {"enabled": corpus_configured(), "institutions": institutions.for_user(user)}
+
+
+@app.post("/api/institution/deposit")
+async def institution_deposit(request: Request, institution: str = Form(..., max_length=80), file: UploadFile = File(...),
+                              year: int = Form(...), authors: str = Form("", max_length=300), title: str = Form("", max_length=300)):
+    """One work per request (the browser sends files one by one; each request is capped at 5 MB)."""
+    user = auth.read(request.cookies.get(auth.COOKIE))
+    if not institutions.allowed(user, institution):
+        raise ApiError(403, "institution_forbidden", "This account may not deposit works for this institution.")
+    if not corpus_configured():
+        raise ApiError(503, "engine_not_configured", "Private PlagIQ corpus engine is not configured.")
+    if not 1900 <= year <= datetime.now(timezone.utc).year:
+        raise ApiError(400, "invalid_option", "Invalid year")
+    text = await read_file(file)
+    language = await run_in_threadpool(corpus.detect_language, text)
+    if not language:
+        raise ApiError(400, "language_unknown", "The language of this file could not be detected (Uzbek, Russian or English).")
+    require_tokens(text, language, "too_short", "At least 7 words of readable text are needed.")
+    name_author, name_title = institutions.from_filename(file.filename)
+    item = {**institutions.record(institution, institutions.configured()[institution]["agreement"],
+                                  " ".join(title.split()) or name_title, " ".join(authors.split()) or name_author or "—",
+                                  year, language), "text": text}
+    try:
+        identifier = await engine_client.deposit(item)
+    except EngineError as exc:
+        raise ApiError(422 if exc.code == "archive_refused" else 503, exc.code, str(exc))
+    return {"id": identifier, "title": item["title"], "authors": item["authors"], "language": language,
+            "words": pricing.count_words(text)}
+
+
+@app.get("/api/institution/archive")
+async def institution_archive(request: Request, institution: str):
+    user = auth.read(request.cookies.get(auth.COOKIE))
+    if not institutions.allowed(user, institution):
+        raise ApiError(403, "institution_forbidden", "This account may not manage this institution's works.")
+    try:
+        return {"items": await engine_client.list_deposits(institutions.owner_id(institution))}
+    except EngineError as exc:
+        raise ApiError(503, exc.code, str(exc))
+
+
+@app.delete("/api/institution/archive/{identifier}")
+async def institution_remove(identifier: str, request: Request, institution: str):
+    user = auth.read(request.cookies.get(auth.COOKIE))
+    if not institutions.allowed(user, institution):
+        raise ApiError(403, "institution_forbidden", "This account may not manage this institution's works.")
+    if not re.fullmatch(r"[0-9a-f]{64}", identifier):
+        raise ApiError(404, "report_unavailable", "Not found")
+    try:
+        removed = await engine_client.remove_deposit(identifier, institutions.owner_id(institution))
     except EngineError as exc:
         raise ApiError(503, exc.code, str(exc))
     if not removed:

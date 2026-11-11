@@ -40,7 +40,8 @@ key = "k" * 40
 engine = start('engine_service', 8148, {**base, "ENGINE_API_KEY": key, "CORPUS_DB": tmp + "/index.db"})
 web = start('app', 8149, {**base, "ENGINE_API_KEY": key, "ENGINE_URL": "http://127.0.0.1:8148", "TELEGRAM_BOT_TOKEN": TOKEN,
                           "TELEGRAM_BOT_USERNAME": "plagiq_bot", "USERS_DB": tmp + "/users.db", "FULLTEXT_FETCH": "0",
-                          "OPENALEX_API_URL": "http://127.0.0.1:9/none"})
+                          "OPENALEX_API_URL": "http://127.0.0.1:9/none",
+                          "INSTITUTIONS": json.dumps([{"name": "TDIU", "agreement": "No. 12/2026", "admins": [555]}])})
 try:
     with sync_playwright() as p:
         browser = p.chromium.launch(executable_path=os.environ.get('CHROMIUM_PATH', '/usr/bin/chromium'), headless=True, args=['--no-sandbox'])
@@ -108,6 +109,30 @@ try:
             assert not errors, errors
             author.context.close(); student.context.close()
             print(f'PASS {width}px: deposit with consent, copy found and labelled, text hidden, removal')
+        # University deposit panel (only for the institution's admins)
+        admin = session(555, "Kafedra", 1440)
+        admin.wait_for_selector('#inst:not([hidden])')
+        assert 'University deposit' in admin.locator('#inst-title').inner_text() and 'No. 12/2026' in admin.locator('#inst-sub').inner_text()
+        admin.locator('#inst-files').set_input_files([
+            {'name': 'Rahimov A. - Suv resurslarini boshqarish.txt', 'mimeType': 'text/plain', 'buffer': THESIS.encode()},
+            {'name': 'tiny.txt', 'mimeType': 'text/plain', 'buffer': b'too short'}])
+        admin.locator('#inst-upload').click()
+        admin.wait_for_function("() => document.querySelectorAll('#inst-progress li').length === 2 && !document.querySelector('#inst-progress').textContent.includes('…')")
+        progress = admin.locator('#inst-progress').inner_text()
+        assert '✓ Rahimov A. - Suv resurslarini boshqarish.txt: “Suv resurslarini boshqarish” (Rahimov A., UZ' in progress, progress
+        assert '✗ tiny.txt' in progress
+        admin.wait_for_function("() => document.querySelector('#inst-list-title').textContent.includes('(1)')")
+        if SHOTS:
+            admin.locator('#inst').screenshot(path=str(SHOTS / 'institution-panel.png'))
+        student = session(9999, "Aziz", 1440)
+        assert student.locator('#inst').is_hidden()                                # not an admin
+        run(student, 'kurs.txt', COPY, mode='corpus')
+        student.locator('#consent').check()
+        student.locator('button[type=submit]').click()
+        student.wait_for_selector('#source-list .source-item')
+        item = student.locator('#source-list .source-item').first.inner_text()
+        assert 'Rahimov A.' in item and 'TDIU' in item and 'University deposit' in item, item
+        print('PASS 1440px: university deposit panel, admin-only, upload results, matches labelled with the university')
         browser.close()
 finally:
     web.terminate(); web.wait(timeout=10); engine.terminate(); engine.wait(timeout=10)

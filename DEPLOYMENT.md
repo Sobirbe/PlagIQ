@@ -282,6 +282,25 @@ Signed-in users can tick **"Add this document to the PlagIQ protected archive"**
 
 **Before switching it on publicly,** add the archive to your privacy notice (what is kept, why, for how long, how to remove it), and have your lawyer confirm the consent text under ZRU-547. The archive grows with use, so watch the engine volume's size (see `evaluation/BENCHMARKS.md`; 5,000 sources ≈ 0.9 GB) and raise `CORPUS_MAX_SOURCES` when needed.
 
+## Part 3l — University contributions to the archive
+
+Partner universities can deposit their past theses, diploma and course works. They are matched like any source, but **their text is never shown**: reports give the title, author, year and "University deposit (TDIU)".
+
+1. **Sign an agreement** with the university that allows indexing for plagiarism detection. Your lawyer should prepare it. Note its number and date.
+2. Ask the university's responsible staff for their **Telegram user IDs**. They can get them from @userinfobot.
+3. Railway → **website** service → **Variables**: add `INSTITUTIONS`, for example:
+   ```json
+   [{"name":"TDIU","agreement":"No. 12/2026, 01.11.2026","admins":[123456789,987654321]}]
+   ```
+4. Redeploy. When those staff sign in, they see a **"University deposit"** section. They choose files (any number; each is sent separately, 2 MB maximum) and press "Deposit files". A file named `Author - Title.docx` fills in the author and title, and the language is detected automatically. They can also list and remove their university's works.
+
+**Whole archives (hundreds of files):** on the engine service, open a shell (Railway → engine → the "⋯" menu → Shell, or `railway run`). Upload the folder and a `works.csv` with the columns `file,title,authors,year,language` (language may be left empty), then run:
+```bash
+python institutions.py --institution TDIU --agreement "No. 12/2026" --csv works.csv --folder ./files --check
+python institutions.py --institution TDIU --agreement "No. 12/2026" --csv works.csv --folder ./files
+```
+The first command only validates. The import is all-or-nothing. The agreement is stored with every work. Raise `CORPUS_MAX_SOURCES` first if needed (Part 2).
+
 ## Part 3e — Full-text comparison during academic checks (on by default)
 
 In **Find academic publications** mode, PlagIQ now downloads the free full texts (PDFs) of the most relevant papers it finds and compares the manuscript against the **whole articles**, not only their abstracts. The texts are used for that one check and then discarded; they are not stored. Your lawyer has confirmed this use.
