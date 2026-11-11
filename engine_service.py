@@ -17,6 +17,7 @@ from corpus import LANGUAGES, connect, corpus_version, inventory, search
 from security import SecurityMiddleware
 import import_job
 import wikipedia_import
+import cyberleninka
 
 log = logging.getLogger("plagiq.import")
 import_stop = threading.Event()
@@ -47,6 +48,13 @@ def import_loop():
                             status["imported"], status["updated"], status["corpus_sources"], status["error"])
             except Exception as exc:
                 log.warning("wikipedia %s failed: %s", language, type(exc).__name__)
+        enabled, cl_batch, cl_set, cl_from = cyberleninka.settings()
+        if enabled and not import_stop.is_set():
+            try:
+                status = cyberleninka.run(cl_batch, cl_set, cl_from)
+                log.warning("cyberleninka: %s imported, %s staged, error=%s", status["imported"], status["staged"], status["error"])
+            except Exception as exc:
+                log.warning("cyberleninka failed: %s", type(exc).__name__)
         import_stop.wait(hours * 3600)
 
 @asynccontextmanager
@@ -66,7 +74,7 @@ async def lifespan(app):
     task = asyncio.create_task(cleanup())
     connect().close()                                    # run any index upgrade before serving or importing
     worker = None
-    if import_job.settings()[0] or wikipedia_import.settings()[0]:
+    if import_job.settings()[0] or wikipedia_import.settings()[0] or cyberleninka.settings()[0]:
         worker = threading.Thread(target=import_loop, name="auto-import", daemon=True)
         worker.start()
     try:
@@ -130,10 +138,10 @@ def library():
         rows = inventory(db)
         version = corpus_version(db)
     counts = {lang: sum(m['language'] == lang for m in rows) for lang in LANGUAGES}
-    allowed = {f'wikipedia-{lang}' for lang in LANGUAGES} | set(LANGUAGES)
+    allowed = {f'wikipedia-{lang}' for lang in LANGUAGES} | set(LANGUAGES) | {'cyberleninka'}
     status = {name: {k: v for k, v in info.items() if k in (
                   'finished', 'imported', 'updated', 'failed', 'staged_total', 'failed_total', 'listing_complete',
-                  'dump_complete', 'estimated_cost_usd', 'error', 'language_corrected')}
+                  'dump_complete', 'estimated_cost_usd', 'error', 'language_corrected', 'staged', 'skipped')}
               for name, info in import_job.read_status().items() if name in allowed and isinstance(info, dict)}
     return {'language_counts': counts, 'total': len(rows), 'corpus_version': version,
             'auto_import': import_job.settings()[0], 'auto_import_wikipedia': wikipedia_import.settings()[0],
