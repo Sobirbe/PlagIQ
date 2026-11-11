@@ -53,6 +53,8 @@ T = {
                  no_sources_in_language="The private corpus has no indexed sources in this language."),
     searches="OpenAlex searches (excerpts of at most 14 words)",
     shown_records="Showing {n} of {m} discovered records, most matched words first.", truncated_records="The list is shortened; the percentage above uses all records.",
+    lang_detected=" (detected from the text; selected: {s})",
+    ft_label="Full-text downloads", ft_line="{a} tried, {c} compared; not available: {r}",
     pasted="Pasted reference",
     before="Matched before exclusions", applied="Exclusions chosen by the user",
     ex_none="No exclusions — every verified match is counted", ex_q="quotations ({n} words)", ex_b="bibliography ({n} words)",
@@ -103,6 +105,8 @@ T = {
                  no_sources_in_language="Во внутреннем корпусе нет источников на этом языке."),
     searches="Запросов в OpenAlex (отрывки до 14 слов)",
     shown_records="Показано {n} из {m} найденных записей, сначала с наибольшим числом совпавших слов.", truncated_records="Список сокращён; процент выше рассчитан по всем записям.",
+    lang_detected=" (определён по тексту; выбран: {s})",
+    ft_label="Загрузка полных текстов", ft_line="попыток {a}, сравнено {c}; не удалось: {r}", reasons_tr={"timed out": "истекло время", "blocked by robots.txt": "запрещено robots.txt", "refused by the website (403)": "сайт отказал (403)", "refused by the website (401)": "сайт отказал (401)", "not found (404)": "не найдено (404)", "not a PDF": "не PDF", "no PDF link on page": "на странице нет ссылки на PDF", "scanned PDF (no text)": "скан PDF (без текста)", "website not reachable": "сайт недоступен", "address refused": "адрес отклонён", "file too large": "файл слишком большой", "cost limit": "лимит расходов", "other error": "другая ошибка", "no open-access copy listed": "открытая копия не указана"},
     pasted="Вставленный текст источника",
     before="Совпадения до исключений", applied="Исключения, выбранные пользователем",
     ex_none="Нет — учитываются все проверенные совпадения", ex_q="цитаты ({n} слов)", ex_b="список литературы ({n} слов)",
@@ -153,6 +157,8 @@ T = {
                  no_sources_in_language="Ichki korpusda bu tildagi manbalar yo‘q."),
     searches="OpenAlex so‘rovlari (14 so‘zgacha parchalar)",
     shown_records="Topilgan {m} ta yozuvdan {n} tasi ko‘rsatilgan, eng ko‘p mos so‘zlilari birinchi.", truncated_records="Ro‘yxat qisqartirilgan; yuqoridagi foiz barcha yozuvlar bo‘yicha hisoblangan.",
+    lang_detected=" (matndan aniqlandi; tanlangan: {s})",
+    ft_label="To‘liq matnlarni yuklash", ft_line="{a} ta urinish, {c} tasi solishtirildi; olinmadi: {r}", reasons_tr={"timed out": "vaqt tugadi", "blocked by robots.txt": "robots.txt taqiqlagan", "refused by the website (403)": "sayt rad etdi (403)", "refused by the website (401)": "sayt rad etdi (401)", "not found (404)": "topilmadi (404)", "not a PDF": "PDF emas", "no PDF link on page": "sahifada PDF havolasi yo‘q", "scanned PDF (no text)": "skanerlangan PDF (matnsiz)", "website not reachable": "saytga ulanib bo‘lmadi", "address refused": "manzil rad etildi", "file too large": "fayl juda katta", "cost limit": "xarajat chegarasi", "other error": "boshqa xato", "no open-access copy listed": "ochiq nusxa ko‘rsatilmagan"},
     pasted="Kiritilgan manba matni",
     before="Istisnolargacha moslik", applied="Foydalanuvchi tanlagan istisnolar",
     ex_none="Yo‘q — barcha tasdiqlangan mosliklar hisoblanadi", ex_q="iqtiboslar ({n} so‘z)", ex_b="adabiyotlar ro‘yxati ({n} so‘z)",
@@ -249,7 +255,9 @@ def build_pdf(result, identifier, lang="en", minutes_left=15):
 
     story += [Paragraph(t["s_document"], st["h"]), table([
         (t["document"], result.get("document", "")), (t["date"], result.get("date", "")),
-        (t["language"], str(result.get("language", "")).upper()), (t["sha"], result.get("sha256", "")),
+        (t["language"], str(result.get("language", "")).upper() + (t["lang_detected"].format(
+            s=result["language_note"]["selected"].upper()) if result.get("language_note") else "")),
+        (t["sha"], result.get("sha256", "")),
         (t["expiry"], t["expiry_v"].format(m=minutes_left))])]
 
     mode = result.get("mode", "reference")
@@ -264,6 +272,12 @@ def build_pdf(result, identifier, lang="en", minutes_left=15):
         compared = (result.get("fulltext") or {}).get("compared", 0)
         with_abstract = sum(1 for src in result.get("sources") or [] if src.get("coverage") == "abstract")
         scope_rows.append((t["discovered"], f"{result.get('source_count', 0)} / {with_abstract} / {compared}"))
+        ft = result.get("fulltext") or {}
+        if ft.get("attempted"):
+            reasons = ", ".join(f"{k} ×{v}" for k, v in (ft.get("reasons") or {}).items()) or "—"
+            reasons = ", ".join(f"{t.get('reasons_tr', {}).get(k, k)} ×{v}" for k, v in (ft.get("reasons") or {}).items()) or "—"
+            scope_rows.append((t["ft_label"], t["ft_line"].format(
+                a=ft.get("attempted", 0), c=ft.get("compared", 0), r=reasons)))
     if mode == "corpus":
         counts = result.get("language_counts") or {}
         scope_rows.append((t["corpus_by_lang"], " · ".join(

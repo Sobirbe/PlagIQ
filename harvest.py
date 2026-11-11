@@ -94,8 +94,8 @@ class _Redirect(urllib.request.HTTPRedirectHandler):
 class Fetcher:
     """HTTPS GETs with robots.txt, crawl delay, size caps and same-host redirects."""
 
-    def __init__(self, delay=2.0, allow_http_hosts=()):
-        self.delay, self.allow_http_hosts = delay, set(allow_http_hosts)
+    def __init__(self, delay=2.0, allow_http_hosts=(), timeout=30):
+        self.delay, self.allow_http_hosts, self.timeout = delay, set(allow_http_hosts), timeout
         self.robots, self.last = {}, {}
         self.openers = {flag: urllib.request.build_opener(_Redirect(flag, self.allow_http_hosts)) for flag in (False, True)}
 
@@ -109,7 +109,7 @@ class Fetcher:
 
     def _raw(self, url, limit, cross_host=False, headers=None):
         request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT, **(headers or {})})
-        with self.openers[cross_host].open(request, timeout=30) as response:
+        with self.openers[cross_host].open(request, timeout=self.timeout) as response:
             self.last_url = response.geturl()           # after redirects, for resolving relative links
             body = response.read(limit + 1)
             if len(body) > limit:

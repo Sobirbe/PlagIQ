@@ -192,8 +192,12 @@ Optional settings on the **website** service:
 |---|---|---|
 | `FULLTEXT_FETCH` | `1` | `0` turns it off (abstracts only) |
 | `FULLTEXT_MAX` | `8` | papers downloaded per check (1–20) |
-| `FULLTEXT_SECONDS` | `25` | time limit for all downloads in one check (5–90); slower ones are skipped and counted |
-| `FULLTEXT_OPENALEX_PDF` | off | `1` = when no other copy works, use OpenAlex's PDF copy: about $0.01 each, so up to $0.08 per check at the default 8 |
+| `FULLTEXT_SECONDS` | `30` | time limit for all downloads in one check (5–90); each single download gets at most 10 s; slower ones are skipped and counted |
+| `FULLTEXT_OPENALEX_PDF` | off | `1` = try OpenAlex's own PDF copy **first** (most reliable; publisher sites often block or are slow), then publisher links. About $0.01 per paper, so up to $0.08 per check at the default 8. The free $1/day OpenAlex allowance covers about 12 such checks a day; set `FULLTEXT_MAX=5` to stretch it, or add a prepaid balance at openalex.org |
+
+**If reports show "0 full texts compared":** the page and PDF now list why each download failed (timed out, refused by the website, no PDF link…). If most say "timed out" or "refused", set `FULLTEXT_OPENALEX_PDF=1`.
+
+**Language:** PlagIQ now detects the manuscript's language from its text. If it clearly differs from the menu choice, the detected language is used and the report says so (e.g. "EN (detected from the text; selected: UZ)").
 
 A check now takes a little longer (usually a few seconds, at most `FULLTEXT_SECONDS`). Watch the website's memory on Railway's **Metrics** tab after the change.
 
