@@ -41,7 +41,7 @@ try:
             page.locator('[data-lang=ru]').click()
             assert 'Частые вопросы' in page.locator('#faq-title').inner_text() and 'сум' in page.locator('#price-cards').inner_text()
             page.locator('#submission').set_input_files({'name': 'x.exe', 'mimeType': 'application/octet-stream', 'buffer': b'x'})
-            assert 'TXT, DOCX' in page.locator('#quote').inner_text()
+            assert 'DOC, DOCX' in page.locator('#quote').inner_text()
             assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), (width, 'overflow')
             if SHOTS and width in (390, 1440):
                 page.locator('[data-lang=uz]').click()
