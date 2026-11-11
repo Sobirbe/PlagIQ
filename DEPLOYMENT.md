@@ -92,15 +92,18 @@ Students often copy from Wikipedia. Its text is licensed CC BY-SA 4.0, which all
 
 | Name | Value |
 |---|---|
-| `AUTO_IMPORT_WIKIPEDIA` | `uz` |
+| `AUTO_IMPORT_WIKIPEDIA` | `uz,ru` (Uzbek and Russian) |
 | `WIKIPEDIA_BATCH` | `2000` (articles per day) |
 | `WIKIPEDIA_MIN_WORDS` | `300` (shorter "stub" articles are skipped) |
+| `WIKIPEDIA_MAX_ARTICLES` | `2000` per language (the default): a cap so Wikipedia doesn't crowd out academic sources |
 
 - **How it works:** the engine streams Wikimedia's official download file. It never sends many requests to Wikipedia's live site.
 - **Measured (November 2026):** 500 Uzbek articles imported in about 30 seconds with no failures. A passage copied from one of them was traced to the correct article.
 - **Coverage:** Uzbek Wikipedia's file is about 300 MB, and many of its articles are short stubs. Russian (`ru`) and English (`en`) work too, but their files are many gigabytes and each daily run reads from the start of the file. Use them only with a larger volume and a higher `CORPUS_MAX_SOURCES`.
 - **Updates:** changed articles replace their older version the next time the file is read through. Progress appears in the PlagIQ library card.
-- **Shared limit:** Wikipedia articles and OpenAlex works count towards the same `CORPUS_MAX_SOURCES`. Uzbek Wikipedia alone has tens of thousands of articles over 300 words, so it can fill a 5,000-source library within a few days. When the limit is reached, imports stop and the logs say so. Raise the limit or `WIKIPEDIA_MIN_WORDS` to balance the two.
+- **Limits:** imported sources (OpenAlex, Wikipedia, CyberLeninka, journals) share `CORPUS_MAX_SOURCES`. Uzbek Wikipedia alone has tens of thousands of articles over 300 words and imports fastest, so it is capped per language by `WIKIPEDIA_MAX_ARTICLES` (default 2,000). When the cap is reached, the import stops and the library card says so. **Archive deposits** by users and universities have their own limit, `ARCHIVE_MAX_SOURCES` (default 5,000), so bulk imports can never block a student's or a university's deposit.
+- **Russian Wikipedia:** the file is about 6 GB compressed, and each run streams it from where the last run stopped. With the 2,000-article cap it imports the first 2,000 long articles, ordered by page number, which are mostly the older and most-read topics. The streamed file is not stored.
+- **Library card:** the website now shows the library by source (Uzbek and other journals, CyberLeninka, Wikipedia, university archives, authors' archive).
 
 **Disk space and limits** (measured on a test machine, article-sized sources; see `evaluation/BENCHMARKS.md`):
 

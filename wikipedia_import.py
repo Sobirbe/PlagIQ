@@ -24,7 +24,7 @@ from pathlib import Path
 from urllib.parse import quote, urlsplit
 from xml.etree import ElementTree
 
-from corpus import connect, corpus_version, detect_language, ingest, inventory, remove
+from corpus import connect, corpus_version, count_category, detect_language, ingest, inventory, remove
 from harvest import USER_AGENT
 
 DUMP_URL = "https://dumps.wikimedia.org/{lang}wiki/latest/{lang}wiki-latest-pages-articles.xml.bz2"
@@ -139,11 +139,17 @@ def run(lang, batch=1000, min_words=300, source=None, db_path=None, root=None):
     counts = {"imported": 0, "updated": 0, "unchanged": 0, "skipped_short": 0, "skipped_language": 0, "failed": 0}
     error, position, finished, failures = None, 0, False, []
     today = datetime.now(timezone.utc).date().isoformat()
+    cap = max_articles()
     try:
         with closing(connect(db_path)) as db, closing(open_dump(source)) as stream:
+            have = count_category(db, "wikipedia", lang)
             for position, (page_id, title, rev, year, markup) in enumerate(iter_articles(stream), 1):
                 if position <= state["position"]:
                     continue                                   # done in an earlier run
+                if have + counts["imported"] >= cap and not state["pages"].get(str(page_id)):
+                    error = f"Wikipedia limit reached ({cap} {lang} articles, WIKIPEDIA_MAX_ARTICLES)"
+                    position -= 1
+                    break
                 if counts["imported"] + counts["updated"] >= batch:
                     position -= 1
                     break
@@ -195,6 +201,14 @@ def run(lang, batch=1000, min_words=300, source=None, db_path=None, root=None):
     data[f"wikipedia-{lang}"] = status
     status_path.write_text(json.dumps(data, ensure_ascii=False, indent=1), "utf-8")
     return status
+
+
+def max_articles():
+    """Per-language cap, so Wikipedia (fast to import) cannot fill the library meant for academic sources."""
+    try:
+        return max(0, int(os.environ.get("WIKIPEDIA_MAX_ARTICLES", "2000")))
+    except ValueError:
+        return 2000
 
 
 def settings():
