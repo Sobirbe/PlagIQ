@@ -281,7 +281,7 @@ def verify_page(request: Request, ui: str = ""):
 @app.get("/health")
 def health():
     return {"status":"ok","version":VERSION,"corpus_engine_configured":corpus_configured(),
-            "web_search":websearch.settings()[0]}
+            "web_search":websearch.settings()[0],"web_providers":websearch.providers()}
 
 
 QUOTES = {}
@@ -395,7 +395,7 @@ async def analyse(submission, reference, reference_text, language, mode, options
             fetched = await run_in_threadpool(fulltext.fetch_fulltexts, discovery["sources"], max_works, seconds, paid)
         web = {"enabled": False}
         if web_search and websearch.settings()[0]:
-            # Separate consent: the same excerpts are sent to Yandex; pages are compared once and discarded.
+            # Separate consent: the same excerpts are sent to the search providers; pages are compared once and discarded.
             web_sources, web = await run_in_threadpool(websearch.run, discovery.get("query_texts") or [], language)
             known = {s.get("url") for s in discovery["sources"]}
             discovery["sources"] = discovery["sources"] + [s for s in web_sources if s["url"] not in known]
@@ -414,7 +414,7 @@ async def analyse(submission, reference, reference_text, language, mode, options
                        "self_comparison":False,
                        "scope":"OpenAlex discovery; exact matching against open-access full texts fetched for this check "
                                 "(not stored) where available, otherwise abstracts. "
-                                + ("Web pages found with Yandex for the same excerpts were also compared (not stored)."
+                                + (f"Web pages found with {' and '.join(web.get('providers') or ['web search'])} for the same excerpts were also compared (not stored)."
                                    if web.get("enabled") else "No web-wide plagiarism check.")})
     else:
         try:

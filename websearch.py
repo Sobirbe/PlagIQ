@@ -1,21 +1,27 @@
-"""Internet search module (Yandex Search API v2), transient comparison.
+"""Internet search module (Yandex Search API v2 and/or Brave Search API), transient comparison.
 
 With the user's separate consent, the same short excerpts already used for the
 OpenAlex search (at most 3, each at most 14 words) are searched on the web with
-Yandex: first as an exact phrase in quotes, then without quotes if nothing is
-found. The top result pages (HTML or PDF) are downloaded, compared once and
+the configured providers: first as an exact phrase in quotes, then without
+quotes if nothing is found. Provider order depends on the language (Yandex first
+for Russian and Uzbek, Brave first for English); the second provider is used for
+an excerpt only if the first fails. The top result pages (HTML or PDF) are downloaded, compared once and
 discarded, like open-access full texts (see fulltext.py).
 
 Settings (website service):
+  BRAVE_API_KEY             Brave Search API subscription token (api-dashboard.search.brave.com)
+  BRAVE_INTERVAL=1          seconds between Brave requests (plan rate limit; 0-5)
   YANDEX_API_KEY            API key of a Yandex Cloud service account with search rights
   YANDEX_FOLDER_ID          Yandex Cloud folder ID the key belongs to (not secret)
   WEB_SEARCH=0              turn the module off even when a key is set
   WEB_MAX_PAGES=6           pages downloaded per check (1-15)
   WEB_SECONDS=20            time limit for page downloads per check (5-60)
   YANDEX_SEARCH_URL         override the API address if Yandex changes it
-Request format: POST {"query": {"searchType", "queryText", ...}, "folderId",
+Yandex request format: POST {"query": {"searchType", "queryText", ...}, "folderId",
 "responseFormat": "FORMAT_XML"} with header "Authorization: Api-Key ..."; the
 response's rawData is base64-encoded XML (<yandexsearch>/<response>/<results>).
+Brave: GET .../res/v1/web/search?q=... with header X-Subscription-Token; JSON
+web.results[].url/title.
 """
 import base64
 import html
@@ -23,17 +29,20 @@ import html.parser
 import json
 import os
 import re
+import threading
 import time
 import urllib.error
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor, wait
-from urllib.parse import urlsplit
+from urllib.parse import urlencode, urlsplit
 from xml.etree import ElementTree
 
 import fulltext
 from harvest import MAX_PDF, HarvestError
 
 API = "https://searchapi.api.cloud.yandex.net/v2/web/search"
+BRAVE_API = "https://api.search.brave.com/res/v1/web/search"
+BRAVE_LANG = {"ru": "ru", "en": "en"}                       # no Uzbek search language at Brave: no filter
 SEARCH_TYPE = {"ru": "SEARCH_TYPE_RU", "uz": "SEARCH_TYPE_RU", "en": "SEARCH_TYPE_COM"}
 L10N = {"ru": "LOCALIZATION_RU", "uz": "LOCALIZATION_RU", "en": "LOCALIZATION_EN"}
 MAX_RESPONSE = 5 * 1024 * 1024
@@ -42,15 +51,27 @@ SKIP_TAGS = {"script", "style", "noscript", "svg", "nav", "header", "footer", "f
 BLOCK_TAGS = {"p", "div", "br", "li", "tr", "h1", "h2", "h3", "h4", "h5", "h6", "section", "article", "blockquote", "td", "th"}
 
 
+def _bounded(name, default, low, high):
+    try:
+        return min(max(float(os.environ.get(name, default)), low), high)
+    except ValueError:
+        return default
+
+
+def providers(language=None):
+    """Configured provider names, in the preferred order for `language`."""
+    if os.environ.get("WEB_SEARCH", "1") == "0":
+        return []
+    names = []
+    if os.environ.get("YANDEX_API_KEY") and os.environ.get("YANDEX_FOLDER_ID"):
+        names.append("Yandex")
+    if os.environ.get("BRAVE_API_KEY"):
+        names.append("Brave")
+    return sorted(names, key=lambda n: n != "Brave") if language == "en" else names
+
+
 def settings():
-    def bounded(name, default, low, high):
-        try:
-            return min(max(int(os.environ.get(name, default)), low), high)
-        except ValueError:
-            return default
-    configured = bool(os.environ.get("YANDEX_API_KEY") and os.environ.get("YANDEX_FOLDER_ID"))
-    return (configured and os.environ.get("WEB_SEARCH", "1") != "0", bounded("WEB_MAX_PAGES", 6, 1, 15),
-            bounded("WEB_SECONDS", 20, 5, 60))
+    return (bool(providers()), int(_bounded("WEB_MAX_PAGES", 6, 1, 15)), int(_bounded("WEB_SECONDS", 20, 5, 60)))
 
 
 # ----------------------------------------------------------------- search
@@ -70,6 +91,45 @@ def _yandex(query, language):
         raise HarvestError("search response too large")
     data = json.loads(raw)
     return parse_results(base64.b64decode(data.get("rawData") or ""))
+
+
+_brave_lock = threading.Lock()
+_brave_last = [0.0]
+
+
+def _brave(query, language):
+    params = {"q": query, "count": "10", "safesearch": "moderate", "text_decorations": "false"}
+    if language in BRAVE_LANG:
+        params["search_lang"] = BRAVE_LANG[language]
+    request = urllib.request.Request((os.environ.get("BRAVE_SEARCH_URL") or BRAVE_API) + "?" + urlencode(params),
+                                     headers={"X-Subscription-Token": os.environ.get("BRAVE_API_KEY", ""),
+                                              "Accept": "application/json"})
+    with _brave_lock:                                       # respect the plan's requests-per-second limit
+        wait = _bounded("BRAVE_INTERVAL", 1, 0, 5) - (time.monotonic() - _brave_last[0])
+        if wait > 0:
+            time.sleep(wait)
+        try:
+            with urllib.request.urlopen(request, timeout=15) as response:
+                raw = response.read(MAX_RESPONSE + 1)
+        finally:
+            _brave_last[0] = time.monotonic()
+    if len(raw) > MAX_RESPONSE:
+        raise HarvestError("search response too large")
+    return parse_brave(json.loads(raw))
+
+
+def parse_brave(data):
+    """[(url, title)] from a Brave web search JSON response."""
+    items = ((data.get("web") or {}).get("results") or []) if isinstance(data, dict) else []
+    results = []
+    for item in items if isinstance(items, list) else []:
+        if not isinstance(item, dict):
+            continue
+        url = str(item.get("url") or "").strip()
+        title = " ".join(html.unescape(str(item.get("title") or "")).split())
+        if url.startswith(("https://", "http://")):
+            results.append((url[:500], title[:300] or url[:300]))
+    return results
 
 
 def parse_results(xml_bytes):
@@ -92,25 +152,34 @@ def parse_results(xml_bytes):
 
 
 def search(queries, language):
-    """Exact-phrase search per excerpt, unquoted if the phrase finds nothing.
-    Returns ([(url, title)], searches made, errors)."""
-    found, seen, calls, errors = [], set(), 0, []
+    """Per excerpt: exact phrase, then unquoted if nothing is found; the next provider
+    only if the first one fails. Returns ([(url, title)], searches made, errors, providers used)."""
+    engines = {"Yandex": _yandex, "Brave": _brave}
+    found, seen, calls, errors, used = [], set(), 0, [], []
     for query in queries:
-        for text in (f'"{query}"', query):
-            calls += 1
-            try:
-                hits = _yandex(text, language)
-            except (HarvestError, urllib.error.URLError, OSError, ValueError, ElementTree.ParseError) as exc:
-                errors.append(fulltext.reason(exc) if not isinstance(exc, urllib.error.HTTPError) else f"search refused ({exc.code})")
+        for name in providers(language):
+            failed = False
+            for text in (f'"{query}"', query):
+                calls += 1
+                try:
+                    hits = engines[name](text, language)
+                except (HarvestError, urllib.error.URLError, OSError, ValueError, ElementTree.ParseError) as exc:
+                    label = f"search refused ({exc.code})" if isinstance(exc, urllib.error.HTTPError) else fulltext.reason(exc)
+                    errors.append(f"{name}: {label}")
+                    failed = True
+                    break
+                if name not in used:
+                    used.append(name)
+                for url, title in hits:
+                    key = url.split("#")[0].rstrip("/")
+                    if key not in seen:
+                        seen.add(key)
+                        found.append((url, title))
+                if hits:
+                    break
+            if not failed:
                 break
-            for url, title in hits:
-                key = url.split("#")[0].rstrip("/")
-                if key not in seen:
-                    seen.add(key)
-                    found.append((url, title))
-            if hits:
-                break
-    return found, calls, errors
+    return found, calls, errors, used
 
 
 # ----------------------------------------------------------------- pages
@@ -204,8 +273,9 @@ def fetch_pages(results, max_pages, seconds, fetcher_factory=None):
 def run(queries, language, fetcher_factory=None):
     enabled, max_pages, seconds = settings()
     if not enabled or not queries:
-        return [], {"enabled": enabled, "searches": 0, "results": 0, "attempted": 0, "compared": 0,
+        return [], {"enabled": enabled, "providers": [], "searches": 0, "results": 0, "attempted": 0, "compared": 0,
                     "failed": 0, "timed_out": 0, "reasons": {}, "errors": []}
-    results, calls, errors = search(queries, language)
+    results, calls, errors, used = search(queries, language)
     sources, stats = fetch_pages(results, max_pages, seconds, fetcher_factory)
-    return sources, {"enabled": True, "searches": calls, "results": len(results), "errors": errors, **stats}
+    return sources, {"enabled": True, "providers": used or providers(language), "searches": calls,
+                     "results": len(results), "errors": errors, **stats}
