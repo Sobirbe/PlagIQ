@@ -75,7 +75,7 @@ def reason(exc):
     for needle, label in (("timed out", "timed out"), ("timeout", "timed out"), ("robots", "blocked by robots.txt"),
                           ("403", "refused by the website (403)"), ("401", "refused by the website (401)"),
                           ("404", "not found (404)"), ("not a pdf", "not a PDF"), ("names no pdf", "no PDF link on page"),
-                          ("too little text", "scanned PDF (no text)"), ("resolve", "website not reachable"),
+                          ("text on page", "too little text on page"), ("too little text", "scanned PDF (no text)"), ("resolve", "website not reachable"),
                           ("refused", "address refused"), ("over", "file too large"), ("cost limit", "cost limit")):
         if needle in text:
             return label
