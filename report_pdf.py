@@ -412,6 +412,8 @@ def _plagiarism_sections(result, mode, t, st, table, esc, headline, basis, lang)
         meta.append(f"{t['coverage']}: {coverage}")
         if source.get("rights_basis"):
             meta.append(f"{t['rights']}: {t['rights_v'].get(source['rights_basis'], t['rights_v']['unknown'])}")
+            if source.get("collection"):
+                meta[-1] += f" ({source['collection']})"
         meta.append(f"{t['units_tokens']}: {source.get('matched_tokens') or 0}")
         block.append(Paragraph(esc(" · ".join(meta)), st["small"]))
         if source.get("url"):
