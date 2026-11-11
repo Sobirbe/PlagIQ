@@ -1,7 +1,8 @@
 """Internet search module (Yandex Search API v2 and/or Brave Search API), transient comparison.
 
-With the user's separate consent, the same short excerpts already used for the
-OpenAlex search (at most 3, each at most 14 words) are searched on the web with
+With the user's separate consent, short excerpts (at most 14 words each) spread
+across the whole document, one per WEB_WORDS_PER_EXCERPT words and at most
+WEB_MAX_QUERIES, are searched on the web with
 the configured providers: first as an exact phrase in quotes, then without
 quotes if nothing is found. Provider order depends on the language (Yandex first
 for Russian and Uzbek, Brave first for English); the second provider is used for
@@ -14,7 +15,10 @@ Settings (website service):
   YANDEX_API_KEY            API key of a Yandex Cloud service account with search rights
   YANDEX_FOLDER_ID          Yandex Cloud folder ID the key belongs to (not secret)
   WEB_SEARCH=0              turn the module off even when a key is set
-  WEB_MAX_PAGES=6           pages downloaded per check (1-15)
+  WEB_MAX_QUERIES=20        most excerpts searched per document (3-40)
+  WEB_WORDS_PER_EXCERPT=500 one excerpt per this many words (200-5000)
+  WEB_MAX_PAGES=10          pages downloaded per check (1-20); pages found by several
+                            excerpts are downloaded first
   WEB_SECONDS=20            time limit for page downloads per check (5-60)
   YANDEX_SEARCH_URL         override the API address if Yandex changes it
 Yandex request format: POST {"query": {"searchType", "queryText", ...}, "folderId",
@@ -71,7 +75,17 @@ def providers(language=None):
 
 
 def settings():
-    return (bool(providers()), int(_bounded("WEB_MAX_PAGES", 6, 1, 15)), int(_bounded("WEB_SECONDS", 20, 5, 60)))
+    return (bool(providers()), int(_bounded("WEB_MAX_PAGES", 10, 1, 20)), int(_bounded("WEB_SECONDS", 20, 5, 60)))
+
+
+def max_queries():
+    return int(_bounded("WEB_MAX_QUERIES", 20, 3, 40))
+
+
+def excerpt_count(words):
+    """How many excerpts to search for a document of `words` words (at least 3)."""
+    per = int(_bounded("WEB_WORDS_PER_EXCERPT", 500, 200, 5000))
+    return max(3, min(max_queries(), -(-words // per)))
 
 
 # ----------------------------------------------------------------- search
@@ -151,15 +165,21 @@ def parse_results(xml_bytes):
     return results
 
 
+UNQUOTED_RETRIES = 3        # only the first excerpts get an unquoted second search (cost)
+
+
 def search(queries, language):
-    """Per excerpt: exact phrase, then unquoted if nothing is found; the next provider
-    only if the first one fails. Returns ([(url, title)], searches made, errors, providers used)."""
+    """Per excerpt: exact phrase (then unquoted for the first excerpts if nothing is found);
+    the next provider only if the first one fails. Results are ordered by how many
+    excerpts found the page, then by first appearance.
+    Returns ([(url, title)], searches made, errors, providers used)."""
     engines = {"Yandex": _yandex, "Brave": _brave}
-    found, seen, calls, errors, used = [], set(), 0, [], []
-    for query in queries:
+    found, seen, calls, errors, used = [], {}, 0, [], []
+    for index, query in enumerate(queries):
+        hit_here = set()
         for name in providers(language):
             failed = False
-            for text in (f'"{query}"', query):
+            for text in ((f'"{query}"', query) if index < UNQUOTED_RETRIES else (f'"{query}"',)):
                 calls += 1
                 try:
                     hits = engines[name](text, language)
@@ -173,12 +193,17 @@ def search(queries, language):
                 for url, title in hits:
                     key = url.split("#")[0].rstrip("/")
                     if key not in seen:
-                        seen.add(key)
+                        seen[key] = [0, len(found)]
                         found.append((url, title))
+                    if key not in hit_here:
+                        hit_here.add(key)
+                        seen[key][0] += 1
                 if hits:
                     break
             if not failed:
                 break
+    order = {url: seen[url.split("#")[0].rstrip("/")] for url, _ in found}
+    found.sort(key=lambda item: (-order[item[0]][0], order[item[0]][1]))
     return found, calls, errors, used
 
 
@@ -277,5 +302,5 @@ def run(queries, language, fetcher_factory=None):
                     "failed": 0, "timed_out": 0, "reasons": {}, "errors": []}
     results, calls, errors, used = search(queries, language)
     sources, stats = fetch_pages(results, max_pages, seconds, fetcher_factory)
-    return sources, {"enabled": True, "providers": used or providers(language), "searches": calls,
+    return sources, {"enabled": True, "providers": used or providers(language), "excerpts": len(queries), "searches": calls,
                      "results": len(results), "errors": errors, **stats}

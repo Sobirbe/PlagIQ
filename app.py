@@ -285,7 +285,7 @@ def verify_page(request: Request, ui: str = ""):
 @app.get("/health")
 def health():
     return {"status":"ok","version":VERSION,"corpus_engine_configured":corpus_configured(),
-            "web_search":websearch.settings()[0],"web_providers":websearch.providers(),
+            "web_search":websearch.settings()[0],"web_providers":websearch.providers(),"web_max_excerpts":websearch.max_queries(),
             "login":auth.public_config(),"ai_detector":aidetect.settings()}
 
 
@@ -473,7 +473,9 @@ async def analyse(submission, reference, reference_text, language, mode, options
         web = {"enabled": False}
         if web_search and websearch.settings()[0]:
             # Separate consent: the same excerpts are sent to the search providers; pages are compared once and discarded.
-            web_sources, web = await run_in_threadpool(websearch.run, discovery.get("query_texts") or [], language)
+            from discovery import spread_excerpts
+            excerpts = spread_excerpts(original, websearch.excerpt_count(pricing.count_words(original)))
+            web_sources, web = await run_in_threadpool(websearch.run, excerpts, language)
             known = {s.get("url") for s in discovery["sources"]}
             discovery["sources"] = discovery["sources"] + [s for s in web_sources if s["url"] not in known]
         result = await run_in_threadpool(compare_sources, original, discovery["sources"], language)

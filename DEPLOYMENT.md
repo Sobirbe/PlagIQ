@@ -198,16 +198,16 @@ Every PDF report can carry a QR code. A supervisor or editor scans it and sees a
 
 Antiplagiat-style services also search the open web. With a Yandex key, PlagIQ can do the same for **Russian and Uzbek web pages** (and English through Yandex's international search). **Brave Search API** is simpler to set up and covers English well. You can use either one or both. The user must tick a separate box, "Also search the web with …" (it names the services you set up); it is off by default and appears only in **Find academic publications** mode.
 
-**What happens:** the same 3 short excerpts (at most 14 words each) already sent to OpenAlex are searched, first as an exact phrase in quotes, then without quotes if nothing is found. With both services set up, Russian and Uzbek manuscripts go to Yandex first and English ones to Brave first; the other service is used for an excerpt only if the first one fails (for example, a rate limit). Up to 6 result pages (web pages or PDFs) are downloaded, compared word by word with the same seven-word matcher, and discarded. The report marks them "Web page (compared, not stored)" and shows a line such as "Web (Yandex): 2 searches, 6 pages tried, 4 compared".
+**What happens:** short excerpts (at most 14 words each) spread across the whole document are searched: the title, plus the most distinctive sentence from each part of the text (one excerpt per 500 words, at least 3 and at most 20; the bibliography is skipped). Each is searched as an exact phrase in quotes; the first 3 are searched again without quotes if nothing is found. With both services set up, Russian and Uzbek manuscripts go to Yandex first and English ones to Brave first; the other service is used for an excerpt only if the first one fails (for example, a rate limit). Up to 10 result pages (web pages or PDFs) are downloaded, pages found by several excerpts first, compared word by word with the same seven-word matcher, and discarded. The report marks them "Web page (compared, not stored)" and shows a line such as "Web (Yandex): 10 excerpts, 12 searches, 10 pages tried, 7 compared".
 
 **Set-up for Brave (about 5 minutes):**
-1. Sign up at api-dashboard.search.brave.com and choose a **Search** plan (check its current price and monthly request limit there). Each PlagIQ check makes **at most 6 searches**.
+1. Sign up at api-dashboard.search.brave.com and choose a **Search** plan (check its current price and monthly request limit there). A PlagIQ check makes about one search per 500 words, **at most 23** (20 excerpts, plus up to 3 retries).
 2. **API keys → Add API key**; copy it once. It is a secret.
 3. Railway → **website** service → **Variables**: add `BRAVE_API_KEY` = the key → redeploy.
 4. If your plan allows more than one request per second, you may set `BRAVE_INTERVAL=0`; the default `1` keeps to the basic plan's limit (a check then takes up to ~6 seconds longer).
 
 **Set-up in Yandex Cloud (about 15 minutes):**
-1. Sign in at console.yandex.cloud and create a **billing account** (Yandex Search API is a paid service; check the current price per 1,000 requests on its pricing page). Each PlagIQ check makes **at most 6 searches**.
+1. Sign in at console.yandex.cloud and create a **billing account** (Yandex Search API is a paid service; check the current price per 1,000 requests on its pricing page). A PlagIQ check makes about one search per 500 words, **at most 23** (20 excerpts, plus up to 3 retries).
 2. Open your **folder** (e.g. `default`). Its **folder ID** (starts with `b1g…`) is shown at the top; copy it. It is not secret.
 3. **Service accounts → Create**: name `plagiq-search`, role **`search-api.webSearch.user`**.
 4. Open the service account → **Create new key → API key**, scope **`yc.search-api.execute`**. Copy the key once; it is a secret.
@@ -221,7 +221,8 @@ Antiplagiat-style services also search the open web. With a Yandex key, PlagIQ c
 | `YANDEX_API_KEY` | — | service-account API key (secret; only in Railway Variables) |
 | `YANDEX_FOLDER_ID` | — | Yandex Cloud folder ID |
 | `WEB_SEARCH` | `1` | `0` hides the option even when a key is set |
-| `WEB_MAX_PAGES` | `6` | result pages downloaded per check (1–15) |
+| `WEB_MAX_QUERIES` | `20` | most excerpts searched per document (3–40); one per `WEB_WORDS_PER_EXCERPT` (500) words, so a 5,000-word paper uses 10. Each excerpt is one search (the first 3 may need two), so cost grows with document length |
+| `WEB_MAX_PAGES` | `10` | result pages downloaded per check (1–20); pages found by several excerpts come first |
 | `WEB_SECONDS` | `20` | time limit for those downloads (5–60) |
 
 **Privacy note:** the tick box tells users that excerpts go to the named search services as well as OpenAlex. Do not tick it for confidential manuscripts.
