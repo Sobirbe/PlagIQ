@@ -355,7 +355,8 @@ def validate(metadata, text):
         raise ValueError('Declared Russian, but the text is not mostly Cyrillic')
     if metadata['language'] == 'en' and latin < 0.5:
         raise ValueError('Declared English, but the text is not mostly Latin script')
-    script = cyrillic_profile(text)
+    # Only judge Cyrillic texts this way: a Latin Uzbek text quoting some Russian is still Uzbek.
+    script = cyrillic_profile(text) if cyrillic >= 0.5 else None
     if metadata['language'] == 'ru' and script == 'uz':
         raise ValueError('Declared Russian, but the text uses Uzbek Cyrillic letters (қ ғ ў ҳ); set language to "uz"')
     if metadata['language'] == 'uz' and script == 'ru':

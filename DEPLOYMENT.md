@@ -87,7 +87,29 @@ Optional:
 
 **Turning it off:** delete `AUTO_IMPORT` (or set it empty) and redeploy. Imported texts stay in the library.
 
-**Disk space and limits:** see the measured sizes in `evaluation/BENCHMARKS.md`. Raise `CORPUS_MAX_SOURCES` and `AUTO_IMPORT_BATCH` gradually, and watch the volume usage on the engine's **Metrics** tab.
+**E. Add Wikipedia (recommended)**
+Students often copy from Wikipedia. Its text is licensed CC BY-SA 4.0, which allows indexing and quoting short excerpts with attribution. PlagIQ records "Wikipedia contributors", the article link, the revision and the licence for every article. On the engine, add:
+
+| Name | Value |
+|---|---|
+| `AUTO_IMPORT_WIKIPEDIA` | `uz` |
+| `WIKIPEDIA_BATCH` | `2000` (articles per day) |
+| `WIKIPEDIA_MIN_WORDS` | `300` (shorter "stub" articles are skipped) |
+
+- **How it works:** the engine streams Wikimedia's official download file. It never sends many requests to Wikipedia's live site.
+- **Measured (November 2026):** 500 Uzbek articles imported in about 30 seconds with no failures. A passage copied from one of them was traced to the correct article.
+- **Coverage:** Uzbek Wikipedia's file is about 300 MB, and many of its articles are short stubs. Russian (`ru`) and English (`en`) work too, but their files are many gigabytes and each daily run reads from the start of the file. Use them only with a larger volume and a higher `CORPUS_MAX_SOURCES`.
+- **Updates:** changed articles replace their older version the next time the file is read through. Progress appears in the PlagIQ library card.
+- **Shared limit:** Wikipedia articles and OpenAlex works count towards the same `CORPUS_MAX_SOURCES`. Uzbek Wikipedia alone has tens of thousands of articles over 300 words, so it can fill a 5,000-source library within a few days. When the limit is reached, imports stop and the logs say so. Raise the limit or `WIKIPEDIA_MIN_WORDS` to balance the two.
+
+**Disk space and limits** (measured on a test machine, article-sized sources; see `evaluation/BENCHMARKS.md`):
+
+| Sources | Disk | Search (repeated) | Memory |
+|---|---|---|---|
+| 1,000 | about 170 MB | about 0.05 s | about 38 MB |
+| 5,000 | about 860 MB | about 0.07 s | about 38 MB |
+
+`CORPUS_MAX_SOURCES=5000` fits a 1 GB volume with room to spare. Raise it, and `AUTO_IMPORT_BATCH`, step by step, while watching the volume usage on the engine's **Metrics** tab.
 
 **Upgrading an existing engine:** v0.5 changes the index format (7× smaller) and improves Unicode handling. On first start, the engine automatically rebuilds the index from the texts already stored in its database. It downloads nothing. Measured at about 0.1–0.2 s per source. Back up the volume first.
 

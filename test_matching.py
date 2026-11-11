@@ -211,3 +211,11 @@ def test_detect_language_from_text():
     en = 'The quality of higher education is assessed with the help of new indicators for the region. ' * 6
     assert [detect_language(t) for t in (ru, uz_cyr, uz_lat, en)] == ['ru', 'uz', 'uz', 'en']
     assert detect_language('short') is None
+
+
+def test_latin_uzbek_quoting_russian_is_accepted(tmp_path):
+    text = ("Abdurauf Fitrat oʻzbek adabiyoti va tilshunosligi rivojiga katta hissa qoʻshgan olim boʻlib, "
+            "uning asarlari bugungi kunda ham oʻrganilmoqda. ") * 12 + "Rus manbasida shunday yozilgan: «Это был выдающийся учёный, который был известен»."
+    with connect(tmp_path / 'i.db') as db:
+        ingest(db, meta('uz'), text)
+        assert db.execute('SELECT count(*) FROM sources').fetchone()[0] == 1
