@@ -249,6 +249,9 @@ def harvest(endpoint, out, since=None, set_spec=None, download=False, max_record
         body, _ = fetcher.get(endpoint + "?" + urlencode(params), MAX_XML)
         records, token = parse_records(body)
         for record in records:
+            if seen >= max_records:                     # limit applies within a page too
+                token = None
+                break
             seen += 1
             row = {"oai_id": record["oai_id"], "title": record["title"][:200], "language": "", "licence": "",
                    "status": "", "reason": "", "url": "", "file": ""}

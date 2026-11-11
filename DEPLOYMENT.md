@@ -290,6 +290,31 @@ CyberLeninka is the largest open collection of Russian-language scientific artic
 **Manual run** (engine shell): `python cyberleninka.py --out staging/cyberleninka --max 200 --set vak --import`
 
 Before you import at scale, read CyberLeninka's terms of use and have your lawyer confirm them. The imported articles are under open licences, but bulk collection from an aggregator may have its own conditions.
+## Part 3n — Uzbek journals (open-licence articles)
+
+Many Uzbek journals publish on Open Journal Systems, which has an OAI-PMH feed, and state a CC BY licence in every record. PlagIQ can find them and import their articles automatically.
+
+**What was measured (November 2026):** OpenAlex lists 252 Uzbek journals. For 193 of them PlagIQ can derive a feed address, and those hold about **167,000 articles**. Of the three large journals sampled live:
+- inlibrary.uz ("Современная наука и исследования") and inscience.uz ("Общество и инновации") state CC BY 4.0 in all usable records;
+- erus.uz has a malformed feed and states no open licence, so it is skipped.
+
+Two articles were then harvested and imported as a live test.
+
+**Automatic on the engine:** add `AUTO_IMPORT_UZ_JOURNALS=1` (and optionally `UZ_JOURNALS_BATCH=50`, articles per journal per run).
+1. The first run surveys every journal and writes `staging/uz-journals/journals.csv`, with status, licence share and languages for each.
+2. Every run then harvests a batch from each journal marked `ok`: at least half of its records state CC BY, CC BY-SA or CC0.
+
+Articles are imported only when their own record and article page state an open licence, and the PDF comes from the journal's own host. NC/ND licences go to `review.csv`. robots.txt and crawl delays are respected.
+
+**Your control:** open `journals.csv` on the engine volume and change a journal's `status` to exclude or include it. Raise `CORPUS_MAX_SOURCES` gradually (5,000 sources ≈ 0.9 GB).
+
+**Manual:**
+```bash
+python uz_journals.py survey --out staging/uz-journals
+python uz_journals.py harvest --out staging/uz-journals --batch 50 --import
+```
+
+Also fixed: `harvest.py` now stops at `--max` within a feed page. Before, it always processed the whole page of up to 100 records.
 ## Part 3k — Protected archive of checked works (opt-in)
 
 Signed-in users can tick **"Add this document to the PlagIQ protected archive"** when they run a check. The full text then goes into the private library, so **later copies of it are found**, even though it was never published. This is what antiplag.uz calls its "internal archive".

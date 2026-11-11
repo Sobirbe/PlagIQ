@@ -155,3 +155,31 @@ def test_oai_error_and_no_records():
     assert harvest.parse_records(f'<OAI-PMH {ns}><error code="noRecordsMatch"/></OAI-PMH>'.encode()) == ([], None)
     with pytest.raises(harvest.HarvestError, match='badArgument'):
         harvest.parse_records(f'<OAI-PMH {ns}><error code="badArgument">x</error></OAI-PMH>'.encode())
+
+
+def test_max_records_applies_within_a_page(journal, tmp_path):
+    base, _ = journal
+    rows = harvest.harvest(base + '/index.php/j/oai', tmp_path / 'm', download=False, max_records=2, fetcher=fetcher())
+    assert [r['oai_id'] for r in rows] == ['oai:j:1', 'oai:j:2']
+
+
+def test_uz_journals_survey_and_harvest(journal, tmp_path):
+    import uz_journals
+    base, routes = journal
+    routes['/index.php/k/oai?verb=ListRecords&metadataPrefix=oai_dc'] = (200, 'text/xml', page(
+        record(9, ['Copyright the authors']) + record(10, [])).encode())
+    routes['/index.php/bad/oai?verb=ListRecords&metadataPrefix=oai_dc'] = (200, 'text/xml', b'<OAI-PMH><broken')
+    journals = [('Journal J', base + '/index.php/j', 500), ('Journal K', base + '/index.php/k', 90),
+                ('Journal B', base + '/index.php/bad', 10), ('Plain site', 'https://example.uz/', 40)]
+    rows = {r['name']: r for r in uz_journals.survey(tmp_path, journals, fetcher(), keep_http=True)}
+    assert rows['Journal J']['status'] == 'ok' and rows['Journal J']['share'] == 0.67   # 4 of 6 non-deleted records
+    assert rows['Journal K']['status'] == 'no_licence' and rows['Plain site']['status'] == 'no_oai'
+    assert rows['Journal B']['status'] == 'bad_feed'
+    assert [r['name'] for r in uz_journals.approved(tmp_path)] == ['Journal J']
+    totals = uz_journals.harvest_all(tmp_path, batch=10, do_import=True, db_path=str(tmp_path / 'c.db'),
+                                     fetcher_factory=fetcher)
+    assert totals == {'journals': 1, 'downloaded': 2, 'imported': 2, 'errors': 0}         # articles 1 and 8
+    with connect(tmp_path / 'c.db') as db:
+        assert search(db, "Oliy ta'lim muassasalarida sifat muhim va dolzarb masala hisoblanadi", 'uz')['sources']
+    assert uz_journals.endpoint_for('http://x.uz/index.php/j/about') == 'https://x.uz/index.php/j/oai'
+    assert uz_journals.endpoint_for('https://x.uz/') is None
