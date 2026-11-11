@@ -91,7 +91,8 @@ def suggest_queries(text, max_queries=MAX_QUERIES):
 
 def _search(query, language, max_results):
     params = {"search": query, "per_page": str(min(max_results, 10)),
-              "select": "id,display_name,doi,publication_year,abstract_inverted_index,primary_location"}
+              "select": "id,display_name,doi,publication_year,abstract_inverted_index,primary_location,"
+                        "best_oa_location,locations,open_access,has_content"}
     if language in LANGUAGE_FILTER:
         params["filter"] = LANGUAGE_FILTER[language]
     key = os.environ.get("OPENALEX_API_KEY")
@@ -135,12 +136,31 @@ def discover(text, max_results=8, language=None):
             abstract = reconstruct_abstract(work.get("abstract_inverted_index"))
             year = work.get("publication_year")
             sources.append({"title": title[:300], "url": url[:500], "year": year if type(year) is int else None,
-                            "abstract": abstract[:20000], "coverage": "abstract" if abstract else "metadata_only"})
+                            "abstract": abstract[:20000], "coverage": "abstract" if abstract else "metadata_only",
+                            "access": open_access_links(work)})
     status = "partial" if failures else "searched"
     return {"status": status, "sources": sources, "queries": len(queries), "query_texts": queries,
             "failed_queries": len(failures),
             "message": (f"{len(failures)} of {len(queries)} OpenAlex searches failed; " if failures else "")
                        + "OpenAlex metadata searched; only returned abstracts can be text-compared"}
+
+
+def open_access_links(work):
+    """Where a free full text may be found: PDF links, landing pages, OpenAlex's own copy."""
+    best = work.get("best_oa_location") if isinstance(work.get("best_oa_location"), dict) else {}
+    locations = [best] + [l for l in work.get("locations") or [] if isinstance(l, dict) and l is not best]
+    pdfs, pages = [], []
+    for location in locations:
+        if not location.get("is_oa", location is best):
+            continue
+        for value, bucket in ((location.get("pdf_url"), pdfs), (location.get("landing_page_url"), pages)):
+            if isinstance(value, str) and value.startswith("https://") and value not in bucket:
+                bucket.append(value[:500])
+    oa_url = (work.get("open_access") or {}).get("oa_url") if isinstance(work.get("open_access"), dict) else None
+    if isinstance(oa_url, str) and oa_url.startswith("https://") and oa_url not in pdfs + pages:
+        (pdfs if oa_url.lower().endswith(".pdf") else pages).append(oa_url[:500])
+    return {"openalex_id": str(work.get("id") or "").rsplit("/", 1)[-1], "pdf_urls": pdfs[:4], "pages": pages[:3],
+            "openalex_pdf": bool((work.get("has_content") or {}).get("pdf")) if isinstance(work.get("has_content"), dict) else False}
 
 
 def _safe(fn, *args):

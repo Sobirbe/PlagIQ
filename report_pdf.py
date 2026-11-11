@@ -31,8 +31,8 @@ INK, MUTED, TEAL, LINE, TINT = (colors.HexColor(x) for x in ("#122A32", "#4C6368
 
 T = {
 "en": dict(
-    methods=dict(reference="Exact seven-word matching after normalization, verified word by word", academic="The same exact seven-word matching, against returned abstracts", corpus="The same exact seven-word matching, against indexed full texts"),
-    scopes=dict(reference="One user-provided reference; no academic databases searched.", academic="OpenAlex metadata and returned abstracts only; no full-text publisher corpus or web search.", corpus="Authorized texts indexed in the private PlagIQ corpus only; coverage depends on what has been lawfully imported."),
+    methods=dict(reference="Exact seven-word matching after normalization, verified word by word", academic="The same exact seven-word matching, against open-access full texts and abstracts", corpus="The same exact seven-word matching, against indexed full texts"),
+    scopes=dict(reference="One user-provided reference; no academic databases searched.", academic="OpenAlex search; open-access full texts of the most relevant works compared for this check and not stored; other works by abstract. No web-wide search.", corpus="Authorized texts indexed in the private PlagIQ corpus only; coverage depends on what has been lawfully imported."),
     subtitle="Scope-limited evidence report",
     disclaimer="This report lists exact text overlap found within the scope stated below. It is not an accredited "
                "originality certificate, a determination of plagiarism or misconduct, or an assessment of AI authorship. "
@@ -42,7 +42,7 @@ T = {
     document="File name", date="Checked (UTC)", sha="SHA-256 of extracted text", language="Manuscript language",
     mode="Comparison", method="Method", scope="Searched scope", status="Search status", expiry="Report availability",
     expiry_v="Deleted from PlagIQ within {m} min; downloadable only in the submitting browser session",
-    corpus_by_lang="Indexed sources by language", discovered="Records discovered / with usable abstract",
+    corpus_by_lang="Indexed sources by language", discovered="Records found / with abstract / full texts compared (not stored)",
     reference="Reference",
     matched="Matched portion within scope", basis_tokens="Share of the manuscript's words that lie inside at least one verified match of seven or more consecutive words. Each word is counted once, whatever the number of sources. The same measure is used in every mode.",
     tokens_v="{a} of {b} words", chars_v="{a} of {b} characters (supporting detail)", version="Corpus version (snapshot ID)",
@@ -74,15 +74,15 @@ T = {
             "A low or zero result does not show that a document is original.",
             "Text extraction from PDF/DOCX can omit headers, footnotes, text boxes or images."],
     footer="PlagIQ · Scope-limited evidence · not a certificate", page="Page {p} of {n}",
-    modes=dict(reference="Your own reference", academic="OpenAlex discovery (abstracts only)", corpus="Private authorized corpus"),
+    modes=dict(reference="Your own reference", academic="OpenAlex discovery (open-access full texts and abstracts)", corpus="Private authorized corpus"),
     states=dict(partial="Partly searched (some searches failed)", searched="Searched", unavailable="Unavailable", no_query="No search phrase", not_searched="Not searched"),
     rights_v=dict(written_permission="Written permission", open_license="Open licence", public_domain="Public domain", unknown="Unknown"),
-    cov=dict(abstract="Abstract", metadata_only="Metadata only", reference="Your reference"), cov_full="Indexed full text",
+    cov=dict(fulltext="Full text (compared, not stored)", abstract="Abstract", metadata_only="Metadata only", reference="Your reference"), cov_full="Indexed full text",
     yes="Yes", no="No",
 ),
 "ru": dict(
-    methods=dict(reference="Точное совпадение семи слов после нормализации, проверенное пословно", academic="То же точное сравнение семи слов по полученным аннотациям", corpus="То же точное сравнение семи слов по индексированным полным текстам"),
-    scopes=dict(reference="Один источник, предоставленный пользователем; научные базы не проверялись.", academic="Только метаданные и полученные аннотации OpenAlex; без полнотекстовых баз издателей и поиска в интернете.", corpus="Только разрешённые тексты во внутреннем корпусе PlagIQ; охват зависит от законно загруженных источников."),
+    methods=dict(reference="Точное совпадение семи слов после нормализации, проверенное пословно", academic="То же точное сравнение семи слов по открытым полным текстам и аннотациям", corpus="То же точное сравнение семи слов по индексированным полным текстам"),
+    scopes=dict(reference="Один источник, предоставленный пользователем; научные базы не проверялись.", academic="Поиск в OpenAlex; открытые полные тексты наиболее релевантных работ сравнены для этой проверки и не сохранены; остальные — по аннотациям. Поиск по интернету не проводился.", corpus="Только разрешённые тексты во внутреннем корпусе PlagIQ; охват зависит от законно загруженных источников."),
     subtitle="Отчёт о совпадениях в ограниченном охвате",
     disclaimer="Отчёт перечисляет точные текстовые совпадения только в указанном ниже охвате. Это не аккредитованный "
                "сертификат оригинальности, не заключение о плагиате или нарушении и не оценка авторства ИИ. "
@@ -92,7 +92,7 @@ T = {
     document="Имя файла", date="Проверено (UTC)", sha="SHA-256 извлечённого текста", language="Язык рукописи",
     mode="Сравнение", method="Метод", scope="Охват поиска", status="Статус поиска", expiry="Доступность отчёта",
     expiry_v="Удаляется из PlagIQ в течение {m} мин; скачивание только в сессии браузера отправителя",
-    corpus_by_lang="Индексированные источники по языкам", discovered="Найдено записей / с аннотацией",
+    corpus_by_lang="Индексированные источники по языкам", discovered="Найдено записей / с аннотацией / сравнено полных текстов (не сохранены)",
     reference="Источник",
     matched="Доля совпадений в охвате", basis_tokens="Доля слов рукописи, входящих хотя бы в одно проверенное совпадение не менее чем из семи слов подряд. Каждое слово учитывается один раз независимо от числа источников. Мера одинакова во всех режимах.",
     tokens_v="{a} из {b} слов", chars_v="{a} из {b} символов (дополнительно)", version="Версия корпуса (идентификатор снимка)",
@@ -124,15 +124,15 @@ T = {
             "Низкий или нулевой результат не доказывает оригинальность.",
             "Извлечение текста из PDF/DOCX может пропускать колонтитулы, сноски, надписи и изображения."],
     footer="PlagIQ · Доказательства в ограниченном охвате · не сертификат", page="Стр. {p} из {n}",
-    modes=dict(reference="Ваш источник", academic="Поиск OpenAlex (только аннотации)", corpus="Внутренний разрешённый корпус"),
+    modes=dict(reference="Ваш источник", academic="Поиск OpenAlex (открытые полные тексты и аннотации)", corpus="Внутренний разрешённый корпус"),
     states=dict(partial="Поиск выполнен частично (часть запросов не удалась)", searched="Поиск выполнен", unavailable="Недоступно", no_query="Нет поисковой фразы", not_searched="Поиск не проводился"),
     rights_v=dict(written_permission="Письменное разрешение", open_license="Открытая лицензия", public_domain="Общественное достояние", unknown="Неизвестно"),
-    cov=dict(abstract="Аннотация", metadata_only="Только метаданные", reference="Ваш источник"), cov_full="Индексированный полный текст",
+    cov=dict(fulltext="Полный текст (сравнён, не сохранён)", abstract="Аннотация", metadata_only="Только метаданные", reference="Ваш источник"), cov_full="Индексированный полный текст",
     yes="Да", no="Нет",
 ),
 "uz": dict(
-    methods=dict(reference="Normallashtirishdan keyin aniq yetti so‘zli moslik, so‘zma-so‘z tekshirilgan", academic="Xuddi shu aniq yetti so‘zli moslik, olingan annotatsiyalar bo‘yicha", corpus="Xuddi shu aniq yetti so‘zli moslik, indekslangan to‘liq matnlar bo‘yicha"),
-    scopes=dict(reference="Foydalanuvchi bergan bitta manba; ilmiy bazalar qidirilmagan.", academic="Faqat OpenAlex metadata va olingan annotatsiyalar; to‘liq matnli nashriyot bazalari va internet qidirilmagan.", corpus="Faqat PlagIQ ichki korpusidagi ruxsat berilgan matnlar; qamrov qonuniy yuklangan manbalarga bog‘liq."),
+    methods=dict(reference="Normallashtirishdan keyin aniq yetti so‘zli moslik, so‘zma-so‘z tekshirilgan", academic="Xuddi shu aniq yetti so‘zli moslik, ochiq to‘liq matnlar va annotatsiyalar bo‘yicha", corpus="Xuddi shu aniq yetti so‘zli moslik, indekslangan to‘liq matnlar bo‘yicha"),
+    scopes=dict(reference="Foydalanuvchi bergan bitta manba; ilmiy bazalar qidirilmagan.", academic="OpenAlex qidiruvi; eng mos ishlarning ochiq to‘liq matnlari shu tekshiruv uchun solishtirildi va saqlanmadi; qolganlari annotatsiya bo‘yicha. Internet qidirilmadi.", corpus="Faqat PlagIQ ichki korpusidagi ruxsat berilgan matnlar; qamrov qonuniy yuklangan manbalarga bog‘liq."),
     subtitle="Cheklangan doiradagi dalillar hisoboti",
     disclaimer="Ushbu hisobot faqat quyida ko‘rsatilgan doirada topilgan aniq matn mosliklarini sanab o‘tadi. U akkreditatsiyalangan "
                "originallik sertifikati, plagiat yoki qoidabuzarlik haqidagi xulosa yoki sun’iy intellekt muallifligini baholash emas. "
@@ -142,7 +142,7 @@ T = {
     document="Fayl nomi", date="Tekshirilgan (UTC)", sha="Ajratilgan matnning SHA-256", language="Hujjat tili",
     mode="Solishtirish", method="Usul", scope="Qidiruv doirasi", status="Qidiruv holati", expiry="Hisobot mavjudligi",
     expiry_v="PlagIQ’dan {m} daqiqa ichida o‘chiriladi; faqat yuborgan brauzer seansida yuklab olinadi",
-    corpus_by_lang="Tillar bo‘yicha indekslangan manbalar", discovered="Topilgan yozuvlar / annotatsiyasi borlari",
+    corpus_by_lang="Tillar bo‘yicha indekslangan manbalar", discovered="Topilgan yozuvlar / annotatsiyasi borlari / solishtirilgan to‘liq matnlar (saqlanmagan)",
     reference="Manba",
     matched="Doira ichidagi moslik ulushi", basis_tokens="Hujjatdagi so‘zlardan kamida yetti ketma-ket so‘zli tasdiqlangan moslik ichida bo‘lganlari ulushi. Har bir so‘z manbalar sonidan qat’i nazar bir marta sanaladi. O‘lchov barcha rejimlarda bir xil.",
     tokens_v="{b} ta so‘zdan {a} tasi", chars_v="{b} ta belgidan {a} tasi (qo‘shimcha)", version="Korpus versiyasi (holat identifikatori)",
@@ -174,10 +174,10 @@ T = {
             "Past yoki nol natija hujjat original ekanini isbotlamaydi.",
             "PDF/DOCX’dan matn ajratishda sarlavhalar, izohlar, matn bloklari yoki rasmlar tushib qolishi mumkin."],
     footer="PlagIQ · Cheklangan doiradagi dalillar · sertifikat emas", page="{n} sahifadan {p}",
-    modes=dict(reference="O‘z manbangiz", academic="OpenAlex qidiruvi (faqat annotatsiyalar)", corpus="Ruxsat berilgan ichki korpus"),
+    modes=dict(reference="O‘z manbangiz", academic="OpenAlex qidiruvi (ochiq to‘liq matnlar va annotatsiyalar)", corpus="Ruxsat berilgan ichki korpus"),
     states=dict(partial="Qisman qidirildi (ayrim so‘rovlar bajarilmadi)", searched="Qidirildi", unavailable="Mavjud emas", no_query="Qidiruv iborasi yo‘q", not_searched="Qidirilmagan"),
     rights_v=dict(written_permission="Yozma ruxsat", open_license="Ochiq litsenziya", public_domain="Jamoat mulki", unknown="Noma’lum"),
-    cov=dict(abstract="Annotatsiya", metadata_only="Faqat metadata", reference="Sizning manbangiz"), cov_full="Indekslangan to‘liq matn",
+    cov=dict(fulltext="To‘liq matn (solishtirildi, saqlanmadi)", abstract="Annotatsiya", metadata_only="Faqat metadata", reference="Sizning manbangiz"), cov_full="Indekslangan to‘liq matn",
     yes="Ha", no="Yo‘q",
 ),
 }
@@ -261,7 +261,9 @@ def build_pdf(result, identifier, lang="en", minutes_left=15):
         scope_rows.append((t["reference"], pasted(result.get("reference", ""))))
     if mode == "academic":
         scope_rows.append((t["searches"], str(result.get("queries") or 1)))
-        scope_rows.append((t["discovered"], f"{result.get('source_count', 0)} / {result.get('evaluated_sources', 0)}"))
+        compared = (result.get("fulltext") or {}).get("compared", 0)
+        with_abstract = sum(1 for src in result.get("sources") or [] if src.get("coverage") == "abstract")
+        scope_rows.append((t["discovered"], f"{result.get('source_count', 0)} / {with_abstract} / {compared}"))
     if mode == "corpus":
         counts = result.get("language_counts") or {}
         scope_rows.append((t["corpus_by_lang"], " · ".join(

@@ -180,6 +180,23 @@ Put the keys in Railway Variables on the engine service as `OPENALEX_API_KEY` an
 
 **How much is available** (OpenAlex counts, November 2026, using OpenAlex's own language labels): Uzbek-language works with a reusable licence 110,482 (47,734 with an OpenAlex PDF copy); Russian-language 460,073; Russian-language by Uzbekistan-based authors 13,914; English by Uzbekistan-based authors 103,155. At about 0.17 MB of index per article, 100,000 articles would need roughly 17 GB; this size has not been benchmarked yet, so raise `CORPUS_MAX_SOURCES` in steps and re-run the benchmark.
 
+## Part 3e — Full-text comparison during academic checks (on by default)
+
+In **Find academic publications** mode, PlagIQ now downloads the free full texts (PDFs) of the most relevant papers it finds and compares the manuscript against the **whole articles**, not only their abstracts. The texts are used for that one check and then discarded; they are not stored. Your lawyer has confirmed this use.
+
+In a live sample (November 2026), most papers found came with a free full text: English 22 of 24, Russian 20 of 24, Uzbek 16 of 16. The report marks each paper as "Full text (compared, not stored)" or "Abstract".
+
+Optional settings on the **website** service:
+
+| Name | Default | Meaning |
+|---|---|---|
+| `FULLTEXT_FETCH` | `1` | `0` turns it off (abstracts only) |
+| `FULLTEXT_MAX` | `8` | papers downloaded per check (1–20) |
+| `FULLTEXT_SECONDS` | `25` | time limit for all downloads in one check (5–90); slower ones are skipped and counted |
+| `FULLTEXT_OPENALEX_PDF` | off | `1` = when no other copy works, use OpenAlex's PDF copy: about $0.01 each, so up to $0.08 per check at the default 8 |
+
+A check now takes a little longer (usually a few seconds, at most `FULLTEXT_SECONDS`). Watch the website's memory on Railway's **Metrics** tab after the change.
+
 ## Part 3d — Prices shown on the website
 
 The website shows the word count and the **planned** price as soon as a file is chosen, plus a price table and calculator. **No money is taken.** There is no payment system, and the page says checks are free during the pilot.
