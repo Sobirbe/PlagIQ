@@ -21,6 +21,8 @@ import corpus
 import fulltext
 import websearch
 import integrity
+import aidetect
+import auth
 import pricing
 import verify
 import extract
@@ -227,8 +229,8 @@ VERIFY_TEXT = {
                off="Verification is not set up on this server.", rid="Report ID", date="Checked (UTC)",
                hash="Document SHA-256 begins with", mode="Comparison", result="Matched portion within scope",
                words="Words in the document", sources="Sources compared", lang="Document language",
-               modes={"r": "Your own reference", "a": "OpenAlex (open-access full texts and abstracts)", "c": "Private authorized corpus"},
-               ne="Not evaluated",
+               modes={"i": "AI detector only", "r": "Your own reference", "a": "OpenAlex (open-access full texts and abstracts)", "c": "Private authorized corpus"},
+               ne="Not evaluated", ai="AI detector estimate (Pangram): AI + AI-assisted",
                note="Compare the first 16 characters of the SHA-256 printed in the report with the value above. This page confirms the "
                     "figures of a PlagIQ evidence report; it is not a certificate of originality and keeps no copy of the document."),
     "ru": dict(title="Проверка отчёта PlagIQ", ok="Действителен: PlagIQ выдал отчёт с этими данными.",
@@ -236,8 +238,8 @@ VERIFY_TEXT = {
                off="Проверка на этом сервере не настроена.", rid="Номер отчёта", date="Проверено (UTC)",
                hash="SHA-256 документа начинается с", mode="Сравнение", result="Доля совпадений в охвате",
                words="Слов в документе", sources="Сравнено источников", lang="Язык документа",
-               modes={"r": "Ваш источник", "a": "OpenAlex (открытые полные тексты и аннотации)", "c": "Внутренний разрешённый корпус"},
-               ne="Не оценено",
+               modes={"i": "Только ИИ-детектор", "r": "Ваш источник", "a": "OpenAlex (открытые полные тексты и аннотации)", "c": "Внутренний разрешённый корпус"},
+               ne="Не оценено", ai="Оценка ИИ-детектора (Pangram): ИИ + с помощью ИИ",
                note="Сравните первые 16 символов SHA-256 из отчёта со значением выше. Страница подтверждает данные отчёта PlagIQ; "
                     "это не сертификат оригинальности, копия документа не хранится."),
     "uz": dict(title="PlagIQ hisobotini tekshirish", ok="Haqiqiy: PlagIQ shu ma’lumotlar bilan hisobot bergan.",
@@ -245,8 +247,8 @@ VERIFY_TEXT = {
                off="Bu serverda tekshirish sozlanmagan.", rid="Hisobot raqami", date="Tekshirilgan (UTC)",
                hash="Hujjat SHA-256 boshlanishi", mode="Solishtirish", result="Doira ichidagi moslik ulushi",
                words="Hujjatdagi so‘zlar", sources="Solishtirilgan manbalar", lang="Hujjat tili",
-               modes={"r": "O‘z manbangiz", "a": "OpenAlex (ochiq to‘liq matnlar va annotatsiyalar)", "c": "Ruxsat berilgan ichki korpus"},
-               ne="Baholanmagan",
+               modes={"i": "Faqat AI detektor", "r": "O‘z manbangiz", "a": "OpenAlex (ochiq to‘liq matnlar va annotatsiyalar)", "c": "Ruxsat berilgan ichki korpus"},
+               ne="Baholanmagan", ai="AI detektor bahosi (Pangram): AI + AI yordamida",
                note="Hisobotdagi SHA-256 ning birinchi 16 belgisini yuqoridagi qiymat bilan solishtiring. Bu sahifa PlagIQ dalillar "
                     "hisobotidagi ma’lumotlarni tasdiqlaydi; originallik sertifikati emas va hujjat nusxasini saqlamaydi."),
 }
@@ -265,7 +267,8 @@ def verify_page(request: Request, ui: str = ""):
         result = t["ne"] if f["p"] == "NE" else f["p"] + "%"
         rows = "".join(f"<tr><th>{html.escape(k)}</th><td>{html.escape(v)}</td></tr>" for k, v in (
             (t["rid"], f["r"]), (t["date"], when), (t["hash"], f["h"]), (t["mode"], t["modes"][f["m"]]),
-            (t["result"], result), (t["words"], f["w"]), (t["sources"], f["n"]), (t["lang"], f["l"].upper())))
+            (t["result"], result), (t["words"], f["w"]), (t["sources"], f["n"]), (t["lang"], f["l"].upper()))
+            + (((t["ai"], f["x"] + "%"),) if "x" in f else ()))
     links = " · ".join(f'<a href="?{html.escape(str(request.query_params))}&amp;ui={l}">{l.upper()}</a>' for l in VERIFY_TEXT)
     colour = "#0b6a64" if valid else "#9b2c16"
     page = (f'<!doctype html><html lang="{lang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
@@ -282,7 +285,61 @@ def verify_page(request: Request, ui: str = ""):
 @app.get("/health")
 def health():
     return {"status":"ok","version":VERSION,"corpus_engine_configured":corpus_configured(),
-            "web_search":websearch.settings()[0],"web_providers":websearch.providers()}
+            "web_search":websearch.settings()[0],"web_providers":websearch.providers(),
+            "login":auth.public_config(),"ai_detector":aidetect.settings()}
+
+
+def _secure(request):
+    return request.url.scheme == "https" or os.getenv("PUBLIC_ORIGIN", "").startswith("https://")
+
+
+@app.get("/login", response_class=HTMLResponse)
+def login_page():
+    """Telegram returns here with #tgAuthResult=...; the page script finishes sign-in."""
+    return home()
+
+
+@app.post("/auth/telegram")
+async def telegram_login(request: Request):
+    if not auth.enabled():
+        raise ApiError(503, "login_not_configured", "Sign-in is not set up on this server.")
+    try:
+        data = await request.json()
+    except ValueError:
+        raise ApiError(400, "login_failed", "Telegram sign-in could not be verified.")
+    user = auth.check_telegram(data)
+    if not user:
+        raise ApiError(401, "login_failed", "Telegram sign-in could not be verified.")
+    await run_in_threadpool(auth.remember, user)
+    response = JSONResponse({"user": user})
+    response.set_cookie(auth.COOKIE, auth.issue(user), max_age=auth.SESSION_DAYS * 86400, httponly=True,
+                        secure=_secure(request), samesite="strict")
+    return response
+
+
+@app.post("/auth/logout")
+def logout():
+    response = JSONResponse({"signed_out": True})
+    response.delete_cookie(auth.COOKIE)
+    return response
+
+
+@app.get("/api/me")
+async def me(request: Request):
+    user = auth.read(request.cookies.get(auth.COOKIE))
+    return {"auth": auth.public_config(), "user": user,
+            "history": await run_in_threadpool(auth.history, user) if user else []}
+
+
+@app.delete("/api/me")
+async def delete_me(request: Request):
+    user = auth.read(request.cookies.get(auth.COOKIE))
+    if not user:
+        raise ApiError(401, "login_required", "Sign in with Telegram first.")
+    await run_in_threadpool(auth.forget, user)
+    response = JSONResponse({"deleted": True})
+    response.delete_cookie(auth.COOKIE)
+    return response
 
 
 QUOTES = {}
@@ -331,16 +388,24 @@ async def check(request:Request, submission:UploadFile=File(...),
                 reference:UploadFile|None=File(None),reference_text:str=Form(""),
                 language:str=Form("uz"),mode:str=Form("reference"),consent:bool=Form(False),
                 exclude_quotes:bool=Form(False),exclude_bibliography:bool=Form(False),min_words:int=Form(7),
-                web_search:bool=Form(False)):
+                web_search:bool=Form(False),ai_check:bool=Form(False),ai_consent:bool=Form(False)):
     global active_scans
     purge_reports()
+    user = auth.read(request.cookies.get(auth.COOKIE))
+    if auth.required() and not user:
+        raise ApiError(401, "login_required", "Sign in with Telegram to run a check.")
     if language not in ("uz","ru","en"):
         raise ApiError(400, "invalid_language", "Invalid language")
-    if mode not in ("reference","academic","corpus"):
+    if mode not in ("reference","academic","corpus","ai"):
         raise ApiError(400, "invalid_mode", "Invalid mode")
     if min_words not in citations.MIN_WORD_OPTIONS:
         raise ApiError(400, "invalid_option", "Unsupported minimum match length")
     options = dict(exclude_quotes=exclude_quotes, exclude_bibliography=exclude_bibliography, min_words=min_words)
+    ai_check = ai_check or mode == "ai"
+    if ai_check and not aidetect.configured():
+        raise ApiError(503, "ai_not_configured", "The AI detector is not set up on this server.")
+    if ai_check and not ai_consent:
+        raise ApiError(400, "ai_consent_required", "Consent is required before the full text is sent to the AI detector.")
     if mode == "academic" and not consent:
         raise ApiError(400, "consent_required", "Explicit consent is required before sending a short query excerpt to OpenAlex")
     if mode == "corpus":
@@ -353,13 +418,16 @@ async def check(request:Request, submission:UploadFile=File(...),
     rate_limit(request)
     active_scans += 1
     try:
-        result = await analyse(submission, reference, reference_text, language, mode, options, web_search)
+        result = await analyse(submission, reference, reference_text, language, mode, options, web_search, ai_check)
     finally:
         active_scans -= 1
-    return finish(request, result)
+    response = finish(request, result)
+    if user:
+        await run_in_threadpool(auth.log_check, user, result, response.headers.get("x-report-id", ""))
+    return response
 
 
-async def analyse(submission, reference, reference_text, language, mode, options=None, web_search=False):
+async def analyse(submission, reference, reference_text, language, mode, options=None, web_search=False, ai_check=False):
     original = await read_file(submission)
     # The menu defaults to Uzbek; when the text clearly is another language, use that
     # (search filter and normalization depend on it) and say so in the result.
@@ -369,7 +437,14 @@ async def analyse(submission, reference, reference_text, language, mode, options
         language = detected
     require_tokens(original, language, "too_short",
                    "At least 7 words of readable text are needed for seven-word matching.")
-    if mode == "reference":
+    if mode == "ai":
+        result = {"mode": "ai", "percent": None, "not_evaluated_reason": "ai_only", "matched_tokens": 0,
+                  "total_tokens": len(corpus.lexical(original, language)), "matched_chars": 0, "total_chars": len(original),
+                  "unit": "words", "language": language, "sources": [], "source_count": 0, "matched_source_count": 0,
+                  "database_status": "not_searched", "reference": "None", "self_comparison": False,
+                  "method": "AI-writing detector (Pangram)", "ai_detection": "Pangram estimate",
+                  "scope": "AI-writing detector only; no plagiarism comparison was made."}
+    elif mode == "reference":
         source = await read_file(reference) if reference and reference.filename else reference_text
         if not source.strip():
             raise ApiError(400, "reference_missing", "Provide a reference document or text, or choose academic discovery")
@@ -460,7 +535,11 @@ async def analyse(submission, reference, reference_text, language, mode, options
     # Writing-integrity signals (not AI detection). DOIs are looked up only with the academic consent.
     result["integrity"], result["integrity_examples"] = await run_in_threadpool(
         integrity.assess, original, mode == "academic")
-    result["plan"] = pricing.quote(pricing.count_words(original))
+    words = pricing.count_words(original)
+    if ai_check:
+        # Separate consent: the full text goes to Pangram; flagged passages stay out of the cache and PDF.
+        result["ai"], result["ai_passages"] = await run_in_threadpool(aidetect.detect, original, language, words)
+    result["plan"] = pricing.quote(words)
     result.update({"document":clean_filename(submission.filename, "Document"),
                    "date":datetime.now(timezone.utc).isoformat(timespec="seconds"),
                    "quotations_excluded":False, "bibliography_excluded":False,
@@ -486,7 +565,7 @@ def highlight(text, segments):
 
 
 # Manuscript text shown to the user once, never kept in the report cache or PDF.
-PRIVATE_FIELDS = ("highlight_html", "search_phrases", "integrity_examples")
+PRIVATE_FIELDS = ("highlight_html", "search_phrases", "integrity_examples", "ai_passages")
 
 
 def finish(request, result):
@@ -494,12 +573,12 @@ def finish(request, result):
     while len(results) >= MAX_REPORTS:
         results.pop(next(iter(results)))
     owner = request.cookies.get("plagiq_session") or secrets.token_urlsafe(32)
-    response = JSONResponse({"report_id":identifier, **result})
+    response = JSONResponse({"report_id":identifier, **result}, headers={"x-report-id": identifier})
     # Do not retain manuscript highlights or raw text in the report cache.
     results[identifier] = {"owner": owner, "expires": time.monotonic() + REPORT_TTL,
                            "result": {k:v for k,v in result.items() if k not in PRIVATE_FIELDS}}
     response.set_cookie("plagiq_session", owner, max_age=REPORT_TTL,
-                        httponly=True, secure=request.url.scheme == "https" or bool(os.getenv("PUBLIC_ORIGIN", "").startswith("https://")), samesite="strict")
+                        httponly=True, secure=_secure(request), samesite="strict")
     return response
 
 

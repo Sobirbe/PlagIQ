@@ -34,8 +34,8 @@ INK, MUTED, TEAL, LINE, TINT = (colors.HexColor(x) for x in ("#122A32", "#4C6368
 
 T = {
 "en": dict(
-    methods=dict(reference="Exact seven-word matching after normalization, verified word by word", academic="The same exact seven-word matching, against open-access full texts and abstracts", corpus="The same exact seven-word matching, against indexed full texts"),
-    scopes=dict(reference="One user-provided reference; no academic databases searched.", academic="OpenAlex search; open-access full texts of the most relevant works compared for this check and not stored; other works by abstract. No web-wide search.", corpus="Authorized texts indexed in the private PlagIQ corpus only; coverage depends on what has been lawfully imported."),
+    methods=dict(ai="Pangram AI-writing detector (provider's estimate)", reference="Exact seven-word matching after normalization, verified word by word", academic="The same exact seven-word matching, against open-access full texts and abstracts", corpus="The same exact seven-word matching, against indexed full texts"),
+    scopes=dict(ai="AI-writing detector only; no plagiarism comparison was made.", reference="One user-provided reference; no academic databases searched.", academic="OpenAlex search; open-access full texts of the most relevant works compared for this check and not stored; other works by abstract. No web-wide search.", corpus="Authorized texts indexed in the private PlagIQ corpus only; coverage depends on what has been lawfully imported."),
     subtitle="Scope-limited evidence report",
     disclaimer="This report lists exact text overlap found within the scope stated below. It is not an accredited "
                "originality certificate, a determination of plagiarism or misconduct, or an assessment of AI authorship. "
@@ -85,15 +85,15 @@ T = {
             "A low or zero result does not show that a document is original.",
             "Text extraction from PDF/DOC/DOCX can omit headers, footnotes, text boxes or images."],
     footer="PlagIQ · Certificate of check and evidence report", page="Page {p} of {n}",
-    modes=dict(reference="Your own reference", academic="OpenAlex discovery (open-access full texts and abstracts)", corpus="Private authorized corpus"),
+    modes=dict(ai="AI detector only", reference="Your own reference", academic="OpenAlex discovery (open-access full texts and abstracts)", corpus="Private authorized corpus"),
     states=dict(partial="Partly searched (some searches failed)", searched="Searched", unavailable="Unavailable", no_query="No search phrase", not_searched="Not searched"),
     rights_v=dict(written_permission="Written permission", open_license="Open licence", public_domain="Public domain", unknown="Unknown"),
     cov=dict(fulltext="Full text (compared, not stored)", abstract="Abstract", metadata_only="Metadata only", reference="Your reference"), cov_full="Indexed full text",
     yes="Yes", no="No",
 ),
 "ru": dict(
-    methods=dict(reference="Точное совпадение семи слов после нормализации, проверенное пословно", academic="То же точное сравнение семи слов по открытым полным текстам и аннотациям", corpus="То же точное сравнение семи слов по индексированным полным текстам"),
-    scopes=dict(reference="Один источник, предоставленный пользователем; научные базы не проверялись.", academic="Поиск в OpenAlex; открытые полные тексты наиболее релевантных работ сравнены для этой проверки и не сохранены; остальные — по аннотациям. Поиск по интернету не проводился.", corpus="Только разрешённые тексты во внутреннем корпусе PlagIQ; охват зависит от законно загруженных источников."),
+    methods=dict(ai="ИИ-детектор Pangram (оценка провайдера)", reference="Точное совпадение семи слов после нормализации, проверенное пословно", academic="То же точное сравнение семи слов по открытым полным текстам и аннотациям", corpus="То же точное сравнение семи слов по индексированным полным текстам"),
+    scopes=dict(ai="Только ИИ-детектор; сравнение на плагиат не проводилось.", reference="Один источник, предоставленный пользователем; научные базы не проверялись.", academic="Поиск в OpenAlex; открытые полные тексты наиболее релевантных работ сравнены для этой проверки и не сохранены; остальные — по аннотациям. Поиск по интернету не проводился.", corpus="Только разрешённые тексты во внутреннем корпусе PlagIQ; охват зависит от законно загруженных источников."),
     subtitle="Отчёт о совпадениях в ограниченном охвате",
     disclaimer="Отчёт перечисляет точные текстовые совпадения только в указанном ниже охвате. Это не аккредитованный "
                "сертификат оригинальности, не заключение о плагиате или нарушении и не оценка авторства ИИ. "
@@ -143,15 +143,15 @@ T = {
             "Низкий или нулевой результат не доказывает оригинальность.",
             "Извлечение текста из PDF/DOC/DOCX может пропускать колонтитулы, сноски, надписи и изображения."],
     footer="PlagIQ · Сертификат проверки и отчёт с доказательствами", page="Стр. {p} из {n}",
-    modes=dict(reference="Ваш источник", academic="Поиск OpenAlex (открытые полные тексты и аннотации)", corpus="Внутренний разрешённый корпус"),
+    modes=dict(ai="Только ИИ-детектор", reference="Ваш источник", academic="Поиск OpenAlex (открытые полные тексты и аннотации)", corpus="Внутренний разрешённый корпус"),
     states=dict(partial="Поиск выполнен частично (часть запросов не удалась)", searched="Поиск выполнен", unavailable="Недоступно", no_query="Нет поисковой фразы", not_searched="Поиск не проводился"),
     rights_v=dict(written_permission="Письменное разрешение", open_license="Открытая лицензия", public_domain="Общественное достояние", unknown="Неизвестно"),
     cov=dict(fulltext="Полный текст (сравнён, не сохранён)", abstract="Аннотация", metadata_only="Только метаданные", reference="Ваш источник"), cov_full="Индексированный полный текст",
     yes="Да", no="Нет",
 ),
 "uz": dict(
-    methods=dict(reference="Normallashtirishdan keyin aniq yetti so‘zli moslik, so‘zma-so‘z tekshirilgan", academic="Xuddi shu aniq yetti so‘zli moslik, ochiq to‘liq matnlar va annotatsiyalar bo‘yicha", corpus="Xuddi shu aniq yetti so‘zli moslik, indekslangan to‘liq matnlar bo‘yicha"),
-    scopes=dict(reference="Foydalanuvchi bergan bitta manba; ilmiy bazalar qidirilmagan.", academic="OpenAlex qidiruvi; eng mos ishlarning ochiq to‘liq matnlari shu tekshiruv uchun solishtirildi va saqlanmadi; qolganlari annotatsiya bo‘yicha. Internet qidirilmadi.", corpus="Faqat PlagIQ ichki korpusidagi ruxsat berilgan matnlar; qamrov qonuniy yuklangan manbalarga bog‘liq."),
+    methods=dict(ai="Pangram AI detektori (provayder bahosi)", reference="Normallashtirishdan keyin aniq yetti so‘zli moslik, so‘zma-so‘z tekshirilgan", academic="Xuddi shu aniq yetti so‘zli moslik, ochiq to‘liq matnlar va annotatsiyalar bo‘yicha", corpus="Xuddi shu aniq yetti so‘zli moslik, indekslangan to‘liq matnlar bo‘yicha"),
+    scopes=dict(ai="Faqat AI detektor; plagiatga solishtirilmadi.", reference="Foydalanuvchi bergan bitta manba; ilmiy bazalar qidirilmagan.", academic="OpenAlex qidiruvi; eng mos ishlarning ochiq to‘liq matnlari shu tekshiruv uchun solishtirildi va saqlanmadi; qolganlari annotatsiya bo‘yicha. Internet qidirilmadi.", corpus="Faqat PlagIQ ichki korpusidagi ruxsat berilgan matnlar; qamrov qonuniy yuklangan manbalarga bog‘liq."),
     subtitle="Cheklangan doiradagi dalillar hisoboti",
     disclaimer="Ushbu hisobot faqat quyida ko‘rsatilgan doirada topilgan aniq matn mosliklarini sanab o‘tadi. U akkreditatsiyalangan "
                "originallik sertifikati, plagiat yoki qoidabuzarlik haqidagi xulosa yoki sun’iy intellekt muallifligini baholash emas. "
@@ -201,7 +201,7 @@ T = {
             "Past yoki nol natija hujjat original ekanini isbotlamaydi.",
             "PDF/DOC/DOCX’dan matn ajratishda sarlavhalar, izohlar, matn bloklari yoki rasmlar tushib qolishi mumkin."],
     footer="PlagIQ · Tekshiruv sertifikati va dalillar hisoboti", page="{n} sahifadan {p}",
-    modes=dict(reference="O‘z manbangiz", academic="OpenAlex qidiruvi (ochiq to‘liq matnlar va annotatsiyalar)", corpus="Ruxsat berilgan ichki korpus"),
+    modes=dict(ai="Faqat AI detektor", reference="O‘z manbangiz", academic="OpenAlex qidiruvi (ochiq to‘liq matnlar va annotatsiyalar)", corpus="Ruxsat berilgan ichki korpus"),
     states=dict(partial="Qisman qidirildi (ayrim so‘rovlar bajarilmadi)", searched="Qidirildi", unavailable="Mavjud emas", no_query="Qidiruv iborasi yo‘q", not_searched="Qidirilmagan"),
     rights_v=dict(written_permission="Yozma ruxsat", open_license="Ochiq litsenziya", public_domain="Jamoat mulki", unknown="Noma’lum"),
     cov=dict(fulltext="To‘liq matn (solishtirildi, saqlanmadi)", abstract="Annotatsiya", metadata_only="Faqat metadata", reference="Sizning manbangiz"), cov_full="Indekslangan to‘liq matn",
@@ -285,7 +285,7 @@ INTEGRITY_T = {
                none="No indicators found", dois="References with DOIs", dois_v="{d} found, {c} checked, {u} could not be checked",
                dois_off="Not checked (only in academic-publication mode, with consent)", not_found="DOI does not exist",
                mismatch="DOI belongs to a different work", note="These are checkable signs that deserve a closer look, not proof "
-               "of AI use, and finding none does not prove human authorship. PlagIQ does not calculate an AI percentage. "
+               "of AI use, and finding none does not prove human authorship. These indicators are separate from the optional AI detector estimate. "
                "The text excerpts behind each indicator are shown on the results page only and are not kept.",
                labels=dict(chatbot_phrases="Chatbot phrases left in the text", placeholders="Unfilled placeholders",
                            hidden_characters="Hidden characters (zero-width or direction controls)",
@@ -296,7 +296,7 @@ INTEGRITY_T = {
                none="Индикаторы не найдены", dois="Ссылки с DOI", dois_v="найдено {d}, проверено {c}, не удалось проверить {u}",
                dois_off="Не проверялись (только в режиме научных публикаций, с согласия)", not_found="DOI не существует",
                mismatch="DOI относится к другой работе", note="Это проверяемые признаки, требующие внимания, а не доказательство "
-               "использования ИИ; их отсутствие не доказывает авторство человека. PlagIQ не рассчитывает долю ИИ. "
+               "использования ИИ; их отсутствие не доказывает авторство человека. Эти индикаторы не зависят от необязательной оценки ИИ-детектора. "
                "Фрагменты текста для каждого индикатора показываются только на странице результата и не сохраняются.",
                labels=dict(chatbot_phrases="Оставшиеся фразы чат-бота", placeholders="Незаполненные шаблоны",
                            hidden_characters="Скрытые символы (нулевой ширины или управления направлением)",
@@ -307,14 +307,35 @@ INTEGRITY_T = {
                none="Ko‘rsatkichlar topilmadi", dois="DOI ko‘rsatilgan manbalar", dois_v="{d} ta topildi, {c} tasi tekshirildi, {u} tasini tekshirib bo‘lmadi",
                dois_off="Tekshirilmadi (faqat ilmiy nashrlar rejimida, rozilik bilan)", not_found="DOI mavjud emas",
                mismatch="DOI boshqa ishga tegishli", note="Bular e’tibor talab qiladigan tekshiriladigan belgilar, sun’iy intellekt "
-               "ishlatilganining isboti emas; ularning yo‘qligi ham inson muallifligini isbotlamaydi. PlagIQ sun’iy intellekt "
-               "ulushini hisoblamaydi. Har bir ko‘rsatkichga oid matn parchalari faqat natija sahifasida ko‘rsatiladi va saqlanmaydi.",
+               "ishlatilganining isboti emas; ularning yo‘qligi ham inson muallifligini isbotlamaydi. Bu ko‘rsatkichlar ixtiyoriy AI "
+               "detektor bahosidan alohida. Har bir ko‘rsatkichga oid matn parchalari faqat natija sahifasida ko‘rsatiladi va saqlanmaydi.",
                labels=dict(chatbot_phrases="Matnda qolgan chatbot iboralari", placeholders="To‘ldirilmagan shablon joylari",
                            hidden_characters="Yashirin belgilar (nol kenglikdagi yoki yo‘nalish belgilari)",
                            mixed_script="Lotin va kirill o‘xshash harflari aralashgan so‘zlar",
                            markdown="Qolib ketgan chat formatlash belgilari (##, **, ```)", doi_not_found="Mavjud bo‘lmagan DOI",
                            doi_mismatch="Boshqa ishga tegishli DOI")),
 }
+
+
+AI_T = {'en': {'title': 'AI detector (Pangram)', 'status': 'Result', 'est': "Provider's estimate", 'est_v': 'AI-written {fraction_ai}% · AI-assisted {fraction_ai_assisted}% · human {fraction_human}%', 'verdict': 'Overall', 'verdicts': {'ai': 'Mostly AI-written', 'human': 'Mostly human-written', 'mixed': 'Mixed'}, 'segs': 'Passages analysed / flagged / humanizer-like', 'model': 'Model', 'row': 'Pangram estimate: AI {fraction_ai}% · AI-assisted {fraction_ai_assisted}%', 'unsupported': 'Not available: Pangram does not support Uzbek; the text was not sent and not charged.', 'too_long': 'Not run: the document has {words} words; the AI detector limit is {max_words}.', 'error': 'Not completed ({error}). No AI estimate is given.', 'note': "These percentages are Pangram's statistical estimate, not proof. Pangram reports a false-positive rate of about 1 in 10,000 on its own test data; any detector can be wrong, especially on short, heavily edited or formulaic text. Use the result as a reason to talk to the author, not as a verdict. The flagged passages are shown on the results page only.", 'limit': "The AI estimate comes from Pangram's model (full text sent with the user's consent). No plagiarism comparison was made."}, 'ru': {'title': 'ИИ-детектор (Pangram)', 'status': 'Результат', 'est': 'Оценка провайдера', 'est_v': 'написано ИИ {fraction_ai}% · с помощью ИИ {fraction_ai_assisted}% · человеком {fraction_human}%', 'verdict': 'Итог', 'verdicts': {'ai': 'В основном написано ИИ', 'human': 'В основном написано человеком', 'mixed': 'Смешанный'}, 'segs': 'Фрагментов проанализировано / отмечено / похожих на «хьюманайзер»', 'model': 'Модель', 'row': 'Оценка Pangram: ИИ {fraction_ai}% · с помощью ИИ {fraction_ai_assisted}%', 'unsupported': 'Недоступно: Pangram не поддерживает узбекский язык; текст не отправлялся и не оплачивался.', 'too_long': 'Не выполнено: в документе {words} слов; лимит ИИ-детектора {max_words}.', 'error': 'Не завершено ({error}). Оценка ИИ не приводится.', 'note': 'Эти проценты — статистическая оценка Pangram, а не доказательство. Pangram сообщает о доле ложных срабатываний около 1 на 10 000 на своих тестовых данных; любой детектор может ошибаться, особенно на коротком, сильно отредактированном или шаблонном тексте. Используйте результат как повод для разговора с автором, а не как вердикт. Отмеченные фрагменты показываются только на странице результата.', 'limit': 'Оценка ИИ получена моделью Pangram (полный текст отправлен с согласия пользователя). Сравнение на плагиат не проводилось.'}, 'uz': {'title': 'AI detektor (Pangram)', 'status': 'Natija', 'est': 'Provayder bahosi', 'est_v': 'AI yozgan {fraction_ai}% · AI yordamida {fraction_ai_assisted}% · inson {fraction_human}%', 'verdict': 'Umumiy', 'verdicts': {'ai': 'Asosan AI yozgan', 'human': 'Asosan inson yozgan', 'mixed': 'Aralash'}, 'segs': 'Tahlil qilingan / belgilangan / «humanizer»ga o‘xshash parchalar', 'model': 'Model', 'row': 'Pangram bahosi: AI {fraction_ai}% · AI yordamida {fraction_ai_assisted}%', 'unsupported': 'Mavjud emas: Pangram o‘zbek tilini qo‘llab-quvvatlamaydi; matn yuborilmadi va pul olinmadi.', 'too_long': 'Bajarilmadi: hujjatda {words} so‘z bor; AI detektor chegarasi {max_words}.', 'error': 'Yakunlanmadi ({error}). AI bahosi berilmaydi.', 'note': 'Bu foizlar Pangram’ning statistik bahosi, isbot emas. Pangram o‘z test ma’lumotlarida noto‘g‘ri ijobiy natija taxminan 10 000 tadan 1 ta ekanini bildiradi; har qanday detektor xato qilishi mumkin, ayniqsa qisqa, kuchli tahrirlangan yoki shablon matnda. Natijani hukm emas, muallif bilan suhbat uchun asos sifatida qo‘llang. Belgilangan parchalar faqat natija sahifasida ko‘rsatiladi.', 'limit': 'AI bahosi Pangram modelidan olingan (to‘liq matn foydalanuvchi roziligi bilan yuborilgan). Plagiatga solishtirilmadi.'}}
+
+
+def ai_section(data, lang, st, table):
+    if not data or data.get("status") == "not_configured":
+        return []
+    t = AI_T.get(lang, AI_T["en"])
+    status = data.get("status")
+    if status == "done":
+        rows = [(t["est"], t["est_v"].format(**data)), (t["verdict"], t["verdicts"].get(data.get("verdict"), "—")),
+                (t["segs"], f"{data.get('segments', 0)} / {data.get('segments_flagged', 0)} / {data.get('humanized_segments', 0)}"),
+                (t["model"], ("Pangram " + str(data.get("version") or "")).strip())]
+    elif status == "unsupported_language":
+        rows = [(t["status"], t["unsupported"])]
+    elif status == "too_long":
+        rows = [(t["status"], t["too_long"].format(words=data.get("words", ""), max_words=data.get("max_words", "")))]
+    else:
+        rows = [(t["status"], t["error"].format(error=data.get("error", "")))]
+    return [Paragraph(html.escape(t["title"]), st["h"]), table(rows), Paragraph(html.escape(t["note"]), st["small"])]
 
 
 def integrity_section(data, lang, st, table):
@@ -330,6 +351,87 @@ def integrity_section(data, lang, st, table):
     for item in (refs or {}).get("mismatch") or []:
         rows.append((t["mismatch"], f"{item['doi']} → {item.get('title') or '—'}"))
     return [Paragraph(html.escape(t["title"]), st["h"]), table(rows), Paragraph(html.escape(t["note"]), st["small"])]
+
+
+def _plagiarism_sections(result, mode, t, st, table, esc, headline, basis, lang):
+    """Result, indicators, AI detector and sources sections of a plagiarism check."""
+    story = []
+    pasted = lambda name: t["pasted"] if name == "Pasted reference" else name
+    c = result.get("citation")
+    counted = c["matched_words_counted"] if c else (result.get("matched_tokens") or 0)
+    result_rows = [(t["units_tokens"], t["tokens_v"].format(a=counted, b=result.get("total_tokens") or 0)),
+                   (t["units_chars"], t["chars_v"].format(a=result.get("matched_chars") or 0, b=result.get("total_chars") or 0))]
+    if c:
+        o, ex = c["exclusions"], c["excluded"]
+        chosen = ([t["ex_q"].format(n=ex["quotations"])] if o["quotations"] else []) + \
+                 ([t["ex_b"].format(n=ex["bibliography"])] if o["bibliography"] else []) + \
+                 ([t["ex_s"].format(m=o["min_words"], n=ex["short"])] if o["min_words"] > 7 else [])
+        result_rows += [
+            (t["before"], f"{c['percent_all']}% · " + t["tokens_v"].format(a=c["matched_words_all"], b=c["total_words"])),
+            (t["applied"], "; ".join(chosen) or t["ex_none"]),
+            (t["where"], "; ".join(f"{t['locs'][k]}: {v}" for k, v in c["locations"].items() if v) or "—"),
+            (t["detected"], (t["bib_yes"].format(h=c["bibliography"]["heading"]) if c.get("bibliography") else t["bib_no"])
+             + "; " + t["quotes_v"].format(n=c["quotations_found"], c=c["quotations_cited"]))]
+    ai = result.get("ai") or {}
+    result_rows.append((t["ai"], AI_T.get(lang, AI_T["en"])["row"].format(**ai) if ai.get("status") == "done" else t["ai_v"]))
+    if mode == "reference":
+        result_rows.append((t["identical"], t["yes"] if result.get("self_comparison") else t["no"]))
+    story += [Paragraph(t["s_result"], st["h"]),
+              KeepTogether([Paragraph(esc(t["matched"]), st["small"]), Paragraph(esc(headline), st["big"]),
+                            Paragraph(esc(basis), st["small"]), Spacer(1, 6)]),
+              table(result_rows)]
+    if c:
+        story.append(Paragraph(esc(t["rules"]), st["small"]))
+
+    story += integrity_section(result.get("integrity"), lang, st, table)
+    story += ai_section(result.get("ai"), lang, st, table)
+
+    story.append(Paragraph(t["s_sources"], st["h"]))
+    sources = result.get("sources") or []
+    sources = sorted(sources, key=lambda s: -(s.get("matched_tokens") or 0))
+    # Academic mode lists every discovered record (matched or not); the corpus lists
+    # matched sources only, possibly fewer than the engine found.
+    total = len(sources) if mode == "academic" else result.get("matched_source_count", len(sources))
+    if not sources and mode != "reference":
+        story.append(Paragraph(esc(t["no_sources"]), st["body"]))
+    if sources:
+        key = "shown_records" if mode == "academic" else "shown"
+        story.append(Paragraph(esc(t[key].format(n=min(len(sources), PDF_SOURCES), m=total)), st["small"]))
+    if result.get("sources_truncated") or len(sources) > PDF_SOURCES:
+        story.append(Paragraph(esc(t["truncated_records" if mode == "academic" else "truncated"]), st["small"]))
+    if any(s.get("passages") for s in sources):
+        story.append(Paragraph(esc(t["loc_note"]), st["small"]))
+    for number, source in enumerate(sources[:PDF_SOURCES], 1):
+        block = [Paragraph(f"{number}. " + esc(pasted(source.get("title") or "—")), st["source"])]
+        meta = []
+        if source.get("authors"):
+            meta.append(f"{t['authors']}: {source['authors']}")
+        if source.get("year"):
+            meta.append(f"{t['year']}: {source['year']}")
+        coverage = t["cov_web"] if source.get("coverage") == "web" else t["cov"].get(source.get("coverage"), t["cov_full"])
+        meta.append(f"{t['coverage']}: {coverage}")
+        if source.get("rights_basis"):
+            meta.append(f"{t['rights']}: {t['rights_v'].get(source['rights_basis'], t['rights_v']['unknown'])}")
+        meta.append(f"{t['units_tokens']}: {source.get('matched_tokens') or 0}")
+        block.append(Paragraph(esc(" · ".join(meta)), st["small"]))
+        if source.get("url"):
+            block.append(Paragraph(esc(source["url"]), st["small"]))
+        passages = source.get("passages") or []
+        for i, passage in enumerate(passages, 1):
+            block.extend([
+                Paragraph(esc(t["passage"].format(i=i) + " — " + t["loc"].format(
+                    qs=passage.get("query_start"), qe=passage.get("query_end"),
+                    ss=passage.get("source_start"), se=passage.get("source_end"))), st["small"]),
+                Paragraph(esc(passage.get("source_excerpt", "")), st["quote"])])
+            story.append(KeepTogether(block))  # first passage stays with the source heading
+            block = []
+        if block:
+            story.append(KeepTogether(block))
+        hidden = (source.get("passage_count") or len(passages)) - len(passages)
+        if hidden > 0:
+            story.append(Paragraph(esc(t["passages_more"].format(n=hidden)), st["small"]))
+
+    return story
 
 
 def build_pdf(result, identifier, lang="en", minutes_left=15, verify_url=None):
@@ -401,80 +503,14 @@ def build_pdf(result, identifier, lang="en", minutes_left=15, verify_url=None):
     else:
         headline = f"{percent}%"
         basis = t["basis_tokens"]
-    c = result.get("citation")
-    counted = c["matched_words_counted"] if c else (result.get("matched_tokens") or 0)
-    result_rows = [(t["units_tokens"], t["tokens_v"].format(a=counted, b=result.get("total_tokens") or 0)),
-                   (t["units_chars"], t["chars_v"].format(a=result.get("matched_chars") or 0, b=result.get("total_chars") or 0))]
-    if c:
-        o, ex = c["exclusions"], c["excluded"]
-        chosen = ([t["ex_q"].format(n=ex["quotations"])] if o["quotations"] else []) + \
-                 ([t["ex_b"].format(n=ex["bibliography"])] if o["bibliography"] else []) + \
-                 ([t["ex_s"].format(m=o["min_words"], n=ex["short"])] if o["min_words"] > 7 else [])
-        result_rows += [
-            (t["before"], f"{c['percent_all']}% · " + t["tokens_v"].format(a=c["matched_words_all"], b=c["total_words"])),
-            (t["applied"], "; ".join(chosen) or t["ex_none"]),
-            (t["where"], "; ".join(f"{t['locs'][k]}: {v}" for k, v in c["locations"].items() if v) or "—"),
-            (t["detected"], (t["bib_yes"].format(h=c["bibliography"]["heading"]) if c.get("bibliography") else t["bib_no"])
-             + "; " + t["quotes_v"].format(n=c["quotations_found"], c=c["quotations_cited"]))]
-    result_rows.append((t["ai"], t["ai_v"]))
-    if mode == "reference":
-        result_rows.append((t["identical"], t["yes"] if result.get("self_comparison") else t["no"]))
-    story += [Paragraph(t["s_result"], st["h"]),
-              KeepTogether([Paragraph(esc(t["matched"]), st["small"]), Paragraph(esc(headline), st["big"]),
-                            Paragraph(esc(basis), st["small"]), Spacer(1, 6)]),
-              table(result_rows)]
-    if c:
-        story.append(Paragraph(esc(t["rules"]), st["small"]))
-
-    story += integrity_section(result.get("integrity"), lang, st, table)
-
-    story.append(Paragraph(t["s_sources"], st["h"]))
-    sources = result.get("sources") or []
-    sources = sorted(sources, key=lambda s: -(s.get("matched_tokens") or 0))
-    # Academic mode lists every discovered record (matched or not); the corpus lists
-    # matched sources only, possibly fewer than the engine found.
-    total = len(sources) if mode == "academic" else result.get("matched_source_count", len(sources))
-    if not sources and mode != "reference":
-        story.append(Paragraph(esc(t["no_sources"]), st["body"]))
-    if sources:
-        key = "shown_records" if mode == "academic" else "shown"
-        story.append(Paragraph(esc(t[key].format(n=min(len(sources), PDF_SOURCES), m=total)), st["small"]))
-    if result.get("sources_truncated") or len(sources) > PDF_SOURCES:
-        story.append(Paragraph(esc(t["truncated_records" if mode == "academic" else "truncated"]), st["small"]))
-    if any(s.get("passages") for s in sources):
-        story.append(Paragraph(esc(t["loc_note"]), st["small"]))
-    for number, source in enumerate(sources[:PDF_SOURCES], 1):
-        block = [Paragraph(f"{number}. " + esc(pasted(source.get("title") or "—")), st["source"])]
-        meta = []
-        if source.get("authors"):
-            meta.append(f"{t['authors']}: {source['authors']}")
-        if source.get("year"):
-            meta.append(f"{t['year']}: {source['year']}")
-        coverage = t["cov_web"] if source.get("coverage") == "web" else t["cov"].get(source.get("coverage"), t["cov_full"])
-        meta.append(f"{t['coverage']}: {coverage}")
-        if source.get("rights_basis"):
-            meta.append(f"{t['rights']}: {t['rights_v'].get(source['rights_basis'], t['rights_v']['unknown'])}")
-        meta.append(f"{t['units_tokens']}: {source.get('matched_tokens') or 0}")
-        block.append(Paragraph(esc(" · ".join(meta)), st["small"]))
-        if source.get("url"):
-            block.append(Paragraph(esc(source["url"]), st["small"]))
-        passages = source.get("passages") or []
-        for i, passage in enumerate(passages, 1):
-            block.extend([
-                Paragraph(esc(t["passage"].format(i=i) + " — " + t["loc"].format(
-                    qs=passage.get("query_start"), qe=passage.get("query_end"),
-                    ss=passage.get("source_start"), se=passage.get("source_end"))), st["small"]),
-                Paragraph(esc(passage.get("source_excerpt", "")), st["quote"])])
-            story.append(KeepTogether(block))  # first passage stays with the source heading
-            block = []
-        if block:
-            story.append(KeepTogether(block))
-        hidden = (source.get("passage_count") or len(passages)) - len(passages)
-        if hidden > 0:
-            story.append(Paragraph(esc(t["passages_more"].format(n=hidden)), st["small"]))
+    if mode == "ai":
+        story += integrity_section(result.get("integrity"), lang, st, table)
+        story += ai_section(result.get("ai"), lang, st, table)
+    else:
+        story += _plagiarism_sections(result, mode, t, st, table, esc, headline, basis, lang)
 
     story += [Paragraph(t["s_limits"], st["h"])]
-    limits = list(t["limits"])
+    limits = list(t["limits"]) if mode != "ai" else [AI_T.get(lang, AI_T["en"])["limit"]] + list(t["limits"])[2:]
     if mode == "academic" and (result.get("web") or {}).get("enabled"):
         limits[0] = t["limit_web"]
     metadata_only = (result.get("source_count") or 0) - (result.get("evaluated_sources") or 0)
