@@ -270,6 +270,38 @@ The **AI detector** mode, plus an optional "Also check with the AI detector" box
 
 **Before going live,** read Pangram's terms on data use and retention, add them to your privacy notice, and have your lawyer confirm that sending full manuscripts abroad is acceptable under Law ZRU-547.
 
+## Part 3k — Protected archive of checked works (opt-in)
+
+Signed-in users can tick **"Add this document to the PlagIQ protected archive"** when they run a check. The full text then goes into the private library, so **later copies of it are found**, even though it was never published. This is what antiplag.uz calls its "internal archive".
+
+- **Who sees what:** other users see only the title, author and year of an archived work, plus the matching passage in *their own* document. They never see the archived text.
+- **Self-checks:** checking the identical document again does not match itself. If the author checks a document that copies their own archived work, it is labelled "Your own archived work".
+- **Removal:** users see their works in the menu under their name ("My archived works") and can remove them at any time. Deleting the account removes them too.
+- **Consent:** the user must confirm they are the author or have the author's permission. That confirmation and its time are stored with the work.
+- **Requirements:** the private engine (Part 2) and Telegram sign-in (Part 3i). Without both, the option is hidden.
+- **Academic checks** now also search the private library (imported publications and the archive) when the engine is set up, so archived works are found in the default mode, not only in "PlagIQ library" mode.
+
+**Before switching it on publicly,** add the archive to your privacy notice (what is kept, why, for how long, how to remove it), and have your lawyer confirm the consent text under ZRU-547. The archive grows with use, so watch the engine volume's size (see `evaluation/BENCHMARKS.md`; 5,000 sources ≈ 0.9 GB) and raise `CORPUS_MAX_SOURCES` when needed.
+
+## Part 3l — University contributions to the archive
+
+Partner universities can deposit their past theses, diploma and course works. They are matched like any source, but **their text is never shown**: reports give the title, author, year and "University deposit (TDIU)".
+
+1. **Sign an agreement** with the university that allows indexing for plagiarism detection. Your lawyer should prepare it. Note its number and date.
+2. Ask the university's responsible staff for their **Telegram user IDs**. They can get them from @userinfobot.
+3. Railway → **website** service → **Variables**: add `INSTITUTIONS`, for example:
+   ```json
+   [{"name":"TDIU","agreement":"No. 12/2026, 01.11.2026","admins":[123456789,987654321]}]
+   ```
+4. Redeploy. When those staff sign in, they see a **"University deposit"** section. They choose files (any number; each is sent separately, 2 MB maximum) and press "Deposit files". A file named `Author - Title.docx` fills in the author and title, and the language is detected automatically. They can also list and remove their university's works.
+
+**Whole archives (hundreds of files):** on the engine service, open a shell (Railway → engine → the "⋯" menu → Shell, or `railway run`). Upload the folder and a `works.csv` with the columns `file,title,authors,year,language` (language may be left empty), then run:
+```bash
+python institutions.py --institution TDIU --agreement "No. 12/2026" --csv works.csv --folder ./files --check
+python institutions.py --institution TDIU --agreement "No. 12/2026" --csv works.csv --folder ./files
+```
+The first command only validates. The import is all-or-nothing. The agreement is stored with every work. Raise `CORPUS_MAX_SOURCES` first if needed (Part 2).
+
 ## Part 3e — Full-text comparison during academic checks (on by default)
 
 In **Find academic publications** mode, PlagIQ now downloads the free full texts (PDFs) of the most relevant papers it finds and compares the manuscript against the **whole articles**, not only their abstracts. The texts are used for that one check and then discarded; they are not stored. Your lawyer has confirmed this use.

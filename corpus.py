@@ -27,7 +27,9 @@ WINDOW = 7
 EXCERPT_LIMIT = 500
 MAX_SOURCE_CHARS = 1_000_000
 LANGUAGES = ('uz', 'ru', 'en')
-RIGHTS = ('public_domain', 'open_license', 'written_permission')
+RIGHTS = ('public_domain', 'open_license', 'written_permission', 'author_deposit', 'institution_deposit')
+# Deposited (unpublished) works: never shown to other users, so no URL and no source excerpt in reports.
+DEPOSITS = ('author_deposit', 'institution_deposit')
 
 
 def max_sources():
@@ -254,8 +256,10 @@ def corpus_version(db):
     return hashlib.sha256((str(NORMALIZATION_VERSION) + ':' + ','.join(ids)).encode()).hexdigest()[:12]
 
 
-def search(db, text, language, max_passages=5):
-    """Read-only lookup. The manuscript is fingerprinted in memory and never written."""
+def search(db, text, language, max_passages=5, exclude=()):
+    """Read-only lookup. The manuscript is fingerprinted in memory and never written.
+    `exclude`: SHA-256 ids of deposits to skip (the same document deposited earlier). Published
+    sources are never skipped: an exact copy of a published work must still be found."""
     q = lexical(text, language)
     hits, seen = {}, {}
     for f, i in windows(q):
@@ -269,11 +273,18 @@ def search(db, text, language, max_passages=5):
         metadata = json.loads(raw)
         if metadata['language'] != language:
             continue
+        if identifier in exclude and metadata.get('rights_basis') in DEPOSITS:
+            continue                                    # the same deposited document, checked again
         evidence = match_source(q, _source_lexical(identifier, language, source_text), source_text, pairs, max_passages)
         if not evidence:
             continue
         union.extend(evidence['intervals'])
         public = {k: metadata.get(k) for k in ('title', 'authors', 'year', 'url', 'language', 'rights_basis', 'sha256')}
+        if metadata.get('rights_basis') in DEPOSITS:
+            # Unpublished deposit: other users see title, author and year, never its text.
+            for passage in evidence['passages']:
+                passage['source_excerpt'] = ''
+            public.update(url='', owner=metadata.get('owner', ''), collection=metadata.get('collection', ''))
         sources.append({**public, 'source_filename': metadata['title'], 'source_url': metadata['url'],
                         'matched_chars': evidence['matched_chars'], 'matched_words': evidence['matched_words'],
                         'passage_count': evidence['passage_count'], 'passages': evidence['passages']})
@@ -345,14 +356,19 @@ def detect_language(text):
 def validate(metadata, text):
     """Check one record before anything is written. Returns cleaned metadata."""
     required = ('title', 'url', 'language', 'authors', 'year', 'rights_basis', 'permission_reference')
-    missing = [key for key in required if not metadata.get(key)]
+    deposit = metadata.get('rights_basis') in DEPOSITS
+    missing = [key for key in required if not metadata.get(key) and not (deposit and key == 'url')]
     if missing:
         raise ValueError('Missing citation or rights metadata: ' + ', '.join(missing))
     if metadata['language'] not in LANGUAGES:
         raise ValueError('Unsupported language')
     if metadata['rights_basis'] not in RIGHTS:
         raise ValueError('Explicit full-text indexing rights required')
-    if urlsplit(metadata['url']).scheme != 'https' or not urlsplit(metadata['url']).hostname:
+    if deposit and not metadata.get('owner'):
+        raise ValueError('Deposits need an owner (depositing account or institution)')
+    if deposit:
+        metadata = {**metadata, 'url': ''}
+    elif urlsplit(metadata['url']).scheme != 'https' or not urlsplit(metadata['url']).hostname:
         raise ValueError('HTTPS citation URL required')
     if type(metadata['year']) is not int or not 1000 <= metadata['year'] <= 2200:
         raise ValueError('Year must be a whole number such as 2025')
@@ -434,6 +450,28 @@ def import_manifest(db, manifest):
         for metadata, text, _, name in records:
             _insert(db, {**metadata, 'source_file': name}, text)
     return records
+
+
+def deposits(db, owner):
+    """(id, metadata) of the works one owner deposited."""
+    rows = []
+    for identifier, raw in db.execute('SELECT id, metadata FROM sources'):
+        metadata = json.loads(raw)
+        if metadata.get('rights_basis') in DEPOSITS and metadata.get('owner') == owner:
+            rows.append((identifier, metadata))
+    return sorted(rows, key=lambda r: r[1].get('imported_at', ''), reverse=True)
+
+
+def remove_deposit(db, identifier, owner):
+    """Delete a deposit only for its owner. True if something was removed."""
+    row = db.execute('SELECT metadata FROM sources WHERE id=?', (identifier,)).fetchone()
+    if not row:
+        return False
+    metadata = json.loads(row[0])
+    if metadata.get('rights_basis') not in DEPOSITS or metadata.get('owner') != owner:
+        return False
+    with db:
+        return remove(db, identifier)
 
 
 def inventory(db):

@@ -232,7 +232,7 @@ def test_summary_rejects_malformed(mutate):
 
 
 def test_corpus_result_language_without_sources_is_not_evaluated(monkeypatch):
-    async def fake(text, language):
+    async def fake(text, language, exclude=()):
         return {'query_text_length': len(text), 'unique_passages': [], 'sources': [], 'corpus_sources': 1,
                 'language_counts': {'uz': 0, 'ru': 1, 'en': 0}, 'coverage': 'x'}
     monkeypatch.setattr(web, 'corpus_configured', lambda: True)
@@ -243,7 +243,7 @@ def test_corpus_result_language_without_sources_is_not_evaluated(monkeypatch):
 
 
 def test_engine_busy_is_reported(monkeypatch):
-    async def busy(text, language):
+    async def busy(text, language, exclude=()):
         raise engine_client.EngineError('busy', 'engine_busy')
     monkeypatch.setattr(web, 'corpus_configured', lambda: True)
     monkeypatch.setattr(web, 'run_check', busy)

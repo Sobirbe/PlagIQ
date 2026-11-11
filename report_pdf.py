@@ -87,8 +87,8 @@ T = {
     footer="PlagIQ · Certificate of check and evidence report", page="Page {p} of {n}",
     modes=dict(ai="AI detector only", reference="Your own reference", academic="OpenAlex discovery (open-access full texts and abstracts)", corpus="Private authorized corpus"),
     states=dict(partial="Partly searched (some searches failed)", searched="Searched", unavailable="Unavailable", no_query="No search phrase", not_searched="Not searched"),
-    rights_v=dict(written_permission="Written permission", open_license="Open licence", public_domain="Public domain", unknown="Unknown"),
-    cov=dict(fulltext="Full text (compared, not stored)", abstract="Abstract", metadata_only="Metadata only", reference="Your reference"), cov_full="Indexed full text",
+    rights_v=dict(author_deposit="Author’s deposit", institution_deposit="University deposit", written_permission="Written permission", open_license="Open licence", public_domain="Public domain", unknown="Unknown"),
+    cov=dict(archive="PlagIQ archive (unpublished; text not shown)", own_archive="Your own archived work", fulltext="Full text (compared, not stored)", abstract="Abstract", metadata_only="Metadata only", reference="Your reference"), cov_full="Indexed full text",
     yes="Yes", no="No",
 ),
 "ru": dict(
@@ -145,8 +145,8 @@ T = {
     footer="PlagIQ · Сертификат проверки и отчёт с доказательствами", page="Стр. {p} из {n}",
     modes=dict(ai="Только ИИ-детектор", reference="Ваш источник", academic="Поиск OpenAlex (открытые полные тексты и аннотации)", corpus="Внутренний разрешённый корпус"),
     states=dict(partial="Поиск выполнен частично (часть запросов не удалась)", searched="Поиск выполнен", unavailable="Недоступно", no_query="Нет поисковой фразы", not_searched="Поиск не проводился"),
-    rights_v=dict(written_permission="Письменное разрешение", open_license="Открытая лицензия", public_domain="Общественное достояние", unknown="Неизвестно"),
-    cov=dict(fulltext="Полный текст (сравнён, не сохранён)", abstract="Аннотация", metadata_only="Только метаданные", reference="Ваш источник"), cov_full="Индексированный полный текст",
+    rights_v=dict(author_deposit="Передано автором", institution_deposit="Передано университетом", written_permission="Письменное разрешение", open_license="Открытая лицензия", public_domain="Общественное достояние", unknown="Неизвестно"),
+    cov=dict(archive="Архив PlagIQ (не опубликовано; текст не показывается)", own_archive="Ваша собственная работа в архиве", fulltext="Полный текст (сравнён, не сохранён)", abstract="Аннотация", metadata_only="Только метаданные", reference="Ваш источник"), cov_full="Индексированный полный текст",
     yes="Да", no="Нет",
 ),
 "uz": dict(
@@ -203,8 +203,8 @@ T = {
     footer="PlagIQ · Tekshiruv sertifikati va dalillar hisoboti", page="{n} sahifadan {p}",
     modes=dict(ai="Faqat AI detektor", reference="O‘z manbangiz", academic="OpenAlex qidiruvi (ochiq to‘liq matnlar va annotatsiyalar)", corpus="Ruxsat berilgan ichki korpus"),
     states=dict(partial="Qisman qidirildi (ayrim so‘rovlar bajarilmadi)", searched="Qidirildi", unavailable="Mavjud emas", no_query="Qidiruv iborasi yo‘q", not_searched="Qidirilmagan"),
-    rights_v=dict(written_permission="Yozma ruxsat", open_license="Ochiq litsenziya", public_domain="Jamoat mulki", unknown="Noma’lum"),
-    cov=dict(fulltext="To‘liq matn (solishtirildi, saqlanmadi)", abstract="Annotatsiya", metadata_only="Faqat metadata", reference="Sizning manbangiz"), cov_full="Indekslangan to‘liq matn",
+    rights_v=dict(author_deposit="Muallif topshirgan", institution_deposit="Universitet topshirgan", written_permission="Yozma ruxsat", open_license="Ochiq litsenziya", public_domain="Jamoat mulki", unknown="Noma’lum"),
+    cov=dict(archive="PlagIQ arxivi (nashr etilmagan; matn ko‘rsatilmaydi)", own_archive="O‘zingizning arxivdagi ishingiz", fulltext="To‘liq matn (solishtirildi, saqlanmadi)", abstract="Annotatsiya", metadata_only="Faqat metadata", reference="Sizning manbangiz"), cov_full="Indekslangan to‘liq matn",
     yes="Ha", no="Yo‘q",
 ),
 }
@@ -412,6 +412,8 @@ def _plagiarism_sections(result, mode, t, st, table, esc, headline, basis, lang)
         meta.append(f"{t['coverage']}: {coverage}")
         if source.get("rights_basis"):
             meta.append(f"{t['rights']}: {t['rights_v'].get(source['rights_basis'], t['rights_v']['unknown'])}")
+            if source.get("collection"):
+                meta[-1] += f" ({source['collection']})"
         meta.append(f"{t['units_tokens']}: {source.get('matched_tokens') or 0}")
         block.append(Paragraph(esc(" · ".join(meta)), st["small"]))
         if source.get("url"):
@@ -422,7 +424,8 @@ def _plagiarism_sections(result, mode, t, st, table, esc, headline, basis, lang)
                 Paragraph(esc(t["passage"].format(i=i) + " — " + t["loc"].format(
                     qs=passage.get("query_start"), qe=passage.get("query_end"),
                     ss=passage.get("source_start"), se=passage.get("source_end"))), st["small"]),
-                Paragraph(esc(passage.get("source_excerpt", "")), st["quote"])])
+                Paragraph(esc(passage.get("source_excerpt") or (t["cov"].get(source.get("coverage"), "")
+                                                                 if source.get("coverage") in ("archive", "own_archive") else "")), st["quote"])])
             story.append(KeepTogether(block))  # first passage stays with the source heading
             block = []
         if block:

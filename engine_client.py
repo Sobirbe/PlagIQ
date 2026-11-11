@@ -18,7 +18,8 @@ class EngineError(RuntimeError):
         super().__init__(message)
         self.code = code
 
-RIGHTS = ("written_permission", "open_license", "public_domain")
+RIGHTS = ("written_permission", "open_license", "public_domain", "author_deposit", "institution_deposit")
+DEPOSITS = ("author_deposit", "institution_deposit")
 LANGUAGES = ("uz", "ru", "en")
 
 def configured() -> bool:
@@ -45,7 +46,7 @@ def safe_path(value):
         raise EngineError("Unexpected private engine response.")
     return value
 
-async def run_check(text: str, language: str) -> dict:
+async def run_check(text: str, language: str, exclude=()) -> dict:
     base=engine_base_url()
     if len(text) > 300000:
         raise EngineError("Document exceeds pilot engine limit.")
@@ -63,7 +64,7 @@ async def run_check(text: str, language: str) -> dict:
         async with httpx.AsyncClient(base_url=base, timeout=httpx.Timeout(timeout, connect=10.0), trust_env=False,
                                      follow_redirects=False,
                                      headers={"Authorization": "Bearer " + os.environ["ENGINE_API_KEY"]}) as client:
-            response=await client.post("/v1/checks",json={"query_text":text,"language":segmentation})
+            response=await client.post("/v1/checks",json={"query_text":text,"language":segmentation,"exclude":list(exclude)[:5]})
             if response.status_code == 429:
                 raise EngineError("Private corpus engine is busy. Try again shortly.", "engine_busy")
             if response.status_code != 202:
@@ -152,10 +153,15 @@ def summarize(report: dict, max_sources=25) -> dict:
                 raise ValueError()
             year = src.get("year")
             passage_count = src.get("passage_count", len(passages))
+            deposit = src.get("rights_basis") in DEPOSITS
+            if deposit:
+                passages = [p | {"source_excerpt": ""} for p in passages]       # unpublished text is never shown
             sources.append({
                 "title": str(src.get("source_filename") or "Indexed document")[:250],
                 "url": url if urlsplit(url).scheme == "https" else "",
-                "coverage": "indexed full-text source",
+                "coverage": "archive" if deposit else "indexed full-text source",
+                "owner": str(src.get("owner") or "")[:40] if deposit else "",
+                "collection": str(src.get("collection") or "")[:120] if src.get("rights_basis") == "institution_deposit" else "",
                 "matched_chars": matched_chars,
                 "matched_tokens": matched_words,
                 "authors": str(src.get("authors") or "")[:300],
@@ -194,6 +200,56 @@ def highlight_html(text: str, intervals) -> str:
         pos=end
     out.append(html.escape(text[pos:]))
     return "".join(out).replace("\n","<br>")
+
+
+def _client():
+    return httpx.AsyncClient(base_url=engine_base_url(), timeout=httpx.Timeout(60.0, connect=10.0), trust_env=False,
+                             follow_redirects=False, headers={"Authorization": "Bearer " + os.environ["ENGINE_API_KEY"]})
+
+
+async def deposit(item: dict) -> str:
+    """Add a work to the protected archive; returns its id."""
+    try:
+        async with _client() as client:
+            response = await client.post("/v1/archive", json=item)
+    except httpx.HTTPError as exc:
+        raise EngineError("Private corpus engine is unavailable.") from exc
+    if response.status_code == 422:
+        raise EngineError("The archive refused this document: " + str(response.json().get("detail", ""))[:200], "archive_refused")
+    if response.status_code != 201:
+        raise EngineError("Archive deposit failed (" + str(response.status_code) + ").")
+    identifier = response.json().get("id", "")
+    if not re.fullmatch(r"[0-9a-f]{64}", str(identifier)):
+        raise EngineError("Unexpected private engine response.")
+    return identifier
+
+
+async def list_deposits(owner: str) -> list:
+    try:
+        async with _client() as client:
+            response = await client.get("/v1/archive", params={"owner": owner})
+            response.raise_for_status()
+            items = response.json().get("items", [])
+    except (httpx.HTTPError, ValueError) as exc:
+        raise EngineError("Private corpus engine is unavailable.") from exc
+    out = []
+    for item in items[:500] if isinstance(items, list) else []:
+        if isinstance(item, dict) and re.fullmatch(r"[0-9a-f]{64}", str(item.get("id", ""))):
+            out.append({"id": item["id"], "title": str(item.get("title", ""))[:300], "authors": str(item.get("authors", ""))[:300],
+                        "year": item.get("year") if type(item.get("year")) is int else None,
+                        "language": item.get("language") if item.get("language") in LANGUAGES else None,
+                        "words": item.get("words") if type(item.get("words")) is int else None,
+                        "deposited": str(item.get("deposited") or "")[:10], "collection": str(item.get("collection") or "")[:120]})
+    return out
+
+
+async def remove_deposit(identifier: str, owner: str) -> bool:
+    try:
+        async with _client() as client:
+            response = await client.delete(f"/v1/archive/{identifier}", params={"owner": owner})
+    except httpx.HTTPError as exc:
+        raise EngineError("Private corpus engine is unavailable.") from exc
+    return response.status_code == 200
 
 
 async def library():

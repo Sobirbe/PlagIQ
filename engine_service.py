@@ -13,7 +13,8 @@ from fastapi import Depends, FastAPI, Header, HTTPException
 from pydantic import BaseModel, Field
 from contextlib import closing
 import logging
-from corpus import LANGUAGES, connect, corpus_version, inventory, search
+import re
+from corpus import DEPOSITS, LANGUAGES, connect, corpus_version, deposits, ingest, inventory, remove_deposit, search
 from security import SecurityMiddleware
 import import_job
 import wikipedia_import
@@ -95,6 +96,22 @@ def authorize(authorization: str = Header('')):
 class Query(BaseModel):
     query_text: str = Field(min_length=1, max_length=300000)
     language: str = Field(pattern='^(uz|ru|en)$')
+    exclude: list[str] = Field(default_factory=list, max_length=5)
+
+
+OWNER = r'^(user|org):[0-9a-f]{24}$'
+
+
+class Deposit(BaseModel):
+    text: str = Field(min_length=1, max_length=300000)
+    language: str = Field(pattern='^(uz|ru|en)$')
+    title: str = Field(min_length=1, max_length=300)
+    authors: str = Field(min_length=1, max_length=300)
+    year: int = Field(ge=1900, le=2200)
+    owner: str = Field(pattern=OWNER)
+    rights_basis: str = Field(pattern='^(author_deposit|institution_deposit)$')
+    permission_reference: str = Field(min_length=1, max_length=300)
+    collection: str = Field(default='', max_length=120)
 
 
 @app.get('/health')
@@ -115,12 +132,46 @@ def check(query: Query):
         if len(reports) >= 10:
             raise HTTPException(429, 'Transient report capacity reached')
         with closing(connect()) as db:
-            report = search(db, query.query_text, query.language)
+            report = search(db, query.query_text, query.language,
+                            exclude={x for x in query.exclude if re.fullmatch('[0-9a-f]{64}', x)})
         identifier = uuid.uuid4().hex
         reports[identifier] = (time.monotonic() + 180, report)
         return {'status_url': f'/v1/checks/{identifier}', 'report_url': f'/v1/checks/{identifier}/report'}
     finally:
         lock.release()
+
+
+@app.post('/v1/archive', status_code=201, dependencies=[Depends(authorize)])
+def deposit(item: Deposit):
+    """Add a deposited (unpublished) work to the protected archive. Only the website calls this,
+    after the author's or institution's consent; the text is indexed but never shown to others."""
+    with closing(connect()) as db:
+        try:
+            identifier = ingest(db, item.model_dump(), item.text.replace('\x00', ''))
+        except ValueError as exc:
+            raise HTTPException(422, str(exc)[:200])
+    return {'id': identifier}
+
+
+@app.get('/v1/archive', dependencies=[Depends(authorize)])
+def list_deposits(owner: str):
+    if not re.fullmatch(OWNER, owner):
+        raise HTTPException(422, 'Invalid owner')
+    with closing(connect()) as db:
+        rows = deposits(db, owner)
+    return {'items': [{'id': i, 'title': m.get('title', ''), 'authors': m.get('authors', ''), 'year': m.get('year'),
+                       'language': m.get('language'), 'words': m.get('words'), 'deposited': m.get('imported_at'),
+                       'collection': m.get('collection', '')} for i, m in rows[:500]]}
+
+
+@app.delete('/v1/archive/{identifier}', dependencies=[Depends(authorize)])
+def delete_deposit(identifier: str, owner: str):
+    if not re.fullmatch('[0-9a-f]{64}', identifier) or not re.fullmatch(OWNER, owner):
+        raise HTTPException(422, 'Invalid request')
+    with closing(connect()) as db:
+        if not remove_deposit(db, identifier, owner):
+            raise HTTPException(404, 'Not found')
+    return {'deleted': True}
 
 
 @app.get('/v1/library', dependencies=[Depends(authorize)])
