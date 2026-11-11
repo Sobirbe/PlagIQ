@@ -74,6 +74,7 @@ See [DEPLOYMENT.md](DEPLOYMENT.md) for owner-friendly Railway instructions, priv
 - `citations.py`: quotation, reference-marker and bibliography detection; optional exclusions.
 - `harvest.py`: owner-run OAI-PMH harvester for open-licence journal articles (staging only).
 - `wikipedia_import.py`: Wikipedia (CC BY-SA 4.0) import from official Wikimedia dumps, with attribution; run by the engine when `AUTO_IMPORT_WIKIPEDIA` is set.
+- `fulltext.py`: transient full-text comparison of the most relevant open-access works during academic checks (nothing stored).
 - `import_job.py`: unattended OpenAlex import run by the engine when `AUTO_IMPORT` is set (no shell needed on Railway).
 - `oa_import.py`: owner-run OpenAlex/CORE open-licence full-text staging with cost cap.
 - `extract.py`: bounded TXT/DOCX/PDF text extraction shared by website and importer.

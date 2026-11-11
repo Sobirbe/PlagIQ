@@ -18,6 +18,7 @@ from starlette.formparsers import MultiPartParser
 
 import citations
 import corpus
+import fulltext
 import pricing
 import extract
 from discovery import discover
@@ -126,11 +127,13 @@ def compare(text, source, language):
 
 def compare_sources(text, sources, language):
     """Union of verified matches across returned abstracts (metadata-only records are not compared)."""
-    q, evidence, covered, intervals = corpus.compare_texts(text, [s.get("abstract", "") for s in sources], language)
+    q, evidence, covered, intervals = corpus.compare_texts(
+        text, [s.get("fulltext") or s.get("abstract", "") for s in sources], language)
     result, intervals = _measure(q, covered, intervals)
     entries = [_source_entry(e, title=s.get("title", "Untitled"), url=s.get("url", ""), year=s.get("year"),
-                             coverage=s.get("coverage", "metadata_only")) for s, e in zip(sources, evidence)]
-    result.update({"language": language, "method": METHOD + " against returned abstracts",
+                             coverage="fulltext" if s.get("fulltext") else s.get("coverage", "metadata_only"))
+               for s, e in zip(sources, evidence)]
+    result.update({"language": language, "method": METHOD + " against open-access full texts and abstracts",
                    "total_chars": len(text), "intervals": intervals, "sources": entries,
                    "ai_detection": "Not performed"})
     return result
@@ -316,8 +319,14 @@ async def analyse(submission, reference, reference_text, language, mode, options
                        "self_comparison":same})
     elif mode == "academic":
         discovery = await run_in_threadpool(discover, original, 8, language)
+        enabled, max_works, seconds, paid = fulltext.settings()
+        fetched = {"attempted": 0, "compared": 0, "failed": 0, "timed_out": 0}
+        if enabled and discovery["sources"]:
+            # Transient: full texts are compared for this check only and discarded with `discovery`.
+            fetched = await run_in_threadpool(fulltext.fetch_fulltexts, discovery["sources"], max_works, seconds, paid)
         result = await run_in_threadpool(compare_sources, original, discovery["sources"], language)
-        evaluated = sum(bool(s.get("abstract")) for s in discovery["sources"])
+        evaluated = sum(bool(s.get("abstract") or s.get("fulltext")) for s in discovery["sources"])
+        result["fulltext"] = fetched
         if not evaluated:
             result["percent"] = None
             result["not_evaluated_reason"] = "provider_unavailable" if discovery["status"] not in ("searched", "partial") else "no_abstracts"
@@ -327,7 +336,8 @@ async def analyse(submission, reference, reference_text, language, mode, options
                        "database_status":discovery["status"],"database_message":discovery["message"],
                        "queries":discovery["queries"],"search_phrases":discovery.get("query_texts", []),
                        "self_comparison":False,
-                       "scope":"OpenAlex metadata discovery, and exact token matching against returned abstracts only. NO full-text publisher corpus or web-wide plagiarism check."})
+                       "scope":"OpenAlex discovery; exact matching against open-access full texts fetched for this check "
+                                "(not stored) where available, otherwise abstracts. No web-wide plagiarism check."})
     else:
         try:
             engine_report = await run_check(original, language)
