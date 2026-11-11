@@ -149,8 +149,8 @@ def extract_text(name, content):
 
 async def read_file(upload, kind="document"):
     name = (upload.filename or "").lower()
-    if not name.endswith((".txt", ".docx", ".pdf")):
-        raise ApiError(400, "unsupported_type", "Only TXT, DOCX and text-based PDF supported")
+    if not name.endswith((".txt", ".doc", ".docx", ".pdf")):
+        raise ApiError(400, "unsupported_type", "Only TXT, DOC, DOCX and text-based PDF supported")
     content = await upload.read(MAX_BYTES + 1)
     if len(content) > MAX_BYTES:
         raise ApiError(413, "file_too_large", "File exceeds 2 MB")
