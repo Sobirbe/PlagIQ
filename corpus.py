@@ -166,9 +166,22 @@ def _chains(q, s, hits):
     runs = sorted(((i0, j0, last - i0 + WINDOW) for _, i0, j0, last in runs), key=lambda r: (-r[2], r[0]))
     kept = []
     for i0, j0, n in runs:
+        if not _has_words(qw[i0:i0 + n]):
+            continue                                    # chart ticks, year rows, table digits
         if not any(k[0] <= i0 and i0 + n <= k[0] + k[2] for k in kept):
             kept.append((i0, j0, n))
     return sorted(kept)
+
+
+MIN_LETTER_WORDS = 4
+
+
+def _has_words(tokens):
+    """A match must be text: at least 4 tokens with a letter, and letters in at least
+    half of its tokens. Runs of numbers (axis labels "8 -6 -4 -2 0 2 4 6 8", year rows
+    "2003 2004 ... 2010", table cells) coincide across unrelated papers."""
+    lettered = sum(1 for t in tokens if any(ch.isalpha() for ch in t))
+    return lettered >= MIN_LETTER_WORDS and 2 * lettered >= len(tokens)
 
 
 def _excerpt(text, start, end):

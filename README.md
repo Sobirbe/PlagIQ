@@ -16,7 +16,7 @@ Every mode (own reference, OpenAlex abstracts, private corpus) uses the same cod
 
 1. **Normalize** without losing positions: Unicode NFC, invisible characters removed (soft hyphen, zero-width), lower case, lookalike Latin/Cyrillic letters inside mixed-alphabet words unified (fully for Russian and English, partly for Uzbek), Uzbek Latin↔Cyrillic folding with the tutuq belgisi kept inside words, Russian ё→е; PDF line-end hyphenation is repaired at extraction.
 2. **Find** every run of seven or more identical consecutive words (64-bit fingerprints as an index only).
-3. **Verify** each candidate word by word against the real source text — a fingerprint collision can never become a match — and join consecutive hits on the same alignment into passages; repeated phrases are reported once.
+3. **Verify** each candidate word by word against the real source text — a fingerprint collision can never become a match — and join consecutive hits on the same alignment into passages; repeated phrases are reported once. Runs that are mostly numbers (chart axis ticks, year rows, table digits) are discarded: a passage needs at least 4 tokens with letters, and letters in at least half of its tokens.
 4. **Measure** the share of manuscript words inside at least one verified passage, each word counted once regardless of the number of sources. The private engine's character spans are converted to this word count by the website; no engine-supplied percentage is used.
 
 The result is exact-copy evidence with character positions in both texts. It does not detect paraphrase, translation or edited copying (measured below).
