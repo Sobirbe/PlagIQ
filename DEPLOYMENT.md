@@ -270,6 +270,23 @@ The **AI detector** mode, plus an optional "Also check with the AI detector" box
 
 **Before going live,** read Pangram's terms on data use and retention, add them to your privacy notice, and have your lawyer confirm that sending full manuscripts abroad is acceptable under Law ZRU-547.
 
+## Part 3m — CyberLeninka (Russian open-access articles)
+
+CyberLeninka is the largest open collection of Russian-language scientific articles, and the source that Russian-language checkers rely on most. PlagIQ can import its **openly licensed** articles into the private library:
+
+- The article list comes from CyberLeninka's OAI-PMH feed. The **licence is read from each article page** (its "CC BY" badge). CC BY, CC BY-SA and CC0 are imported. CC BY-NC and CC BY-ND go to `review.csv` for your decision. Articles without a licence badge are skipped.
+- CyberLeninka's robots.txt **forbids downloading PDFs**, so the full text is taken from the article page, which robots.txt allows. At least 3 seconds pass between requests.
+- In a live test (November 2026), 8 of the first 10 articles were imported. The other 2 had no authors or no readable text. A passage copied from an imported article was found.
+
+**Automatic import on the engine:** add `AUTO_IMPORT_CYBERLENINKA=1` to the engine service. Each run examines `CYBERLENINKA_BATCH` (200) articles, about 10–15 minutes at 3 seconds per request, and continues where the last run stopped, every `AUTO_IMPORT_HOURS`. Optional filters:
+- `CYBERLENINKA_SET=vak` limits the import to journals on the VAK list (recommended, since these are the articles students cite most);
+- `CYBERLENINKA_FROM=2018-01-01` takes only records changed since that date.
+
+**Size:** CyberLeninka has millions of articles, and you cannot index all of them. `CORPUS_MAX_SOURCES` (default 1,000) stops the import when the limit is reached. Raise it step by step while watching the volume size: 5,000 sources is about 0.9 GB (see `evaluation/BENCHMARKS.md`).
+
+**Manual run** (engine shell): `python cyberleninka.py --out staging/cyberleninka --max 200 --set vak --import`
+
+Before you import at scale, read CyberLeninka's terms of use and have your lawyer confirm them. The imported articles are under open licences, but bulk collection from an aggregator may have its own conditions.
 ## Part 3k — Protected archive of checked works (opt-in)
 
 Signed-in users can tick **"Add this document to the PlagIQ protected archive"** when they run a check. The full text then goes into the private library, so **later copies of it are found**, even though it was never published. This is what antiplag.uz calls its "internal archive".
