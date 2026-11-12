@@ -564,7 +564,25 @@ async def admin_page(request: Request):
     owner(request)
     data = await engine_library() if corpus_configured() else None
     reason = await engine_client.probe() if corpus_configured() and data is None else ""
-    return HTMLResponse(admin.page({"available": data is not None, **(data or {})}, reason),
+    inventory = await engine_client.inventory() if data is not None else None
+    return HTMLResponse(admin.page({"available": data is not None, **(data or {})}, reason, inventory),
+                        headers={"Cache-Control": "no-store"})
+
+
+@app.post("/admin/diagnostic", response_class=HTMLResponse)
+async def admin_diagnostic(request: Request, doi: str = Form("", max_length=300), title: str = Form("", max_length=500),
+                           passage: str = Form("", max_length=5000)):
+    """Owner-only: is a known licensed source indexed and is a passage from it found? Facts only, no source text."""
+    owner(request)
+    result, error = None, ""
+    try:
+        result = await engine_client.diagnostic(doi.strip(), title.strip(), passage)
+    except EngineError as exc:
+        error = str(exc)
+    data = await engine_library() if corpus_configured() else None
+    inventory = await engine_client.inventory() if data is not None else None
+    form = admin.diagnostic_form(result, error, doi.strip(), title.strip())
+    return HTMLResponse(admin.page({"available": data is not None, **(data or {})}, "", inventory, form),
                         headers={"Cache-Control": "no-store"})
 
 
@@ -962,6 +980,7 @@ async def analyse(submission, reference, reference_text, language, mode, options
         result.update({"mode":"academic","reference":"None","source_count":len(discovery["sources"]),
                        "database_status":discovery["status"],"database_message":discovery["message"],
                        "queries":discovery["queries"],"search_phrases":discovery.get("query_texts", []),
+                       "chapters":discovery.get("chapters", 0),"duplicates_merged":discovery.get("duplicates_merged", 0),
                        "self_comparison":False,
                        "scope":"OpenAlex discovery; exact matching against open-access full texts fetched for this check "
                                 "(not stored) where available, otherwise abstracts. "

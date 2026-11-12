@@ -461,6 +461,102 @@ The script sets aside 25 library texts per language as "articles PlagIQ has neve
 
 **Boilerplate filter:** a seven-word sequence found in 3 or more different library texts (journal headers, licence lines, website banners) is not counted as a match. `BOILERPLATE_SOURCES` (engine and website) changes the number; `0` turns the filter off.
 
+## Part 5d — Library health, source check and the Uzbek relabelling import
+
+### What /admin now shows (owner only)
+Under **Library details**:
+- **Searchable full-text coverage** per language:
+  - indexed texts, full texts (300+ words), short texts, searchable words, and the number of seven-word fingerprints;
+  - everything in this table is held in full by the engine. OpenAlex results that have only metadata or an abstract are never stored there; in academic checks they are compared by their abstract only (or not at all when only metadata exists), and reports say so.
+- **By collection and language**, with a warning when Wikipedia is more than half of the library.
+- **By provider and rights basis:** OpenAlex, journal OAI feeds, CyberLeninka, Wikipedia, CORE, author and university deposits, and owner manifests; then open licence, public domain, written permission and deposits.
+- **Indexing freshness:** newest and oldest import date per collection, and how many texts were added in the last 7 and 30 days.
+- **Limits:** `CORPUS_MAX_SOURCES` and `ARCHIVE_MAX_SOURCES` usage. For Wikipedia, the actual count per language next to `WIKIPEDIA_MAX_ARTICLES`; the cap stops *new* imports only, so a language can hold more than the cap if it was lowered later.
+- **Import history:**
+  - last attempt, **last success**, the error and when it happened, and the main failure reasons of staged works (for example "download is not a PDF ×12");
+  - a disk error from an earlier run is marked "at that time; there is enough free space now" when the disk is fine today, so old failures are not mistaken for a current outage.
+
+### Source check (DOI or title)
+At the bottom of /admin, enter the DOI (or at least 8 characters of the title) of a source you know is licensed and indexed, and press **Check source**. PlagIQ shows:
+- whether the source is in the library, with its collection, provider, rights basis, word count and import date;
+- whether its fingerprints exist ("searchable");
+- whether a search finds it: from 60 words taken from the middle of the indexed text, or from a passage you paste;
+- its rank, and how many other sources also matched.
+
+The check never shows any source text: not the sampled words, and certainly not the text of an unpublished deposit. It runs as one search, queued like any other.
+
+**Recommended routine:** after every large import, check three known sources, one each in Uzbek, Russian and English, and keep a note of the results.
+
+### Uzbek works that OpenAlex labels Russian (engine)
+With `uz` in `AUTO_IMPORT`, each run now also lists open-licence works that OpenAlex labels **Russian** but whose authors are at **Uzbek institutions**:
+- titles containing the Russian-only letter "ы" are skipped before any download;
+- each downloaded text's language is detected; Uzbek texts are imported as Uzbek, and the permission record notes the correction;
+- Russian texts are imported only if `ru` is also in `AUTO_IMPORT`; otherwise they are refused with a stated reason;
+- licence rules are the same as for every OpenAlex import: CC BY, CC BY-SA, CC0 and public domain are imported; NC and ND go to the review sheet.
+
+/admin shows this pass as **uz-from-ru**. Settings, on the **engine**:
+- `AUTO_IMPORT_UZ_FROM_RU`: default on; `0` turns it off;
+- `AUTO_IMPORT_UZ_FROM_RU_BATCH`: default 100 works per run;
+- `AUTO_IMPORT_UZ_FROM_RU_MAX_COST`: default 0.05 USD per run.
+
+### Academic searches: chapters and duplicates (website)
+- Long documents get more OpenAlex excerpts (3 up to 3,000 words, then one more per 3,000, at most `OPENALEX_MAX_QUERIES`, default 8).
+- When the text has headings ("1. Kirish", "2-BOB", "ГЛАВА 2", "Introduction", "Xulosa"…), the excerpts are taken **one per chapter**. A table of contents and very short sections are merged with the next part.
+- Results are **de-duplicated** by DOI and by title (for example a 2001 article and its 2017 reprint), keeping the copy that has an abstract.
+
+### Library composition and disk
+In November 2026 Wikipedia made up about 80% of the library (1,824 of 2,288 texts). For academic checks, journals, CyberLeninka and OpenAlex works matter more. With a larger engine volume:
+1. **Back up first:** /admin → Backups (archive deposits and accounts). Turn on Railway volume backups.
+2. **Enlarge the volume**, for example to 5 GB: Railway → engine → the volume → Settings. Live resizing needs a paid plan; never delete or replace the volume.
+3. **Then, on the engine**, a starting point (raise step by step while /admin shows the disk under two-thirds full):
+   - `CORPUS_MAX_SOURCES=5000`
+   - `AUTO_IMPORT=uz` (add `ru` if you want Russian OpenAlex works too)
+   - `AUTO_IMPORT_UZ_JOURNALS=1`
+   - `AUTO_IMPORT_CYBERLENINKA=1`
+   - leave `AUTO_IMPORT_WIKIPEDIA` empty, which stops new Wikipedia imports and keeps the existing articles
+   - keep `AUTO_IMPORT_MAX_COST` set.
+4. **Verify:** after the next run, /admin shows a new "Last success", growing counts outside Wikipedia, and source checks that pass.
+
+### Test on staging before production
+The repository cannot deploy for you. Use a separate Railway **staging environment**, so nothing touches the live site, the live library or real accounts:
+1. Railway → project → environment menu (top left, "production") → **New Environment**. Choose to duplicate production so that the website and engine services are copied.
+   - Staging gets its **own** variables and its **own, empty** volumes.
+   - Railway may label these menus differently; look for "Environments".
+2. In the staging environment, on **both** services:
+   - set a **new** `ENGINE_API_KEY`, different from production and identical on staging's website and engine;
+   - check `ENGINE_URL` points to staging's engine (`http://${{engine.RAILWAY_PRIVATE_DOMAIN}}:8000`).
+3. On staging's website:
+   - remove or leave empty `PAYMENTS_ENABLED`, `TELEGRAM_BOT_REPLIES` and the Payme/Click/Uzum keys;
+   - leave `TELEGRAM_BOT_TOKEN` out, or use a separate test bot: one bot can have one sign-in domain and one webhook, and they belong to production;
+   - set `SESSION_SECRET` (40+ random characters), so sign-in by **email and password** works;
+   - set `PUBLIC_ORIGIN` to the staging address;
+   - to open /admin on staging, a separate test bot and `OWNER_TELEGRAM_IDS` are needed, because email accounts can never open /admin.
+4. On staging's engine:
+   - `CORPUS_DB=/data/corpus.sqlite3` with a small volume;
+   - `AUTO_IMPORT=uz`, `AUTO_IMPORT_BATCH=20`, `AUTO_IMPORT_MAX_COST=0.05`.
+   - Never copy production's archive deposits to staging: they are other people's unpublished works.
+5. Point staging at the pull-request branch: Railway → staging → each service → Settings → Source → branch. Deploy.
+6. **Verification on staging** (tick each):
+   - [ ] `/health` → `corpus_engine_configured: true`; `/api/library` → `available: true`.
+   - [ ] /admin → "Private engine connected" ✅; **Library details** shows coverage, collections, providers, freshness, limits and import history.
+   - [ ] After the first import run, "uz" and "uz-from-ru" appear under Import history with a "Last success" time.
+   - [ ] **Source check** on an imported work's DOI → "✅ found (rank 1 …)" and "(searchable)". A made-up DOI → "Not in the library".
+   - [ ] An academic check of a long document with chapters: the result line shows more searches than 3, and the PDF still shows the certificate, scope and evidence pages as before.
+   - [ ] The short-text check without sign-in, email sign-in, the archive, and the PDF/QR all work as before. Payments stay off.
+7. Only then merge the pull request (production deploys from `main`), redeploy the **engine** too, and repeat the first four checks on production.
+
+### Railway variables used by this change
+| Service | Variable | Default | Purpose |
+|---|---|---|---|
+| engine | `AUTO_IMPORT_UZ_FROM_RU` | on when `uz` is in `AUTO_IMPORT` | Uzbek works labelled Russian (0 = off) |
+| engine | `AUTO_IMPORT_UZ_FROM_RU_BATCH` | 100 | works listed per run in that pass |
+| engine | `AUTO_IMPORT_UZ_FROM_RU_MAX_COST` | 0.05 | USD cap per run for that pass |
+| engine | `ENGINE_QUEUE_SECONDS` | 60 | how long a search (or source check) waits for its turn |
+| website | `OPENALEX_MAX_QUERIES` | 8 | upper bound of OpenAlex excerpts per academic check (3–12) |
+| both | `ENGINE_API_KEY`, `ENGINE_URL` | — | unchanged: the private-network connection and its key |
+
+No payment, sign-in or report variables change.
+
 ## Part 4 — Checks before you approve the pull request
 
 Use only harmless sample text. Tick each item:
