@@ -28,7 +28,7 @@ Settings (website service; keys are secrets, set them only in Railway):
     PAYME_MERCHANT_ID, PAYME_TEST_KEY          (Payme sandbox merchant ID and test key)
     CLICK_SERVICE_ID, CLICK_MERCHANT_ID, CLICK_SECRET_KEY
     TOPUP_MIN=1000, TOPUP_MAX=2000000          (so'm)
-    PAYME_IKPU, PAYME_PACKAGE_CODE             (optional: fiscal item data returned to Payme)
+    PAYME_IKPU, PAYME_PACKAGE_CODE, PAYME_VAT_PERCENT   (optional fiscal data; both codes from tasnif.soliq.uz)
 Data is kept in the accounts database (auth.db_file()), tables orders, payme_tx, click_tx, ledger.
 """
 import base64
@@ -282,6 +282,55 @@ def refund(user, charge_id, amount_uzs, note):
                    (user["id"], _ms(), amount_uzs, str(charge_id), note[:120], mode()))
 
 
+def has_records(user):
+    """True when the accounts database holds payment rows for this user (the tables may not exist yet)."""
+    import auth
+    try:
+        with _lock, closing(sqlite3.connect(auth.db_file(), timeout=10)) as db:
+            return bool(db.execute("SELECT 1 FROM ledger WHERE user=? UNION SELECT 1 FROM orders WHERE user=? LIMIT 1",
+                                   (user["id"], user["id"])).fetchone())
+    except sqlite3.Error:
+        return False
+
+
+def _in_progress(db, orders):
+    if not orders:
+        return False
+    marks = ",".join("?" * len(orders))
+    return bool(db.execute(f"SELECT 1 FROM payme_tx WHERE state=1 AND order_id IN ({marks})", orders).fetchone()
+                or db.execute(f"SELECT 1 FROM click_tx WHERE state='prepared' AND created>? AND order_id IN ({marks})",
+                              [_ms() - 3_600_000] + orders).fetchone())
+
+
+def in_progress(user):
+    """True while a Payme transaction is open or a Click payment was prepared in the last hour."""
+    if not has_records(user):
+        return False
+    with _lock, closing(_connect()) as db:
+        return _in_progress(db, [r[0] for r in db.execute("SELECT id FROM orders WHERE user=?", (user["id"],))])
+
+
+def forget(user):
+    """Delete all of a user's payment records (orders, provider transactions, ledger) with the account.
+    Refused while a payment is in progress, so a provider never confirms money for a deleted order."""
+    with _lock, closing(_connect()) as db:
+        db.execute("BEGIN IMMEDIATE")
+        try:
+            orders = [r[0] for r in db.execute("SELECT id FROM orders WHERE user=?", (user["id"],))]
+            marks = ",".join("?" * len(orders))
+            if _in_progress(db, orders):
+                raise PaymentError("payment_in_progress", "A payment is still in progress. Try again in an hour.")
+            if orders:
+                db.execute(f"DELETE FROM payme_tx WHERE order_id IN ({marks})", orders)
+                db.execute(f"DELETE FROM click_tx WHERE order_id IN ({marks})", orders)
+            db.execute("DELETE FROM orders WHERE user=?", (user["id"],))
+            db.execute("DELETE FROM ledger WHERE user=?", (user["id"],))
+            db.execute("COMMIT")
+        except BaseException:
+            db.execute("ROLLBACK")
+            raise
+
+
 def attach_report(charge_id, report_id):
     if charge_id and report_id:
         with _lock, closing(_connect()) as db:
@@ -393,11 +442,11 @@ def _payme_order(db, params):
 
 def _detail(row):
     """Optional fiscal data (Payme "detail") when the owner set PAYME_IKPU."""
-    code = os.environ.get("PAYME_IKPU", "").strip()
-    if not code:
+    code, package = os.environ.get("PAYME_IKPU", "").strip(), os.environ.get("PAYME_PACKAGE_CODE", "").strip()
+    if not code or not package:                    # Payme requires both for fiscal data
         return None
     return {"receipt_type": 0, "items": [{"title": "PlagIQ balance top-up", "price": row["pay_uzs"] * 100, "count": 1,
-                                          "code": code, "package_code": os.environ.get("PAYME_PACKAGE_CODE", "").strip(),
+                                          "code": code, "package_code": package,
                                           "vat_percent": int(os.environ.get("PAYME_VAT_PERCENT", "0") or 0)}]}
 
 

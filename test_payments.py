@@ -25,7 +25,7 @@ def pay(monkeypatch, tmp_path):
                         "CLICK_SERVICE_ID": "101", "CLICK_MERCHANT_ID": "202", "CLICK_SECRET_KEY": CLICK_SECRET,
                         "PUBLIC_ORIGIN": "https://plagiq.example"}.items():
         monkeypatch.setenv(name, value)
-    for name in ("LOGIN_REQUIRED", "SESSION_SECRET", "PRIVATE_PILOT_USER", "PRIVATE_PILOT_PASSWORD", "PAYME_IKPU"):
+    for name in ("LOGIN_REQUIRED", "SESSION_SECRET", "PRIVATE_PILOT_USER", "PRIVATE_PILOT_PASSWORD", "PAYME_IKPU", "PAYME_PACKAGE_CODE"):
         monkeypatch.delenv(name, raising=False)
     web.RATE.clear(); web.results.clear()
     return TestClient(web.app, base_url="https://plagiq.example")
@@ -173,9 +173,10 @@ def test_payme_fiscal_detail_only_when_configured(pay, monkeypatch):
     order = new_order(pay)
     params = {"amount": 2000000, "account": {"order_id": order["id"]}}
     assert "detail" not in rpc(pay, "CheckPerformTransaction", params)["result"]
-    monkeypatch.setenv("PAYME_IKPU", "10305008002000000")
+    monkeypatch.setenv("PAYME_IKPU", "12345678901234567")
+    monkeypatch.setenv("PAYME_PACKAGE_CODE", "000000")    # dummy test values, not real codes
     item = rpc(pay, "CheckPerformTransaction", params)["result"]["detail"]["items"][0]
-    assert item["code"] == "10305008002000000" and item["price"] == 2000000 and item["count"] == 1
+    assert item["code"] == "12345678901234567" and item["price"] == 2000000 and item["count"] == 1
 
 
 # ------------------------------------------------------------- Click
@@ -310,3 +311,48 @@ def test_packages_credit_bonus(pay):
     assert first["pay_uzs"] == 150000 and first["credit_uzs"] == 180000
     order = new_order(pay, package=first["id"], amount=None)
     assert order["pay_uzs"] == 150000 and order["credit_uzs"] == 180000
+
+
+# ------------------------------------------------------------- erasure
+
+def test_delete_account_erases_payment_records(pay):
+    sign_in(pay)
+    top_up(pay, 20000)
+    run_check(pay, EN * 7)
+    click_order = new_order(pay, "click", 15000)
+    assert balance(pay) == 5000
+    assert pay.delete("/api/me").status_code == 200
+    import sqlite3
+    with sqlite3.connect(auth.db_file()) as db:
+        for table in ("orders", "ledger", "payme_tx", "click_tx"):
+            assert db.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0] == 0, table
+    sign_in(pay)                                   # same Telegram ID signs in again: nothing is left
+    account = pay.get("/api/payments").json()["account"]
+    assert account == {"balance_uzs": 0, "ledger": [], "orders": []}
+    assert pay.post("/payments/click/prepare", data=click_form(click_order["id"], "15000", 0)).json()["error"] == -5
+
+
+def test_delete_refused_while_payment_in_progress(pay):
+    sign_in(pay)
+    order = new_order(pay)
+    rpc(pay, "CreateTransaction", {"id": "g" * 24, "time": 1, "amount": 2000000, "account": {"order_id": order["id"]}})
+    r = pay.delete("/api/me")
+    assert r.status_code == 409 and r.json()["code"] == "payment_in_progress"
+    assert pay.get("/api/me").json()["user"]                                     # account kept
+    rpc(pay, "CancelTransaction", {"id": "g" * 24, "reason": 3})
+    assert pay.delete("/api/me").status_code == 200
+
+
+def test_delete_without_payments_tables(pay, monkeypatch):
+    monkeypatch.setenv("PAYMENTS_ENABLED", "0")
+    sign_in(pay)
+    assert pay.delete("/api/me").status_code == 200
+
+
+def test_fiscal_detail_needs_both_codes(pay, monkeypatch):
+    sign_in(pay)
+    order = new_order(pay)
+    params = {"amount": 2000000, "account": {"order_id": order["id"]}}
+    monkeypatch.setenv("PAYME_IKPU", "12345678901234567")
+    monkeypatch.delenv("PAYME_PACKAGE_CODE", raising=False)
+    assert "detail" not in rpc(pay, "CheckPerformTransaction", params)["result"]
