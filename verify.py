@@ -37,8 +37,9 @@ def facts(result, identifier):
     """The signed facts for one report."""
     mode = result.get("mode", "reference")
     if mode == "academic":
-        compared = (result.get("fulltext") or {}).get("compared", 0) + (result.get("web") or {}).get("compared", 0) + sum(
-            1 for s in result.get("sources") or [] if s.get("coverage") == "abstract")
+        compared = (result.get("fulltext") or {}).get("compared", 0) + (result.get("web") or {}).get("compared", 0) + (
+            result["abstract_count"] if "abstract_count" in result else
+            sum(1 for s in result.get("sources") or [] if s.get("coverage") == "abstract"))
     elif mode == "corpus":
         compared = result.get("source_count") or 0
     else:

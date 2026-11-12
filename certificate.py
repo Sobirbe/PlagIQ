@@ -24,7 +24,7 @@ C = {
         scope="Scope", scopes=dict(academic="Open academic publications found through OpenAlex{w}",
                                    reference="Comparison with one reference document supplied by the user",
                                    corpus="PlagIQ private corpus of authorized texts"),
-        scope_web=" and the web ({p})",
+        scope_web=" and the web ({p})", scope_library=", and the PlagIQ library", src_library=" · PlagIQ library: {n}",
         verify="Verify this certificate", verify_v="Scan the QR code, or open the link, to confirm that PlagIQ issued it with these figures.",
         verify_off="Online verification is not enabled on this server.",
         issued="Issued electronically by PlagIQ", details="Full evidence (every matched passage and source) on the following pages.",
@@ -45,6 +45,7 @@ C = {
                                    reference="Сравнение с одним документом, предоставленным пользователем",
                                    corpus="Внутренний корпус PlagIQ с разрешёнными текстами"),
         scope_web=" и интернет ({p})",
+        scope_library=", а также библиотека PlagIQ", src_library=" · библиотека PlagIQ: {n}",
         verify="Проверить сертификат", verify_v="Отсканируйте QR-код или откройте ссылку, чтобы убедиться, что PlagIQ выдал его с этими данными.",
         verify_off="Онлайн-проверка на этом сервере не настроена.",
         issued="Выдан в электронном виде PlagIQ", details="Полные доказательства (все совпадения и источники) — на следующих страницах.",
@@ -65,6 +66,7 @@ C = {
                                    reference="Foydalanuvchi bergan bitta hujjat bilan solishtirish",
                                    corpus="PlagIQ ichki korpusidagi ruxsat berilgan matnlar"),
         scope_web=" va internet ({p})",
+        scope_library=" hamda PlagIQ kutubxonasi", src_library=" · PlagIQ kutubxonasi: {n}",
         verify="Sertifikatni tekshirish", verify_v="PlagIQ uni aynan shu ma’lumotlar bilan berganini tasdiqlash uchun QR kodni skanerlang yoki havolani oching.",
         verify_off="Bu serverda onlayn tekshirish sozlanmagan.",
         issued="PlagIQ tomonidan elektron shaklda berilgan", details="To‘liq dalillar (barcha mos parchalar va manbalar) keyingi sahifalarda.",
@@ -88,9 +90,13 @@ def facts(result, lang):
     mode = result.get("mode", "reference")
     web = result.get("web") or {}
     if mode == "academic":
-        abstracts = sum(1 for s in result.get("sources") or [] if s.get("coverage") == "abstract")
+        abstracts = result["abstract_count"] if "abstract_count" in result else \
+            sum(1 for s in result.get("sources") or [] if s.get("coverage") == "abstract")
+        library = result.get("library") or {}
         sources = t["src_academic"].format(f=(result.get("fulltext") or {}).get("compared", 0), a=abstracts,
                                            w=t["src_web"].format(n=web.get("compared", 0)) if web.get("enabled") else "")
+        if library.get("searched"):
+            sources += t["src_library"].format(n=library.get("size", 0))
     elif mode == "ai":
         sources = t["src_ai"]
     elif mode == "corpus":
@@ -109,6 +115,8 @@ def facts(result, lang):
     signals = len(integrity.get("signals") or [])
     providers = ", ".join(web.get("providers") or [])
     scope = t["scope_ai"] if mode == "ai" else t["scopes"].get(mode, "").format(w=t["scope_web"].format(p=providers) if web.get("enabled") else "")
+    if mode == "academic" and (result.get("library") or {}).get("searched"):
+        scope += t["scope_library"]
     rows = [(t["sources"], sources)] + ([] if mode == "ai" else [(t["exclusions"], ", ".join(chosen) or t["ex_none"])])
     ai = result.get("ai") or {}
     if ai.get("status") == "done":
