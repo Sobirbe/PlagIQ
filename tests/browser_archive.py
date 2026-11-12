@@ -93,7 +93,9 @@ try:
             for expected in ('Suv resurslarini boshqarish', 'Dilnoza', 'PlagIQ archive (unpublished; text not shown)',
                              'Text not shown: unpublished work in the PlagIQ archive', 'Author’s deposit'):
                 assert expected in item, (expected, item)
-            assert 'Magistrlik dissertatsiyasi' not in item                       # source text never shown
+            source_side = student.locator('#source-list .source-item').first.locator('.pair > div:not(.mine)').first.inner_text()
+            assert 'Magistrlik dissertatsiyasi' not in source_side and 'Text not shown' in source_side   # archived text hidden
+            assert 'Your text' in item                                                # the student's own passage is shown
             if SHOTS:
                 student.locator('#result').screenshot(path=str(SHOTS / f'archive-match-{width}.png'))
             # the author removes the work; the copy is no longer found
