@@ -83,7 +83,7 @@ def checklist(library, probe=""):
         ("Payments (test mode only)", payments.enabled() or (None if os.environ.get("PAYMENTS_ENABLED") != "1" else False),
          "on: " + ", ".join(payments.providers()) + " (sandbox; no real money)" if payments.enabled() else
          "off (optional)" if os.environ.get("PAYMENTS_ENABLED") != "1" else payments.problem(),
-         "PAYMENTS_ENABLED=1, PAYMENTS_MODE=test and the Payme and/or Click test keys on the website (Part 3o)"),
+         "PAYMENTS_ENABLED=1, PAYMENTS_MODE=test and the Payme, Click and/or Uzum test credentials on the website (Part 3o)"),
         ("Partner universities", bool(institutions.configured()) or None, ", ".join(institutions.configured()) or "none yet (optional)",
          "INSTITUTIONS on the website (Part 3l)"),
     ]

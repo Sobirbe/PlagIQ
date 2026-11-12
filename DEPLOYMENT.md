@@ -387,9 +387,9 @@ To change the plans, add a `PRICING_TIERS` variable to the website service in Ra
 
 Keep the ids `free`, `researcher`, `extended`, `thesis` and `phd`, which have names and descriptions in all three languages. Change only the numbers. If the value is invalid, the site quietly uses the defaults. Before charging real money, measure the real cost per check; switching from test mode to real payments needs a separate, reviewed change (Part 3o).
 
-## Part 3o — Payments with Payme and Click (TEST MODE ONLY)
+## Part 3o — Payments with Payme, Click and Uzum Bank (TEST MODE ONLY)
 
-This version takes **sandbox payments only**: it refuses to switch on unless `PAYMENTS_MODE=test`, it sends Payme users to the Payme sandbox (test.paycom.uz), and every page, receipt and the /admin dashboard says "TEST MODE". Real payments need a later, separately reviewed change. Uzum Bank is not included yet.
+This version takes **sandbox payments only**: it refuses to switch on unless `PAYMENTS_MODE=test`, it sends Payme users to the Payme sandbox (test.paycom.uz), and every page, receipt and the /admin dashboard says "TEST MODE". Real payments need a later, separately reviewed change.
 
 **How it works.** A signed-in user tops up a balance (any amount between `TOPUP_MIN` and `TOPUP_MAX`, or a package: "10 checks + 2 free" means paying 10 × the plan price and getting 12 × the plan price on the balance). Each check costs its plan price (Part 3d), plus the AI-detector price if chosen; Free-plan checks cost nothing. The price is taken before the check and given back automatically if the check fails, or (for the AI part) if the AI detector could not run, for example for Uzbek text. Each paid top-up has a printable receipt in the account menu. This receipt confirms the payment; it is not a fiscal receipt.
 
@@ -397,16 +397,31 @@ This version takes **sandbox payments only**: it refuses to switch on unless `PA
 1. In the Payme cabinet, set the **endpoint URL** to `https://plagiq-production.up.railway.app/payments/payme`, the account field to **`order_id`**, and the account type to **one-time** ("Одноразовый").
 2. On the **website** service in Railway → **Variables**, add: `PAYMENTS_ENABLED=1`, `PAYMENTS_MODE=test`, `PAYME_MERCHANT_ID` (the cashbox ID) and `PAYME_TEST_KEY` (the **test** key from the cabinet). Type the key only into Railway; never paste it into a chat or a file.
 3. Open the sandbox and run its tests: wrong key (−32504), wrong amount (−31001), non-existent order (−31050), then create, repeat create, perform, cancel. For an order number and amount, start a top-up on the site and copy the order number from the sandbox checkout page.
-4. Optional, for Payme's fiscal data: `PAYME_IKPU` (the IKPU/MXIK code of the service), `PAYME_PACKAGE_CODE`, `PAYME_VAT_PERCENT`.
+4. Optional: fiscal (tax) data sent to Payme with each payment. PlagIQ sends it only when both codes are set:
+   - `PAYME_IKPU`: the 17-digit IKPU (MXIK) code of the service. Find it on **tasnif.soliq.uz**: search for the service (for example "dasturiy ta'minot" / "программное обеспечение" / information services), open the result that describes it, and copy its code. Pick the entry that describes *what PlagIQ sells*: online access to a software service for checking documents. Entries about multimedia or entertainment content do not fit. Your accountant should confirm the choice; PlagIQ cannot pick it for you.
+   - `PAYME_PACKAGE_CODE`: the package (unit) code shown in the details of that same IKPU entry on tasnif.soliq.uz.
+   - `PAYME_VAT_PERCENT`: your VAT rate, for example `0` if you are not a VAT payer. Ask your accountant.
+   Payme puts these on the fiscal receipt it issues.
 
 **Click** (docs: docs.click.uz/shop-api):
 1. Ask Click for a **test service** and give them the Prepare URL `…/payments/click/prepare` and the Complete URL `…/payments/click/complete`.
 2. Add `CLICK_SERVICE_ID`, `CLICK_MERCHANT_ID` and `CLICK_SECRET_KEY` to the website service.
 3. Use Click's Playground (docs.click.uz/testing/playground) to send Prepare and Complete requests. Click has no separate sandbox website, so **use only the test service's keys**. A live service's keys would take real money even though PlagIQ says "test".
 
+**Uzum Bank** (Merchant API; docs: developer.uzumbank.uz/merchant):
+1. Ask Uzum Bank's business team for a **test service** for the Merchant API. They issue the service ID (`serviceId`) and a login and password for the webhooks.
+2. Give them the five webhook addresses: `https://plagiq-production.up.railway.app/payments/uzum/check`, `…/create`, `…/confirm`, `…/reverse` and `…/status`. The payment attribute is **`account`**, which is the PlagIQ order number.
+3. Add `UZUM_SERVICE_ID`, `UZUM_LOGIN` and `UZUM_PASSWORD` to the website service. Add `UZUM_SERVICE_NAME` too: the service name as it appears in the Uzum Bank app, which PlagIQ shows the user.
+4. Uzum has **no payment link**. After "Pay with Uzum Bank", PlagIQ shows the order number and these steps: open the Uzum Bank app → Payments → find the service → enter the order number. Uzum also has no public sandbox, so as with Click, **use only the test service's credentials**.
+5. Rules from Uzum's specification, all implemented:
+   - every webhook needs HTTP Basic auth;
+   - errors are HTTP 400 with `errorCode` 10001–10018;
+   - a transaction not confirmed within 30 minutes is treated as failed, and the order can then be paid again;
+   - a confirmed top-up can be reversed only while its balance is unspent (otherwise 10017).
+
 **Optional:** `TOPUP_MIN` (default 1000), `TOPUP_MAX` (default 2000000), `SELLER_NAME` and `SELLER_TIN` (shown on receipts).
 
-**What is stored:** orders, provider transactions and the balance ledger, in the accounts database on the website's `/data` volume (it is included in the accounts backup on /admin). These records are kept when a user deletes their account, for accounting. Card details never reach PlagIQ. The privacy notice says this; have the retention period confirmed by your lawyer.
+**What is stored:** orders, provider transactions and the balance ledger, in the accounts database on the website's `/data` volume (it is included in the accounts backup on /admin). **Deleting an account deletes all of its payment records** (orders, Payme and Click transactions, ledger), and any unspent balance is lost; the confirmation says so and shows the balance. Deletion is refused while a payment is still in progress (an open Payme transaction, or a Click payment prepared in the last hour), so a provider never confirms money for a deleted order. After deletion, Payme's statement (GetStatement) no longer lists that user's transactions; keep your own exports from the Payme and Click cabinets if your accountant needs them. Card details never reach PlagIQ.
 
 **Turning it off:** set `PAYMENTS_ENABLED=0` (or delete it). Checks become free again; balances stay stored.
 

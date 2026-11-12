@@ -363,12 +363,19 @@ async def delete_me(request: Request):
     user = auth.read(request.cookies.get(auth.COOKIE))
     if not user:
         raise ApiError(401, "login_required", "Sign in with Telegram first.")
+    if await run_in_threadpool(payments.in_progress, user):
+        raise ApiError(409, "payment_in_progress", "A payment is still in progress; the account was kept. Try again in an hour.")
     if corpus_configured():                    # the right to erasure covers archived works too
         try:
             for item in await engine_client.list_deposits(auth.owner_id(user)):
                 await engine_client.remove_deposit(item["id"], auth.owner_id(user))
         except EngineError as exc:
             raise ApiError(503, exc.code, "Archived works could not be removed; the account was kept. Try again later.")
+    if await run_in_threadpool(payments.has_records, user):      # erasure covers payment records and the balance
+        try:
+            await run_in_threadpool(payments.forget, user)
+        except payments.PaymentError as exc:
+            raise ApiError(409, exc.code, str(exc))
     await run_in_threadpool(auth.forget, user)
     response = JSONResponse({"deleted": True})
     response.delete_cookie(auth.COOKIE)
@@ -597,7 +604,7 @@ def payments_receipt_html(row, user):
     test = row["mode"] == "test"
     lines = [("Order / Buyurtma / Заказ", row["id"]), ("Date / Sana / Дата", when),
              ("Customer / Mijoz / Клиент", user["name"]),
-             ("Paid with / To‘lov / Оплата", {"payme": "Payme", "click": "Click"}.get(row["provider"], row["provider"])),
+             ("Paid with / To‘lov / Оплата", {"payme": "Payme", "click": "Click", "uzum": "Uzum Bank"}.get(row["provider"], row["provider"])),
              ("Paid / To‘langan / Оплачено", f"{row['pay_uzs']:,} so'm".replace(",", " ")),
              ("Added to balance / Balansga / На баланс", f"{row['credit_uzs']:,} so'm".replace(",", " ")),
              ("Provider reference", row.get("provider_ref") or "—"),
@@ -623,6 +630,13 @@ async def payme_endpoint(request: Request):
     body = await request.body()
     reply = await run_in_threadpool(payments.payme, body, request.headers.get("authorization", ""))
     return JSONResponse(reply, 200)
+
+
+@app.post("/payments/uzum/{method}")
+async def uzum_endpoint(method: str, request: Request):
+    body = await request.body()
+    status, reply = await run_in_threadpool(payments.uzum, method, body, request.headers.get("authorization", ""))
+    return JSONResponse(reply, status)
 
 
 @app.post("/payments/click/{stage}")
