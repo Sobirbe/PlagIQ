@@ -137,7 +137,7 @@ def run(lang, batch=1000, min_words=300, source=None, db_path=None, root=None):
     state = json.loads(state_path.read_text("utf-8")) if state_path.exists() else {"position": 0, "pages": {}}
     source = source or DUMP_URL.format(lang=lang)
     counts = {"imported": 0, "updated": 0, "unchanged": 0, "skipped_short": 0, "skipped_language": 0, "failed": 0}
-    error, position, finished, failures = None, 0, False, []
+    error, note, position, finished, failures = None, None, 0, False, []
     today = datetime.now(timezone.utc).date().isoformat()
     cap = max_articles()
     try:
@@ -147,7 +147,7 @@ def run(lang, batch=1000, min_words=300, source=None, db_path=None, root=None):
                 if position <= state["position"]:
                     continue                                   # done in an earlier run
                 if have + counts["imported"] >= cap and not state["pages"].get(str(page_id)):
-                    error = f"Wikipedia limit reached ({cap} {lang} articles, WIKIPEDIA_MAX_ARTICLES)"
+                    note = f"Wikipedia limit reached ({cap} {lang} articles, WIKIPEDIA_MAX_ARTICLES): not a fault"
                     position -= 1
                     break
                 if counts["imported"] + counts["updated"] >= batch:
@@ -195,7 +195,7 @@ def run(lang, batch=1000, min_words=300, source=None, db_path=None, root=None):
     root.mkdir(parents=True, exist_ok=True)
     state_path.write_text(json.dumps(state), "utf-8")
     status = {"language": lang, "source": "wikipedia", "finished": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-              **counts, "failure_examples": failures, "dump_complete": finished, "error": error, "corpus_sources": sources, "corpus_version": version}
+              **counts, "failure_examples": failures, "dump_complete": finished, "error": error, "note": note, "corpus_sources": sources, "corpus_version": version}
     status_path = root / "import-status.json"
     data = json.loads(status_path.read_text("utf-8")) if status_path.exists() else {}
     data[f"wikipedia-{lang}"] = status

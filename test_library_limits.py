@@ -51,7 +51,7 @@ def test_wikipedia_stops_at_its_cap(tmp_path, monkeypatch):
     source.write_bytes(dump(6))
     status = wikipedia_import.run("uz", batch=100, min_words=20, source=str(source), db_path=str(tmp_path / "c.db"),
                                   root=tmp_path)
-    assert status["imported"] == 3 and "WIKIPEDIA_MAX_ARTICLES" in status["error"]
+    assert status["imported"] == 3 and status["error"] is None and "WIKIPEDIA_MAX_ARTICLES" in status["note"]
     again = wikipedia_import.run("uz", batch=100, min_words=20, source=str(source), db_path=str(tmp_path / "c.db"),
                                  root=tmp_path)
     assert again["imported"] == 0                                             # still capped

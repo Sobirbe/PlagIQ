@@ -126,10 +126,12 @@ def page(library, probe=""):
                        "Room to raise CORPUS_MAX_SOURCES step by step.") + "</p>")
         imports = library.get("imports") or {}
         if imports:
-            lib += "<h3>Automatic imports</h3><table><tr><th>Import</th><th>Last run</th><th>Imported</th><th>Problem</th></tr>"
+            lib += "<h3>Automatic imports</h3><table><tr><th>Import</th><th>Last run</th><th>Imported</th><th>Problem or note</th></tr>"
             lib += "".join(f"<tr><td>{esc(k)}</td><td>{esc(str(v.get('finished') or '—'))[:19]}</td>"
                            f"<td>{esc(str(v.get('imported') if v.get('imported') is not None else '—'))}</td>"
-                           f"<td>{esc(str(v.get('error') or ''))[:160]}</td></tr>" for k, v in sorted(imports.items()))
+                           f"<td>{esc(str(v.get('error') or ''))[:160]}"
+                           + (f"<span class=\"note\">{esc(str(v['note']))[:160]}</span>" if v.get("note") else "")
+                           + "</td></tr>" for k, v in sorted(imports.items()))
             lib += "</table>"
         else:
             lib += "<p>No automatic import has run yet (AUTO_IMPORT… settings on the engine, Parts 2, 3m, 3n).</p>"
@@ -160,7 +162,7 @@ def page(library, probe=""):
             f'main{{max-width:980px;margin:24px auto;padding:0 16px}}section{{background:#fff;border:1px solid #dce6e5;border-radius:14px;padding:18px;margin:0 0 16px;overflow-x:auto}}'
             f'h1{{font-size:24px}}h2{{font-size:18px;margin:0 0 10px}}h3{{font-size:15px}}table{{border-collapse:collapse;width:100%;font-size:14px}}'
             f'th,td{{text-align:left;padding:7px 8px;border-bottom:1px solid #e6eeed;vertical-align:top}}td.h{{color:#7a4a00;font-size:13px}}'
-            f'.warn{{color:#9b2c16;font-weight:700}}code{{background:#f2f4f4;padding:1px 4px;border-radius:4px}}</style></head><body><main>'
+            f'.warn{{color:#9b2c16;font-weight:700}}.note{{color:#51676a}}code{{background:#f2f4f4;padding:1px 4px;border-radius:4px}}</style></head><body><main>'
             f'<h1>PlagIQ owner dashboard</h1><section><h2>Setup checklist</h2><table>{rows}</table></section>'
             f'<section><h2>Library</h2>{lib}</section><section><h2>Usage</h2>{use}</section><section><h2>Payments</h2>{pay}</section>'
             f'<section><h2>Backups</h2>{backup}</section></main></body></html>')

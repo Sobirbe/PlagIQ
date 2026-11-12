@@ -72,3 +72,11 @@ def test_admin_shows_proxy_setting(monkeypatch):
     assert row[1] is False and "share one allowance" in row[2]
     monkeypatch.setenv("TRUSTED_PROXY_HOPS", "1")
     assert next(r for r in admin.checklist(None) if r[0].startswith("Visitors told apart"))[1] is True
+
+
+def test_admin_shows_limit_as_note_not_problem():
+    import admin
+    page = admin.page({"available": True, "total": 1, "by_source": {"wikipedia": 1},
+                       "imports": {"wikipedia-uz": {"finished": "2026-11-12T09:15:22", "imported": 0, "error": None,
+                                                    "note": "Wikipedia limit reached (500 uz articles, WIKIPEDIA_MAX_ARTICLES): not a fault"}}})
+    assert '<span class="note">Wikipedia limit reached' in page and "Problem or note" in page

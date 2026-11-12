@@ -320,7 +320,7 @@ async def library():
                 "total": _int(data.get("total", 0), 0, 10**9),
                 "disk": {k: _int((data.get("disk") or {}).get(k, 0), 0, 10**15) for k in ("db_bytes", "staging_bytes", "free_bytes", "total_bytes")}
                         if isinstance(data.get("disk"), dict) else None,
-                "imports": {str(k)[:40]: {f: v.get(f) for f in ("finished", "imported", "error", "staged", "journals", "downloaded")
+                "imports": {str(k)[:40]: {f: v.get(f) for f in ("finished", "imported", "error", "note", "staged", "journals", "downloaded")
                                           if isinstance(v.get(f), (int, str, type(None)))}
                             for k, v in (data.get("imports") or {}).items() if isinstance(v, dict)},
                 "by_source": {k: _int(v, 0, 10**9) for k, v in (data.get("by_source") or {}).items()
