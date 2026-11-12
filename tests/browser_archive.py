@@ -52,10 +52,11 @@ try:
             page = ctx.new_page()
             page.goto('http://127.0.0.1:8149')
             page.locator('[data-lang=en]').click()
-            page.wait_for_selector('#account button.tg')
+            page.wait_for_selector('#account summary.signin-open')
+            page.locator('#account summary.signin-open').click()
             with page.expect_popup():
                 page.locator('#account button.tg').click()
-            page.wait_for_selector('#account summary')
+            page.wait_for_selector('#account summary:not(.signin-open)')
             return page
 
         def run(page, name, text, mode='reference'):

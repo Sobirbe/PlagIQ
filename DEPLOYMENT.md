@@ -244,16 +244,23 @@ The result is "Review suggested" or "No indicators found". Neither is a verdict:
 
 To switch the DOI lookups off, set `INTEGRITY_DOI_CHECK=0` on the website service.
 
-## Part 3i — Sign-in with Telegram
+## Part 3i — Sign-in (Telegram, phone number, email)
 
-Users sign in with their Telegram account before running a check. PlagIQ stores only their Telegram ID, name, username and a list of their checks (date, mode, word count, result and AI estimate). It never stores documents or file names. Users can delete their account from the menu.
+People can sign in in three ways, all under the "Sign in" button at the top of the site:
+- **Telegram:** "Sign in with Telegram" on the website (steps 1–5 below).
+- **Phone number through the Telegram bot** (needs step 6): the person opens the bot, presses "📱 Share my number", and the bot replies with a one-time sign-in link (valid 10 minutes). Only the sender's *own* number is accepted (Telegram tells the bot whose number it is). The link opens the site in Telegram's built-in browser; people who prefer their usual browser can choose "Open in browser".
+- **Email and password:** on by default (`EMAIL_LOGIN=0` turns it off). **No email is sent and the address is not verified**: the email is only a login name. The password is stored only as a scrypt hash, and after 10 wrong passwords that email and that connection must wait 15 minutes. If someone forgets their password, the account cannot be recovered; they create a new one. Email-only sites (no Telegram bot) need `SESSION_SECRET` (32+ characters) to sign sessions.
+
+**Without an account:** plagiarism checks of texts up to `ANON_MAX_WORDS` words (default **1000**, the Free plan) need no sign-in. Longer texts, the AI detector, the archive and paid checks always need an account. `ANON_MAX_WORDS=0` makes every check need sign-in.
+
+PlagIQ stores the Telegram ID, name and username; the phone number only if the person shares it with the bot; the email and password hash for email accounts; and a list of checks (date, mode, word count, result and AI estimate). It never stores documents or file names. Users can delete their account from the menu.
 
 1. In Telegram, open **@BotFather** and send `/newbot`. Name it, for example `PlagIQ`, with a username such as `plagiq_uz_bot`. BotFather replies with a **token**, which is a secret.
 2. Still in @BotFather, send `/setdomain`, choose your bot, and send your site address without `https://`, for example `plagiq-production.up.railway.app`. Without this step Telegram refuses the sign-in.
 3. Railway → **website** service → **Settings → Volumes** → add a volume mounted at **`/data`**. Accounts are kept there, so they survive redeploys. Without a volume, accounts are lost at each deploy.
 4. Railway → **website** service → **Variables**: add `TELEGRAM_BOT_TOKEN` = the token, and `TELEGRAM_BOT_USERNAME` = the bot username without @. Deploy.
 5. Open the site. "Sign in with Telegram" appears at the top. Checks need sign-in by default; set `LOGIN_REQUIRED=0` to make it optional.
-6. Recommended: make the bot answer people who open it and press **/start** (otherwise it stays silent, and they think sign-in is broken). Add `TELEGRAM_BOT_REPLIES=1` on the website service and redeploy. At start-up the site registers its address (`PUBLIC_ORIGIN` + `/telegram/webhook`) with Telegram. From then on the bot replies, in the user's Telegram language, with how to sign in and a button that opens the site. /admin shows "Bot answers /start" ✅ once Telegram has accepted it. The bot stores nothing. Do not turn this on if the same bot is already used by another program, because a bot can have only one webhook.
+6. Recommended: make the bot answer people who open it and press **/start**, and turn on sign-in by phone number (otherwise the bot stays silent, and people think sign-in is broken). Add `TELEGRAM_BOT_REPLIES=1` on the website service and redeploy. At start-up the site registers its address (`PUBLIC_ORIGIN` + `/telegram/webhook`) with Telegram. From then on the bot replies, in the user's Telegram language, with how to sign in and a "📱 Share my number" button, and the site shows "With my phone number (Telegram bot)" in the sign-in menu. /admin shows "Bot answers /start" ✅ once Telegram has accepted it. The bot stores only the phone numbers people choose to share. Do not turn this on if the same bot is already used by another program, because a bot can have only one webhook.
 
 The QR verification page (`/verify`) stays public, so supervisors can scan certificates without an account.
 

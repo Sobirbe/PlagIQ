@@ -326,10 +326,59 @@ async def telegram_login(request: Request):
     if not user:
         raise ApiError(401, "login_failed", "Telegram sign-in could not be verified.")
     await run_in_threadpool(auth.remember, user)
-    response = JSONResponse({"user": user})
+    return signed_in_response(request, JSONResponse({"user": user}), user)
+
+
+def signed_in_response(request, response, user):
     response.set_cookie(auth.COOKIE, auth.issue(user), max_age=auth.SESSION_DAYS * 86400, httponly=True,
                         secure=_secure(request), samesite="strict")
     return response
+
+
+async def _account_form(request):
+    try:
+        data = await request.json()
+    except ValueError:
+        raise ApiError(400, "invalid_request", "Invalid request.")
+    if not isinstance(data, dict):
+        raise ApiError(400, "invalid_request", "Invalid request.")
+    return data
+
+
+@app.post("/auth/register")
+async def email_register(request: Request):
+    """Email + password account. Nothing is sent to the address and it is not verified."""
+    data = await _account_form(request)
+    rate_limit(request)                        # the hourly pilot limit also caps account creation
+    try:
+        user = await run_in_threadpool(auth.register_email, data.get("email"), data.get("password"), data.get("name", ""))
+    except auth.AccountError as exc:
+        raise ApiError(exc.status, exc.code, str(exc))
+    return signed_in_response(request, JSONResponse({"user": user}), user)
+
+
+@app.post("/auth/login")
+async def email_login(request: Request):
+    data = await _account_form(request)
+    try:
+        user = await run_in_threadpool(auth.login_email, data.get("email"), data.get("password"), client_key(request))
+    except auth.AccountError as exc:
+        raise ApiError(exc.status, exc.code, str(exc))
+    return signed_in_response(request, JSONResponse({"user": user}), user)
+
+
+@app.get("/auth/bot", response_class=HTMLResponse)
+async def bot_link(request: Request, t: str = ""):
+    """One-time link the Telegram bot sends after the user shared their own phone number."""
+    user = await run_in_threadpool(auth.use_login_link, t) if auth.telegram_enabled() else None
+    if not user:
+        return HTMLResponse('<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width">'
+                            '<p style="font-family:system-ui;padding:20px">This sign-in link has expired or was already used. '
+                            'Send /start to the bot again. · Havola eskirgan yoki ishlatilgan: botga qayta /start yuboring. · '
+                            'Ссылка устарела или уже использована: отправьте боту /start ещё раз.</p>', 410)
+    page = HTMLResponse('<!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="0;url=/">'
+                        '<p style="font-family:system-ui;padding:20px"><a href="/">PlagIQ</a></p>')
+    return signed_in_response(request, page, user)
 
 
 @app.post("/telegram/webhook")
@@ -680,8 +729,9 @@ async def check(request:Request, submission:UploadFile=File(...),
     global active_scans
     purge_reports()
     user = auth.read(request.cookies.get(auth.COOKIE))
-    if auth.required() and not user:
-        raise ApiError(401, "login_required", "Sign in with Telegram to run a check.")
+    anonymous = auth.required() and not user
+    if anonymous and (not auth.anon_max_words() or mode == "ai" or ai_check or archive):
+        raise ApiError(401, "login_required", "Sign in to run this check.")
     if language not in ("uz","ru","en"):
         raise ApiError(400, "invalid_language", "Invalid language")
     if mode not in ("reference","academic","corpus","ai"):
@@ -714,16 +764,22 @@ async def check(request:Request, submission:UploadFile=File(...),
         raise ApiError(503, "server_busy", "PlagIQ is processing other documents. Try again in a minute.")
     rate_limit(request)
     original, price, charge_id = None, 0, None
+    if anonymous:                              # short texts can be checked without an account
+        original = await read_file(submission)
+        if pricing.count_words(original) > auth.anon_max_words():
+            raise ApiError(401, "login_required_long",
+                           f"Texts over {auth.anon_max_words()} words need sign-in. Sign in and check again.")
     if payments.enabled():
         # The price is known from the word count before anything is checked; it is taken from the
         # balance first and given back if the check fails.
-        if not user:
-            raise ApiError(401, "login_required", "Sign in with Telegram to run a check.")
-        original = await read_file(submission)
+        if original is None:
+            original = await read_file(submission)
         words = pricing.count_words(original)
         price = payments.price_for(mode, words, ai_check)
         if price is None:
             raise ApiError(413, "too_long_for_plans", "The document is larger than the biggest plan. Contact us.")
+        if not user and price > 0:             # only free checks without an account
+            raise ApiError(401, "login_required_long", "Sign in to pay for this check.")
         try:
             charge_id = await run_in_threadpool(payments.charge, user, price, f"{mode} check, {words} words"
                                                 + (", AI detector" if ai_check else ""))

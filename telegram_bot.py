@@ -1,15 +1,16 @@
 """Replies from the PlagIQ Telegram bot.
 
-Sign-in happens on the website ("Sign in with Telegram"), so the bot itself is not needed for it.
-People who open the bot and press /start would otherwise get no answer; with this switched on,
-the bot replies (in Uzbek, Russian or English, from the user's Telegram language) with how to
-sign in and a button that opens the site.
+With this switched on, the bot answers private messages (in Uzbek, Russian or English, from the
+user's Telegram language): it explains how to sign in and offers a "share my number" button.
+When the user shares their OWN number (Telegram's contact button; contact.user_id must equal the
+sender), PlagIQ stores the number with the account and replies with a one-time sign-in link
+(/auth/bot?t=..., valid 10 minutes).
 
 Settings (website service):
   TELEGRAM_BOT_REPLIES=1   turn replies on. At start-up the site registers its webhook
                            (PUBLIC_ORIGIN + /telegram/webhook) with Telegram's setWebhook,
                            using a secret token derived from the bot token. Needs PUBLIC_ORIGIN (https).
-The bot only answers messages; it stores nothing and logs no message text.
+The bot logs no message text; it stores only the phone number a user chooses to share.
 """
 import hashlib
 import hmac
@@ -25,18 +26,32 @@ log = logging.getLogger("plagiq.telegram")
 STATUS = {"ok": None, "detail": "not registered yet"}        # last setWebhook result, for /admin
 
 TEXTS = {
-    "uz": ("Assalomu alaykum! PlagIQ — ilmiy ishlarni plagiatga tekshirish xizmati.\n\n"
-           "Kirish uchun botga yozish shart emas: saytni oching, «Telegram orqali kirish» tugmasini bosing "
-           "va ochilgan oynada Telegram orqali tasdiqlang. Shundan keyin hujjatni yuklab tekshirishingiz mumkin.",
-           "PlagIQ saytini ochish"),
-    "ru": ("Здравствуйте! PlagIQ — сервис проверки научных работ на плагиат.\n\n"
-           "Писать боту для входа не нужно: откройте сайт, нажмите «Войти через Telegram» и подтвердите вход "
-           "в открывшемся окне Telegram. После этого можно загрузить документ и проверить его.",
-           "Открыть сайт PlagIQ"),
-    "en": ("Hello! PlagIQ checks academic writing for plagiarism.\n\n"
-           "You do not need to message this bot to sign in: open the website, press “Sign in with Telegram” "
-           "and confirm in the Telegram window that opens. Then upload your document and run the check.",
-           "Open PlagIQ"),
+    "uz": {"hello": "Assalomu alaykum! PlagIQ — ilmiy ishlarni plagiatga tekshirish xizmati.\n\n"
+                    "Telefon raqamingiz orqali kirish uchun pastdagi «📱 Raqamni yuborish» tugmasini bosing — "
+                    "men sizga saytga kirish havolasini yuboraman.\n\nYoki saytda «Telegram orqali kirish» tugmasini "
+                    "bosing: {site}\n1 000 so‘zgacha bo‘lgan matnni ro‘yxatdan o‘tmasdan ham tekshirish mumkin.",
+           "share": "📱 Raqamni yuborish",
+           "link": "Raqamingiz qabul qilindi: {phone}. Saytga kirish uchun tugmani bosing. Havola bir marta ishlaydi va "
+                   "{m} daqiqa amal qiladi.",
+           "open": "PlagIQ’ga kirish",
+           "own": "Iltimos, o‘zingizning raqamingizni «📱 Raqamni yuborish» tugmasi orqali yuboring."},
+    "ru": {"hello": "Здравствуйте! PlagIQ — сервис проверки научных работ на плагиат.\n\n"
+                    "Чтобы войти по номеру телефона, нажмите кнопку «📱 Отправить номер» внизу — я пришлю ссылку для "
+                    "входа на сайт.\n\nИли нажмите «Войти через Telegram» на сайте: {site}\n"
+                    "Текст до 1 000 слов можно проверить и без регистрации.",
+           "share": "📱 Отправить номер",
+           "link": "Номер получен: {phone}. Нажмите кнопку, чтобы войти на сайт. Ссылка одноразовая и действует {m} минут.",
+           "open": "Войти в PlagIQ",
+           "own": "Пожалуйста, отправьте свой собственный номер кнопкой «📱 Отправить номер»."},
+    "en": {"hello": "Hello! PlagIQ checks academic writing for plagiarism.\n\n"
+                    "To sign in with your phone number, press “📱 Share my number” below and I will send you a sign-in "
+                    "link for the website.\n\nOr press “Sign in with Telegram” on the website: {site}\n"
+                    "Texts up to 1,000 words can be checked without signing in.",
+           "share": "📱 Share my number",
+           "link": "Number received: {phone}. Press the button to sign in on the website. The link works once and is "
+                   "valid for {m} minutes.",
+           "open": "Sign in to PlagIQ",
+           "own": "Please send your own number with the “📱 Share my number” button."},
 }
 
 
@@ -45,7 +60,7 @@ def origin():
 
 
 def enabled():
-    return auth.enabled() and os.environ.get("TELEGRAM_BOT_REPLIES", "") == "1" and origin().startswith("https://")
+    return auth.telegram_enabled() and os.environ.get("TELEGRAM_BOT_REPLIES", "") == "1" and origin().startswith("https://")
 
 
 def secret():
@@ -65,17 +80,34 @@ def _call(method, payload, opener=None):
 
 
 def reply_for(update):
-    """The sendMessage payload for an incoming update, or None (only private text messages get an answer)."""
+    """The sendMessage payload for an incoming update, or None (only private messages get an answer).
+    A shared contact that is the sender's own number signs them in: the reply carries a one-time link."""
     message = update.get("message") if isinstance(update, dict) else None
-    if not isinstance(message, dict) or not isinstance(message.get("text"), str):
+    if not isinstance(message, dict):
         return None
-    chat = message.get("chat") or {}
-    if chat.get("type") != "private" or not isinstance(chat.get("id"), int):
+    chat, sender = message.get("chat") or {}, message.get("from") or {}
+    if chat.get("type") != "private" or not isinstance(chat.get("id"), int) or not isinstance(sender.get("id"), int):
         return None
-    code = str((message.get("from") or {}).get("language_code") or "")[:2]
-    text, button = TEXTS.get(code, TEXTS["uz"])
-    return {"chat_id": chat["id"], "text": text,
-            "reply_markup": {"inline_keyboard": [[{"text": button, "url": origin() + "/"}]]}}
+    t = TEXTS.get(str(sender.get("language_code") or "")[:2], TEXTS["uz"])
+    contact = message.get("contact")
+    if isinstance(contact, dict):
+        if contact.get("user_id") != sender["id"]:          # someone else's number proves nothing
+            return {"chat_id": chat["id"], "text": t["own"], "reply_markup": _share_keyboard(t)}
+        phone = "+" + str(contact.get("phone_number", "")).lstrip("+")[:20]
+        name = " ".join(x for x in (sender.get("first_name", ""), sender.get("last_name", "")) if x).strip()
+        user = {"id": sender["id"], "name": name[:120] or str(sender.get("username", ""))[:64] or str(sender["id"]),
+                "username": str(sender.get("username", ""))[:64]}
+        auth.remember(user, phone=phone)
+        nonce = auth.login_link(user["id"])
+        return {"chat_id": chat["id"], "text": t["link"].format(phone=phone, m=auth.LINK_MINUTES),
+                "reply_markup": {"inline_keyboard": [[{"text": t["open"], "url": f"{origin()}/auth/bot?t={nonce}"}]]}}
+    if not isinstance(message.get("text"), str):
+        return None
+    return {"chat_id": chat["id"], "text": t["hello"].format(site=origin() + "/"), "reply_markup": _share_keyboard(t)}
+
+
+def _share_keyboard(t):
+    return {"keyboard": [[{"text": t["share"], "request_contact": True}]], "resize_keyboard": True, "one_time_keyboard": True}
 
 
 def handle(update, opener=None):
