@@ -115,7 +115,8 @@ def _source_entry(evidence, **fields):
     evidence = evidence or {}
     return {**fields, "matched_tokens": evidence.get("matched_words", 0),
             "matched_chars": evidence.get("matched_chars", 0),
-            "passage_count": evidence.get("passage_count", 0), "passages": evidence.get("passages", [])}
+            "passage_count": evidence.get("passage_count", 0), "passages": evidence.get("passages", []),
+            "spans": [list(i) for i in evidence.get("intervals", [])][:2000]}
 
 
 def _measure(q, covered, intervals):
@@ -746,7 +747,7 @@ async def analyse(submission, reference, reference_text, language, mode, options
     result["highlight_html"] = ""
     if result.get("percent") is not None:
         review = await run_in_threadpool(citations.assess, original, language, intervals, **(options or {}))
-        result["highlight_html"] = highlight(original, review.pop("segments"))
+        result["highlight_html"] = highlight(original, review.pop("segments"), result.get("sources"))
         result["citation"] = review
         result["percent_all"] = review["percent_all"]
         result["percent"] = review["percent_counted"]
@@ -760,6 +761,11 @@ async def analyse(submission, reference, reference_text, language, mode, options
     if ai_check:
         # Separate consent: the full text goes to Pangram; flagged passages stay out of the cache and PDF.
         result["ai"], result["ai_passages"] = await run_in_threadpool(aidetect.detect, original, language, words)
+    for source in result.get("sources") or []:
+        for passage in source.get("passages") or []:
+            qs, qe = passage.get("query_start"), passage.get("query_end")
+            if type(qs) is int and type(qe) is int and 0 <= qs < qe <= len(original):
+                passage["query_excerpt"] = original[qs:qe][:600] + ("…" if qe - qs > 600 else "")
     result["plan"] = pricing.quote(words)
     result.update({"document":clean_filename(submission.filename, "Document"),
                    "date":datetime.now(timezone.utc).isoformat(timespec="seconds"),
@@ -771,15 +777,34 @@ async def analyse(submission, reference, reference_text, language, mode, options
 MARK_CLASS = {"quotation_cited": "qc", "quotation_uncited": "qu", "bibliography": "bib", "other": "m"}
 
 
-def highlight(text, segments):
-    """Escaped manuscript with matched words wrapped in <mark>; class names only, no user markup."""
+SOURCE_COLOURS = 8          # the top sources get their own colour; the rest share one
+
+
+def source_ranks(sources):
+    """Source list order used on the page (most matched words first) -> [(rank, spans)]."""
+    order = sorted(range(len(sources or [])), key=lambda i: -(sources[i].get("matched_tokens") or 0))
+    ranked = []
+    for rank, i in enumerate(order):
+        src = sources[i]
+        spans = src.get("spans") or [[p["query_start"], p["query_end"]] for p in src.get("passages") or []]
+        if src.get("matched_tokens"):
+            ranked.append((rank, spans))
+    return ranked
+
+
+def highlight(text, segments, sources=None):
+    """Escaped manuscript with matched words wrapped in <mark>; class names and a numeric
+    data-s (source rank) only, no user markup."""
+    ranked = source_ranks(sources)
     out, pos = [], 0
     for start, end, where, reason in segments:
         if start < pos:
             continue
         out.append(html.escape(text[pos:start]))
         cls = MARK_CLASS[where] + (" x" if reason else "")
-        out.append(f'<mark class="{cls}">' + html.escape(text[start:end]) + "</mark>")
+        rank = next((r for r, spans in ranked if any(s < end and start < e for s, e in spans)), None)
+        attr = f' data-s="{min(rank, SOURCE_COLOURS)}"' if rank is not None else ""
+        out.append(f'<mark class="{cls}"{attr}>' + html.escape(text[start:end]) + "</mark>")
         pos = end
     out.append(html.escape(text[pos:]))
     return "".join(out).replace("\n", "<br>")
@@ -796,8 +821,11 @@ def finish(request, result):
     owner = request.cookies.get("plagiq_session") or secrets.token_urlsafe(32)
     response = JSONResponse({"report_id":identifier, **result}, headers={"x-report-id": identifier})
     # Do not retain manuscript highlights or raw text in the report cache.
-    results[identifier] = {"owner": owner, "expires": time.monotonic() + REPORT_TTL,
-                           "result": {k:v for k,v in result.items() if k not in PRIVATE_FIELDS}}
+    cached = {k:v for k,v in result.items() if k not in PRIVATE_FIELDS}
+    if cached.get("sources"):           # manuscript excerpts of the side-by-side view are never cached
+        cached["sources"] = [{**s, "passages": [{k: v for k, v in p.items() if k != "query_excerpt"}
+                                                for p in s.get("passages") or []]} for s in cached["sources"]]
+    results[identifier] = {"owner": owner, "expires": time.monotonic() + REPORT_TTL, "result": cached}
     response.set_cookie("plagiq_session", owner, max_age=REPORT_TTL,
                         httponly=True, secure=_secure(request), samesite="strict")
     return response

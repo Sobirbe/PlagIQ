@@ -138,7 +138,7 @@ with tempfile.TemporaryDirectory() as tmp:
                 page.locator('[name=mode][value=reference]').check()
                 page.locator('#reference_text').fill('Источник: ' + RU)
                 page.locator('#submit').click()
-                page.wait_for_function("() => document.querySelectorAll('#source-list blockquote').length === 1")
+                page.wait_for_function("() => document.querySelectorAll('#source-list .pair').length === 1")
                 assert page.locator('#highlight-box summary').count() == 1
                 assert page.locator('#source-list').inner_text().count('Ваш источник') == 1
                 # Citation options: a quoted, referenced passage excluded on request, disclosed before/after.

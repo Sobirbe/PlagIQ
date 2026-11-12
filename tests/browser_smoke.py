@@ -68,7 +68,7 @@ with tempfile.TemporaryDirectory() as tmp:
                         page.locator('#submit').click()
                         page.wait_for_function("() => document.querySelector('#source-list').textContent.includes('Synthetic')")
                         assert page.locator('#score').inner_text() == '100%'
-                        assert page.locator('blockquote').count() > 0
+                        assert page.locator('.pair, blockquote').count() > 0
                         assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), (width,lang,'result overflow')
                         page.locator('[data-lang=en]').click()
                         assert 'Only authorized' in page.locator('#scope').inner_text()
