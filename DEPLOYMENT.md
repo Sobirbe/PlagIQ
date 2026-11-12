@@ -20,7 +20,7 @@ You do not need to write code to follow this guide. Every step happens in the Ra
    | Variable | Value | Why |
    |---|---|---|
    | `PUBLIC_ORIGIN` | your staging address, e.g. `https://plagiq-staging.up.railway.app` (no trailing `/`) | Blocks requests from other websites. |
-   | `TRUSTED_PROXY_HOPS` | `1` | Lets PlagIQ see each visitor's real address. Without it, **all visitors share one 12-scans-per-hour allowance.** |
+   | `TRUSTED_PROXY_HOPS` | `1` | Lets PlagIQ see each visitor's real address. Without it, **all signed-out visitors share one 12-checks-per-hour allowance.** Signed-in users are counted per account (`CHECKS_PER_HOUR_ACCOUNT`, default 30), so students behind one university address do not share. |
    | `PRIVATE_PILOT_USER` | a reviewer name | Optional login for the pilot. |
    | `PRIVATE_PILOT_PASSWORD` | a unique password of 16+ characters from a password manager | If set too short, the site deliberately locks everyone out (fails closed). |
 
