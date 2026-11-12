@@ -15,6 +15,33 @@ import websearch
 from engine_client import configured as engine_configured
 
 
+def engine_problem():
+    """Plain-language reason why the website cannot use the engine, or "" when the settings look right."""
+    import engine_client
+    url, key = os.environ.get("ENGINE_URL", "").strip(), os.environ.get("ENGINE_API_KEY", "")
+    problems = []
+    if not url:
+        problems.append("ENGINE_URL is empty or not set on the website")
+    elif "${{" in url:
+        problems.append("ENGINE_URL still contains an unresolved ${{…}} reference")
+    else:
+        try:
+            engine_client.engine_base_url()
+        except engine_client.EngineError:
+            host = url.split("://", 1)[-1].split(":", 1)[0].split("/", 1)[0]
+            problems.append(f"ENGINE_URL does not point to the engine (host is “{host or 'empty'}”; expected "
+                            "something like engine.railway.internal: the ${{engine.RAILWAY_PRIVATE_DOMAIN}} "
+                            "reference did not resolve, or the engine service has another name)")
+    if not key:
+        problems.append("ENGINE_API_KEY is empty or not set on the website (the ${{engine.ENGINE_API_KEY}} "
+                        "reference did not resolve: is the engine's own variable named exactly ENGINE_API_KEY?)")
+    elif "${{" in key:
+        problems.append("ENGINE_API_KEY still contains an unresolved ${{…}} reference")
+    elif len(key) < 32:
+        problems.append(f"ENGINE_API_KEY has only {len(key)} characters; it needs at least 32")
+    return "; ".join(problems)
+
+
 def checklist(library):
     """[(area, ok, detail, how-to)]"""
     origin = os.environ.get("PUBLIC_ORIGIN", "")
@@ -36,7 +63,8 @@ def checklist(library):
          "FULLTEXT_OPENALEX_PDF=1 on the website (Part 3e)"),
         ("Private engine connected", engine_configured() and bool(library and library.get("available")),
          "connected" if library and library.get("available") else
-         "ENGINE_URL / ENGINE_API_KEY missing on the website" if not engine_configured() else "configured but not answering",
+         (engine_problem() or "settings look right, but the engine did not answer") if not engine_configured()
+         else engine_problem() or "settings look right, but the engine did not answer (is the engine Online? see its logs)",
          "create the engine service and add ENGINE_URL and ENGINE_API_KEY to the website (Part 2)"),
         ("Web search", bool(providers), ", ".join(providers) if providers else "no key",
          "YANDEX_API_KEY + YANDEX_FOLDER_ID and/or BRAVE_API_KEY on the website (Part 3g)"),
