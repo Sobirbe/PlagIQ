@@ -17,8 +17,8 @@ class SecurityMiddleware:
         headers = dict(scope.get('headers', []))
         pilot_user, pilot_password = os.getenv('PRIVATE_PILOT_USER', ''), os.getenv('PRIVATE_PILOT_PASSWORD', '')
         # /verify only shows signed report facts, so QR codes work for supervisors without the pilot login.
-        # Payment providers call /payments/payme and /payments/click/* with their own authentication.
-        callback = scope['path'] == '/payments/payme' or scope['path'].startswith('/payments/click/')
+        # Payment providers call /payments/payme, /payments/click/* and /payments/uzum/* with their own authentication.
+        callback = scope['path'] == '/payments/payme' or scope['path'].startswith(('/payments/click/', '/payments/uzum/'))
         if (pilot_user or pilot_password) and scope['path'] not in ('/health', '/verify', '/privacy') and not callback:
             expected = b'Basic ' + base64.b64encode((pilot_user + ':' + pilot_password).encode())
             if (not pilot_user or len(pilot_password) < 16 or
