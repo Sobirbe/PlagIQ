@@ -55,7 +55,7 @@ def edit(sents, rng):
     return out
 
 
-def run(abstracts, translations, seed=13):
+def run(abstracts, translations, seed=13, distractors=500, negatives=400):
     import numpy as np
     from sentence_transformers import SentenceTransformer
     model = SentenceTransformer(MODEL, device="cpu")
@@ -69,10 +69,10 @@ def run(abstracts, translations, seed=13):
         absent = [i for i in items if not i["in_library"]]
         pool = [a for a in abstracts[source] if a["id"] not in translated]
         rng.shuffle(pool)
-        library = [" ".join(i["source"]) for i in inside] + [a["text"] for a in pool[:500]]
+        library = [" ".join(i["source"]) for i in inside] + [a["text"] for a in pool[:distractors]]
         originals = [a for a in abstracts[target] if a["id"] not in translated]
         rng.shuffle(originals)
-        originals = originals[:400]
+        originals = originals[:negatives]
         lib_sents, owner, doc_vecs = [], [], []
         for n, text in enumerate(library):
             ss = sentences(text)
@@ -104,14 +104,18 @@ def run(abstracts, translations, seed=13):
                     spans.append((len(flat), len(flat) + len(sents)))
                     flat += [convert(s) for s in sents]
                 vec = enc(flat)
-                encoded[kind] = [(vec[a:b], k) for (a, b), (_, k) in zip(spans, queries)]
-
-            def decide(qvec, cutoff, need, shortlist=None):
-                sims = qvec @ lib_vec.T
-                if shortlist:
+                prepared = []
+                for (a, b), (_, k) in zip(spans, queries):
+                    qvec = vec[a:b]
                     q = qvec.mean(0)
-                    keep = np.argsort(-(doc_vecs @ (q / np.linalg.norm(q))))[:shortlist]
-                    sims = np.where(np.isin(owner, keep)[None, :], sims, -1.0)
+                    ranking = np.argsort(-(doc_vecs @ (q / np.linalg.norm(q))))
+                    prepared.append(((qvec @ lib_vec.T, ranking), k))      # similarities computed once per text
+                encoded[kind] = prepared
+
+            def decide(prep, cutoff, need, shortlist=None):
+                sims, ranking = prep
+                if shortlist:
+                    sims = np.where(np.isin(owner, ranking[:shortlist])[None, :], sims, -1.0)
                 best, score = owner[sims.argmax(1)], sims.max(1)
                 hits = best[score >= cutoff]
                 if not len(hits):
@@ -140,10 +144,12 @@ def main():
     parser.add_argument("--abstracts", required=True)
     parser.add_argument("--translations", required=True)
     parser.add_argument("--out", required=True)
+    parser.add_argument("--distractors", type=int, default=500, help="extra library abstracts per direction")
+    parser.add_argument("--negatives", type=int, default=400, help="real manuscript-language abstracts per direction")
     args = parser.parse_args()
     abstracts = json.loads(Path(args.abstracts).read_text("utf-8"))
     translations = json.loads(Path(args.translations).read_text("utf-8"))
-    results = run(abstracts, translations)
+    results = run(abstracts, translations, distractors=args.distractors, negatives=args.negatives)
     Path(args.out).write_text(json.dumps(results, ensure_ascii=False, indent=1), "utf-8")
     for r in results:
         if r["cutoff"] == 0.80:
