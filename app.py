@@ -475,7 +475,9 @@ def owner(request):
 async def admin_page(request: Request):
     owner(request)
     data = await engine_library() if corpus_configured() else None
-    return HTMLResponse(admin.page({"available": data is not None, **(data or {})}), headers={"Cache-Control": "no-store"})
+    reason = await engine_client.probe() if corpus_configured() and data is None else ""
+    return HTMLResponse(admin.page({"available": data is not None, **(data or {})}, reason),
+                        headers={"Cache-Control": "no-store"})
 
 
 @app.get("/admin/backup/archive.jsonl.gz")

@@ -271,6 +271,37 @@ async def export_archive():
     return body()
 
 
+async def probe() -> str:
+    """Why the engine does not answer, in plain words ("" when it answers normally)."""
+    if not configured():
+        return "not configured"
+    try:
+        async with httpx.AsyncClient(base_url=engine_base_url(), timeout=httpx.Timeout(10.0), trust_env=False,
+                                     follow_redirects=False,
+                                     headers={"Authorization": "Bearer " + os.environ["ENGINE_API_KEY"]}) as client:
+            response = await client.get("/v1/library")
+    except EngineError as exc:
+        return str(exc)
+    except httpx.ConnectError as exc:
+        text = str(exc).lower()
+        if "name" in text or "resolve" in text or "nodename" in text:
+            return "the engine's private address was not found: is the engine service running and named “engine”?"
+        return ("connection refused: the engine is not running, or not listening on port 8000 "
+                "(check its Custom Start Command and PORT=8000)")
+    except httpx.TimeoutException:
+        return "no reply within 10 s: the engine is starting, busy importing, or stuck (see its logs)"
+    except httpx.HTTPError as exc:
+        return "request failed: " + type(exc).__name__
+    if response.status_code == 401:
+        return ("the engine refused the password (401): ENGINE_API_KEY on the website and on the engine are different; "
+                "make them identical and redeploy both")
+    if response.status_code >= 500:
+        return f"the engine answered with an error ({response.status_code}): see its logs"
+    if response.status_code != 200:
+        return f"unexpected answer {response.status_code}"
+    return ""
+
+
 async def library():
     """Library counts from the private engine for the public page; None if unavailable."""
     if not configured():
