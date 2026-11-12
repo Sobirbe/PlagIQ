@@ -114,3 +114,17 @@ def test_engine_problem_explains_what_is_wrong(monkeypatch, url, key, expected):
     monkeypatch.setenv("ENGINE_API_KEY", key)
     problem = admin.engine_problem()
     assert (expected in problem) if expected else problem == ""
+
+
+def test_probe_explains_why_the_engine_does_not_answer(site, monkeypatch):
+    import asyncio
+    assert asyncio.run(engine_client.probe()) == ""                                  # answers normally
+    monkeypatch.setattr(engine_service.secrets, "compare_digest", lambda a, b: False)   # passwords differ
+    assert "refused the password (401)" in asyncio.run(engine_client.probe())
+
+
+def test_probe_connection_refused(monkeypatch):
+    import asyncio
+    monkeypatch.setenv("ENGINE_API_KEY", "k" * 32)
+    monkeypatch.setenv("ENGINE_URL", "http://127.0.0.1:9")
+    assert "connection refused" in asyncio.run(engine_client.probe())

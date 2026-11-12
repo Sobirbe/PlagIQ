@@ -42,7 +42,7 @@ def engine_problem():
     return "; ".join(problems)
 
 
-def checklist(library):
+def checklist(library, probe=""):
     """[(area, ok, detail, how-to)]"""
     origin = os.environ.get("PUBLIC_ORIGIN", "")
     stats = auth.stats() if auth.enabled() else None
@@ -64,7 +64,8 @@ def checklist(library):
         ("Private engine connected", engine_configured() and bool(library and library.get("available")),
          "connected" if library and library.get("available") else
          (engine_problem() or "settings look right, but the engine did not answer") if not engine_configured()
-         else engine_problem() or "settings look right, but the engine did not answer (is the engine Online? see its logs)",
+         else engine_problem() or ("settings look right, but " + probe if probe else
+                                   "settings look right, but the engine did not answer (is the engine Online? see its logs)"),
          "create the engine service and add ENGINE_URL and ENGINE_API_KEY to the website (Part 2)"),
         ("Web search", bool(providers), ", ".join(providers) if providers else "no key",
          "YANDEX_API_KEY + YANDEX_FOLDER_ID and/or BRAVE_API_KEY on the website (Part 3g)"),
@@ -82,11 +83,11 @@ def _size(n):
     return f"{n / 1024 ** 3:.2f} GB" if n >= 1024 ** 3 else f"{n / 1024 ** 2:.0f} MB"
 
 
-def page(library):
+def page(library, probe=""):
     esc = html.escape
     mark = lambda ok: "✅" if ok else "➖" if ok is None else "❌"          # None = optional, not set
     rows = "".join(f'<tr><td>{mark(ok)}</td><th>{esc(a)}</th><td>{esc(d)}</td><td class="h">{"" if ok else esc(h)}</td></tr>'
-                   for a, ok, d, h in checklist(library))
+                   for a, ok, d, h in checklist(library, probe))
     lib = "<p>The engine is not connected, so there is no library yet.</p>"
     if library and library.get("available"):
         names = {"journals": "Uzbek and other journals", "cyberleninka": "CyberLeninka", "wikipedia": "Wikipedia",
