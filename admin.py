@@ -62,6 +62,10 @@ def checklist(library, probe=""):
           else "Telegram refused the webhook: " + telegram_bot.STATUS["detail"])
          if telegram_bot.enabled() else "off (people who press /start in the bot get no reply)",
          "TELEGRAM_BOT_REPLIES=1 on the website, then redeploy (Part 3i)"),
+        ("Visitors told apart (hourly limit)", os.environ.get("TRUSTED_PROXY_HOPS", "").strip() in ("1", "2", "3", "4", "5"),
+         "on: each visitor has their own allowance" if os.environ.get("TRUSTED_PROXY_HOPS", "").strip() in ("1", "2", "3", "4", "5")
+         else "off: all signed-out visitors share one allowance of 12 checks per hour",
+         "TRUSTED_PROXY_HOPS=1 on the website (Part 1)"),
         ("Accounts kept across deploys", bool(stats and stats["on_volume"]),
          "stored on the /data volume" if stats and stats["on_volume"] else "not on a volume: accounts are lost at each deploy",
          "attach a volume at /data to the website service (Part 3i)"),
