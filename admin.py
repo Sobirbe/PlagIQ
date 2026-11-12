@@ -98,7 +98,8 @@ def page(library):
         if disk and disk.get("total_bytes"):
             used = 1 - disk["free_bytes"] / disk["total_bytes"]
             warn = ' class="warn"' if used > 0.66 else ""
-            lib += (f"<p{warn}>Engine disk: library file {_size(disk['db_bytes'])}; volume {used:.0%} used "
+            lib += (f"<p{warn}>Engine disk: library file {_size(disk['db_bytes'])}; downloaded files waiting "
+                    f"{_size(disk.get('staging_bytes', 0))}; volume {used:.0%} used "
                     f"({_size(disk['free_bytes'])} free of {_size(disk['total_bytes'])}). "
                     + ("Over two thirds used: do not raise CORPUS_MAX_SOURCES; enlarge the volume first." if used > 0.66 else
                        "Room to raise CORPUS_MAX_SOURCES step by step.") + "</p>")
