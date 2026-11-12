@@ -1,4 +1,4 @@
-"""Word-count based price quotes. Display only: PlagIQ has no payment processing.
+"""Word-count based price quotes. Charged only when payments are on (payments.py, test mode only).
 
 Tiers come from the PRICING_TIERS environment variable (JSON list) so the owner
 can change them in Railway without code changes, e.g.
@@ -18,8 +18,9 @@ Cost note: Pangram's list price is $0.05 per 100 words (about 6 so'm per word at
 12,500 so'm/$). 3 so'm per word covers the cost only with Pangram's Professional
 plan ($65/month including $200 of API credits, about 2 so'm per word when used up).
 
-Prices are labelled "planned" until real per-check costs are measured and a
-payment provider is integrated; checks stay free during the pilot.
+Prices are labelled "planned" and checks stay free while payments are off
+(the default). With PAYMENTS_ENABLED=1 and PAYMENTS_MODE=test, checks are charged
+from a balance topped up through the Payme or Click sandbox (no real money).
 """
 import json
 import os

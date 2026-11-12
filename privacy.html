@@ -31,12 +31,14 @@ table{border-collapse:collapse;width:100%;font-size:14px}th,td{text-align:left;p
 <tr><td>Telegram ID, ism, foydalanuvchi nomi</td><td>Hisobga kirish</td><td>Hisobingizni o‘chirguningizcha</td></tr>
 <tr><td>Tekshiruvlar ro‘yxati (sana, rejim, so‘zlar soni, natija)</td><td>«So‘nggi tekshiruvlarim», statistika</td><td>Hisobingizni o‘chirguningizcha. Hujjat matni va fayl nomi saqlanmaydi.</td></tr>
 <tr><td>Himoyalangan arxiv (faqat roziligingiz bilan): to‘liq matn, sarlavha, muallif, yil</td><td>Kelajakdagi ko‘chirmalarni aniqlash</td><td>Uni o‘chirguningizcha. Boshqalar matnni ko‘rmaydi — faqat sarlavha, muallif va yil.</td></tr>
+<tr><td>Balans va to‘lovlar (buyurtma raqami, summa, sana, to‘lov tizimi va uning tranzaksiya raqami, tekshiruvlar uchun yechilgan summalar)</td><td>Balansni to‘ldirish, tekshiruv uchun to‘lov, kvitansiya</td><td>Buxgalteriya hisobi uchun [muddat — huquqshunos belgilaydi]; hisob o‘chirilganda ham saqlanadi. Karta raqami PlagIQ’ga kelmaydi.</td></tr>
 </table>
 <h3>Uchinchi tomonlarga nima yuboriladi</h3>
 <ul>
 <li><b>OpenAlex</b> (ilmiy bazalar qidiruvi): 3 tagacha qisqa parcha (har biri 14 so‘zgacha) va manbalar ro‘yxatidagi DOI — roziligingiz bilan.</li>
 <li><b>Yandex / Brave</b> (internet qidiruvi, alohida rozilik bilan): hujjatning turli qismlaridan 20 tagacha qisqa parcha (har biri 14 so‘zgacha).</li>
 <li><b>Pangram</b> (AI detektor, AQSh, alohida rozilik bilan, faqat rus va ingliz matnlari): <b>hujjatning to‘liq matni</b>.</li>
+<li><b>Payme / Click</b> (to‘lov qilsangiz): buyurtma raqami va summasi. Karta ma’lumotlarini to‘lov tizimining o‘zi qabul qiladi.</li>
 <li><b>Telegram</b>: kirish vaqtida Telegram sizning ID, ism va foydalanuvchi nomingizni bizga beradi.</li>
 </ul>
 <p>Bu xizmatlar o‘z maxfiylik siyosatlariga ko‘ra ishlaydi; PlagIQ hisobotni o‘chirgani ular saqlagan ma’lumotni o‘chirmaydi.</p>
@@ -59,12 +61,14 @@ table{border-collapse:collapse;width:100%;font-size:14px}th,td{text-align:left;p
 <tr><td>Telegram ID, имя, имя пользователя</td><td>Вход в аккаунт</td><td>До удаления аккаунта</td></tr>
 <tr><td>Список проверок (дата, режим, число слов, результат)</td><td>«Мои последние проверки», статистика</td><td>До удаления аккаунта. Текст и имя файла не хранятся.</td></tr>
 <tr><td>Защищённый архив (только с вашего согласия): полный текст, название, автор, год</td><td>Поиск будущих копий</td><td>Пока вы его не удалите. Другие не видят текст — только название, автора и год.</td></tr>
+<tr><td>Баланс и платежи (номер заказа, сумма, дата, платёжная система и её номер транзакции, списания за проверки)</td><td>Пополнение баланса, оплата проверок, квитанции</td><td>Для бухгалтерского учёта [срок — определит юрист]; сохраняется и после удаления аккаунта. Номер карты в PlagIQ не поступает.</td></tr>
 </table>
 <h3>Что передаётся третьим лицам</h3>
 <ul>
 <li><b>OpenAlex</b> (поиск по научным базам): до 3 коротких отрывков (по 14 слов) и DOI из списка литературы — с вашего согласия.</li>
 <li><b>Яндекс / Brave</b> (поиск в интернете, отдельное согласие): до 20 коротких отрывков (по 14 слов) из разных частей документа.</li>
 <li><b>Pangram</b> (ИИ-детектор, США, отдельное согласие, только русские и английские тексты): <b>полный текст документа</b>.</li>
+<li><b>Payme / Click</b> (если вы платите): номер и сумма заказа. Данные карты принимает сама платёжная система.</li>
 <li><b>Telegram</b>: при входе Telegram передаёт нам ваш ID, имя и имя пользователя.</li>
 </ul>
 <p>Эти сервисы работают по своим политикам; удаление отчёта в PlagIQ не удаляет данные, сохранённые ими.</p>
@@ -87,12 +91,14 @@ table{border-collapse:collapse;width:100%;font-size:14px}th,td{text-align:left;p
 <tr><td>Telegram ID, name, username</td><td>Signing in</td><td>Until you delete your account</td></tr>
 <tr><td>List of your checks (date, mode, word count, result)</td><td>"My recent checks", statistics</td><td>Until you delete your account. No text and no file names.</td></tr>
 <tr><td>Protected archive (only with your consent): full text, title, author, year</td><td>Finding later copies</td><td>Until you remove it. Others never see the text, only title, author and year.</td></tr>
+<tr><td>Balance and payments (order number, amount, date, payment provider and its transaction number, amounts charged for checks)</td><td>Topping up the balance, paying for checks, receipts</td><td>For accounting [period to be set by counsel]; kept even after you delete your account. Your card number never reaches PlagIQ.</td></tr>
 </table>
 <h3>What is sent to others</h3>
 <ul>
 <li><b>OpenAlex</b> (academic search): up to 3 short excerpts (14 words each) and the DOIs in your reference list, with your consent.</li>
 <li><b>Yandex / Brave</b> (web search, separate consent): up to 20 short excerpts (14 words each) from across the document.</li>
 <li><b>Pangram</b> (AI detector, USA, separate consent, Russian and English texts only): <b>the full text of the document</b>.</li>
+<li><b>Payme / Click</b> (if you pay): the order number and amount. Card details are entered on the provider's own page.</li>
 <li><b>Telegram</b>: when you sign in, Telegram gives us your ID, name and username.</li>
 </ul>
 <p>These services follow their own privacy policies; deleting a PlagIQ report does not delete what they keep.</p>

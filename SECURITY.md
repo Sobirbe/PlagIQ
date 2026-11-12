@@ -56,6 +56,6 @@
 - No paraphrase or translation detection. Web search (optional, Yandex and/or Brave) covers only the top pages found for 3 short excerpts, not the whole web. Matching is exact seven-word overlap after normalization, including between Uzbek Latin and Cyrillic.
 - Quotations and the bibliography are excluded only if the user chooses, using tested rules; the report shows both figures. The rules do not judge whether a citation is adequate.
 - The PDF opens with a "Certificate of check" that certifies the check (document fingerprint, date, scope, result) and is verifiable by QR code. It is not an accredited certificate of originality or of the absence of plagiarism, and it says so on the page.
-- No payment processing is included or changed.
+- Payments (Payme, Click) run in the providers' **test mode only**: the code refuses any `PAYMENTS_MODE` other than `test`, and Payme checkouts go to the sandbox. Callbacks are authenticated (Payme: HTTP Basic with the test key, compared in constant time; Click: MD5 `sign_string` with the secret key and the service ID). Every state change runs in one SQLite `BEGIN IMMEDIATE` transaction; a top-up is credited once; a check's price is reserved before the check and refunded on failure. Card data never reaches PlagIQ. The callback paths skip only the optional pilot password, which the providers cannot send. Production payments require a separate review.
 
 Report vulnerabilities privately to the repository owner; do not open a public issue with exploit details.
