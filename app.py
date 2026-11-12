@@ -144,7 +144,9 @@ def compare_sources(text, sources, language):
     q, evidence, covered, intervals = corpus.compare_texts(
         text, [s.get("fulltext") or s.get("abstract", "") for s in sources], language)
     result, intervals = _measure(q, covered, intervals)
+    import discovery as finder
     entries = [_source_entry(e, title=s.get("title", "Untitled"), url=s.get("url", ""), year=s.get("year"),
+                             off_topic=finder.off_topic(s),
                              coverage="web" if s.get("coverage") == "web" else
                              "fulltext" if s.get("fulltext") else s.get("coverage", "metadata_only"))
                for s, e in zip(sources, evidence)]
@@ -921,11 +923,18 @@ async def analyse(submission, reference, reference_text, language, mode, options
                        "self_comparison":same})
     elif mode == "academic":
         discovery = await run_in_threadpool(discover, original, 8, language)
+        import discovery as finder
+        stems = await run_in_threadpool(finder.document_stems, original, language)
+        for source in discovery["sources"]:            # topic relevance of each OpenAlex result (title + abstract)
+            source["relevance"] = finder.relevance(source, stems, language)
+        # Full-text slots go to the most relevant results; clearly off-topic ones are never downloaded.
+        ranked = sorted((s for s in discovery["sources"] if not finder.off_topic(s)),
+                        key=lambda s: -(s["relevance"] if s["relevance"] is not None else finder.MIN_RELEVANCE))
         enabled, max_works, seconds, paid = fulltext.settings()
         fetched = {"attempted": 0, "compared": 0, "failed": 0, "timed_out": 0}
-        if enabled and discovery["sources"]:
+        if enabled and ranked:
             # Transient: full texts are compared for this check only and discarded with `discovery`.
-            fetched = await run_in_threadpool(fulltext.fetch_fulltexts, discovery["sources"], max_works, seconds, paid)
+            fetched = await run_in_threadpool(fulltext.fetch_fulltexts, ranked, max_works, seconds, paid)
         web = {"enabled": False}
         if web_search and websearch.settings()[0]:
             # Separate consent: the same excerpts are sent to the search providers; pages are compared once and discarded.
@@ -942,6 +951,12 @@ async def analyse(submission, reference, reference_text, language, mode, options
             result["percent"] = None
             result["not_evaluated_reason"] = "provider_unavailable" if discovery["status"] not in ("searched", "partial") else "no_abstracts"
         result["evaluated_sources"] = evaluated
+        # Off-topic results that matched nothing are compared but not listed (a match is always listed).
+        # The count of compared abstracts is kept first, so QR, certificate and PDF still include them.
+        result["abstract_count"] = sum(1 for e in result["sources"] if e.get("coverage") == "abstract")
+        listed = [e for e in result["sources"] if e.pop("off_topic", False) is False or e["matched_tokens"]]
+        result["off_topic_hidden"] = len(result["sources"]) - len(listed)
+        result["sources"] = listed
         result["library"] = await search_library(result, original, language, owner)
         result["matched_source_count"] = sum(1 for e in result["sources"] if e["matched_tokens"])
         result.update({"mode":"academic","reference":"None","source_count":len(discovery["sources"]),

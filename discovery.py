@@ -168,8 +168,66 @@ def _search(query, language, max_results):
     return payload["results"]
 
 
+# ------------------------------------------------------------- topic relevance
+
+RELEVANCE_STEM = 6            # first letters of a word, so inflected forms (o'qituvchi/o'qituvchilar) match
+MIN_RELEVANCE = 0.3           # calibrated on 224 OpenAlex results in 8 topics (EN/RU/UZ), see evaluation/DISCOVERY.md
+GENERIC = frozenset("""
+analysis research results study studies method methods approach paper article based using different
+important problem problems system systems process development model models effect effects factors
+however therefore within between particular general significant various number level levels
+tadqiqot natija natijalar tahlil usul usullar muammo jarayon rivojlanish tizim omil omillar asosiy
+исследование результаты анализ метод методы подход статья работа развитие система процесс модель
+""".split())
+
+
+def _stems(text, language):
+    import corpus
+    words = [token for token, _, _ in corpus.lexical(text, language or "en")]
+    out = set()
+    for word in words:
+        word = re.sub(r"['’ʻʼ‘`]", "", word)
+        if len(word) >= 5 and word not in STOPWORDS and word not in GENERIC and not word.isdigit():
+            out.add(word[:RELEVANCE_STEM])
+    return out
+
+
+def document_stems(text, language):
+    return _stems(text, language)
+
+
+def relevance(source, doc_stems, language):
+    """Share of a result's distinctive title+abstract words that also occur in the document
+    (0..1), or None when the record has too few words to judge (kept, never hidden)."""
+    stems = _stems((source.get("title") or "") + " " + (source.get("abstract") or "")[:4000], language)
+    if len(stems) < 4:
+        return None
+    score = len(stems & doc_stems) / len(stems)
+    title = _stems(source.get("title") or "", language)
+    if len(title) >= 2 and len(title & doc_stems) / len(title) >= 0.5:
+        score = max(score, len(title & doc_stems) / len(title))     # e.g. a garbled abstract under a fitting title
+    return round(score, 3)
+
+
+def off_topic(source):
+    score = source.get("relevance")
+    return score is not None and score < MIN_RELEVANCE
+
+
+def query_count(text):
+    """3 excerpts for up to 3,000 words, one more for each further 3,000, at most OPENALEX_MAX_QUERIES (default 8):
+    with only 3 short excerpts, a long document is represented by a few generic sentences."""
+    try:
+        cap = max(MAX_QUERIES, min(int(os.environ.get("OPENALEX_MAX_QUERIES", "8")), 12))
+    except ValueError:
+        cap = 8
+    words = len(text.split())
+    return min(cap, MAX_QUERIES + max(0, words - 1) // 3000)
+
+
 def discover(text, max_results=8, language=None):
-    queries = suggest_queries(text)
+    count = query_count(text)
+    queries = suggest_queries(text) if count <= MAX_QUERIES else spread_excerpts(text, count)
     if not queries:
         return {"status": "no_query", "sources": [], "queries": 0, "message": "No search phrase could be extracted"}
     with ThreadPoolExecutor(max_workers=len(queries)) as pool:
