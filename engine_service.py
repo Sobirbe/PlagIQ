@@ -303,7 +303,7 @@ def inventory_stats():
     with closing(connect()) as db:
         data = corpus.stats(db)
     data['limits'] = {'corpus_max_sources': corpus.max_sources(), 'archive_max_sources': corpus.max_deposits(),
-                      'wikipedia_max_articles': wikipedia_import.max_articles()}
+                      'wikipedia_max_articles': wikipedia_import.max_articles(), 'wikipedia_max_share': wikipedia_import.max_share()}
     data['imports'] = {str(name)[:40]: {k: v for k, v in info.items() if k in STATUS_FIELDS}
                        for name, info in import_job.read_status().items() if isinstance(info, dict)}
     data['disk_low_now'] = staging.low_disk()
@@ -333,6 +333,43 @@ def diagnostic(item: Diagnostic):
     finally:
         lock.release()
     return {'matches': len(matches), 'results': results}
+
+
+class Prune(BaseModel):
+    collection: str = Field(default='wikipedia', max_length=40)
+    keep_per_language: int = Field(ge=0, le=100000)
+    confirm: bool = False
+
+
+@app.post('/v1/prune', dependencies=[Depends(authorize)])
+def prune(item: Prune):
+    """Owner-only removal of general-reference texts (Wikipedia), keeping the longest N per language.
+    Without confirm it only reports what would be removed. With confirm, the list of removed articles
+    (title, address, language, words) is written to the staging folder first, then they are deleted."""
+    if not lock.acquire(timeout=queue_seconds()):
+        raise HTTPException(429, 'Engine busy')
+    try:
+        with closing(connect()) as db:
+            try:
+                plan = corpus.prune_collection(db, item.collection, item.keep_per_language, dry_run=True)
+            except ValueError as exc:
+                raise HTTPException(422, str(exc))
+            record = None
+            if item.confirm and plan['removed']:
+                stamp = time.strftime('%Y%m%d-%H%M%S', time.gmtime())
+                root = import_job.staging_root()
+                root.mkdir(parents=True, exist_ok=True)
+                record = root / f'pruned-{item.collection}-{stamp}.json'
+                record.write_text(json.dumps(plan['removed'], ensure_ascii=False), 'utf-8')
+                plan = corpus.prune_collection(db, item.collection, item.keep_per_language, dry_run=False)
+                log.warning('pruned %s: removed %s, kept %s; list in %s', item.collection, plan['remove'], plan['keep'], record)
+            total = db.execute('SELECT COUNT(*) FROM sources').fetchone()[0]
+            left = corpus.count_category(db, item.collection)
+    finally:
+        lock.release()
+    return {'remove': plan['remove'], 'keep': plan['keep'], 'confirmed': bool(item.confirm and record),
+            'record': record.name if record else None, 'total_after': total if item.confirm else total - sum(plan['remove'].values()),
+            'collection_after': left if item.confirm else sum(plan['keep'].values())}
 
 
 @app.get('/v1/checks/{identifier}', dependencies=[Depends(authorize)])

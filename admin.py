@@ -139,10 +139,11 @@ def details(inv):
                    [(NAMES.get(c, c), *(f"{v.get(l, 0):,}" for l in ("uz", "ru", "en")), f"{sum(v.values()):,}",
                      pct(sum(v.values()))) for c, v in sorted(cl.items(), key=lambda kv: -sum(kv[1].values()))])]
     wiki = sum((cl.get("wikipedia") or {}).values())
-    if total and wiki / total > 0.5:
-        out.append(f'<p class="warn">Wikipedia is {wiki / total:.0%} of the library. Journals, CyberLeninka and other '
-                   "academic sources matter more for academic checks: prefer AUTO_IMPORT_UZ_JOURNALS, AUTO_IMPORT_CYBERLENINKA "
-                   "and AUTO_IMPORT over more Wikipedia (DEPLOYMENT.md, Part 5d).</p>")
+    ceiling = (inv.get("limits") or {}).get("wikipedia_max_share", 0.10)
+    if total and wiki / total > ceiling:
+        out.append(f'<p class="warn">Wikipedia is {wiki / total:.0%} of the library (ceiling {ceiling:.0%}). Journals, '
+                   "theses, conference papers and university repositories should come first: prefer AUTO_IMPORT_UZ_JOURNALS, "
+                   "AUTO_IMPORT_CYBERLENINKA and AUTO_IMPORT, and see “Wikipedia share” below (DEPLOYMENT.md, Part 5e).</p>")
     out += ["<h3>By provider and rights basis</h3>",
             _table(["Provider", "Texts"], [(PROVIDERS.get(k, k), f"{v:,}") for k, v in sorted((inv.get("by_provider") or {}).items(), key=lambda kv: -kv[1])]),
             _table(["Rights basis", "Texts"], [(k, f"{v:,}") for k, v in sorted((inv.get("by_rights") or {}).items(), key=lambda kv: -kv[1])])]
@@ -181,6 +182,41 @@ def details(inv):
     return "".join(out)
 
 
+CONFIRM_WORDS = "DELETE WIKIPEDIA"
+
+
+def prune_form(inv=None, result=None, error="", keep=100):
+    """Owner form: keep the longest N Wikipedia articles per language, preview first, then confirm."""
+    esc = html.escape
+    out = []
+    if inv:
+        total = inv.get("total") or 0
+        wiki = sum(((inv.get("category_language") or {}).get("wikipedia") or {}).values())
+        ceiling = (inv.get("limits") or {}).get("wikipedia_max_share", 0.10)
+        share = wiki / total if total else 0
+        out.append(f'<p class="{"warn" if share > ceiling else "note"}">Wikipedia: {wiki:,} of {total:,} texts ({share:.0%}); '
+                   f"ceiling {ceiling:.0%} (WIKIPEDIA_MAX_SHARE). While above it, no new Wikipedia articles are imported; "
+                   "journal, thesis and university texts are never limited by it.</p>")
+    out.append('<p class="note">Removing articles keeps the longest ones per language and never touches journals, theses, '
+               "CyberLeninka or the authors' and universities' archives. <b>Turn on or take a Railway volume backup of the "
+               "engine first.</b> The list of removed articles (title, address, language) is saved in the engine's staging "
+               "folder; Wikipedia texts can be imported again later.</p>")
+    out.append('<form method="post" action="/admin/prune" class="diag">'
+               f'<label>Keep this many Wikipedia articles per language <input name="keep" type="number" min="0" max="100000" value="{int(keep)}"></label>'
+               f'<label>To delete, type <b>{CONFIRM_WORDS}</b> (leave empty to only preview) <input name="confirm_text" maxlength="40"></label>'
+               '<button type="submit">Preview or remove</button></form>')
+    if error:
+        out.append(f'<p class="warn">{esc(error)}</p>')
+    if result:
+        langs = sorted(set(result.get("remove") or {}) | set(result.get("keep") or {}))
+        out.append(_table(["Language", "Remove", "Keep"], [(l.upper(), f"{result['remove'].get(l, 0):,}", f"{result['keep'].get(l, 0):,}") for l in langs]))
+        after_total, after_wiki = result.get("total_after") or 0, result.get("collection_after") or 0
+        verdict = (f"Removed. List saved as {result.get('record')}." if result.get("confirmed") else "Preview only: nothing was removed.")
+        out.append(f"<p><b>{esc(verdict)}</b> Afterwards: Wikipedia {after_wiki:,} of {after_total:,} texts "
+                   f"({after_wiki / after_total:.0%}).</p>" if after_total else f"<p><b>{esc(verdict)}</b></p>")
+    return "".join(out)
+
+
 def diagnostic_form(result=None, error="", doi="", title=""):
     esc = html.escape
     form = ('<form method="post" action="/admin/diagnostic" class="diag">'
@@ -212,7 +248,7 @@ def diagnostic_form(result=None, error="", doi="", title=""):
     return form
 
 
-def page(library, probe="", inventory=None, diagnostic=""):
+def page(library, probe="", inventory=None, diagnostic="", pruning=None):
     esc = html.escape
     mark = lambda ok: "✅" if ok else "➖" if ok is None else "❌"          # None = optional, not set
     rows = "".join(f'<tr><td>{mark(ok)}</td><th>{esc(a)}</th><td>{esc(d)}</td><td class="h">{"" if ok else esc(h)}</td></tr>'
@@ -276,5 +312,6 @@ def page(library, probe="", inventory=None, diagnostic=""):
             f'<section><h2>Library</h2>{lib}</section>'
             f'<section><h2>Library details</h2>{details(inventory) if library and library.get("available") else "<p>The engine is not connected.</p>"}</section>'
             f'<section id="source-check"><h2>Source check (DOI or title)</h2>{diagnostic or diagnostic_form()}</section>'
+            f'<section id="wikipedia-share"><h2>Wikipedia share</h2>{pruning if pruning is not None else (prune_form(inventory) if inventory else "<p>The engine is not connected.</p>")}</section>'
             f'<section><h2>Usage</h2>{use}</section><section><h2>Payments</h2>{pay}</section>'
             f'<section><h2>Backups</h2>{backup}</section></main></body></html>')

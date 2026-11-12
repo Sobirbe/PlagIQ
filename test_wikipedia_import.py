@@ -1,3 +1,4 @@
+import pytest
 """Wikipedia dump import: markup cleaning, filtering, attribution, updates and resume."""
 import bz2
 import json
@@ -7,6 +8,12 @@ from fastapi.testclient import TestClient
 import engine_service
 import wikipedia_import as wiki
 from corpus import connect, inventory, search
+
+
+@pytest.fixture(autouse=True)
+def _no_share_ceiling(monkeypatch):
+    monkeypatch.setenv("WIKIPEDIA_MAX_SHARE", "100")      # these tests start from an empty library
+
 
 NS = 'http://www.mediawiki.org/xml/export-0.11/'
 LONG_UZ = ("Oʻzbekiston Respublikasi Markaziy Osiyoda joylashgan davlat boʻlib uning poytaxti Toshkent shahri hisoblanadi "

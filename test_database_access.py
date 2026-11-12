@@ -143,7 +143,7 @@ def test_admin_details_separate_old_disk_errors_and_explain_caps():
                               "failure_reasons": {"download is not a PDF": 4}}},
            "disk_low_now": None}
     page = admin.details(inv)
-    assert "Wikipedia is 80% of the library" in page
+    assert "Wikipedia is 80% of the library (ceiling 10%)" in page
     assert "at that time; there is enough free space now" in page and "[error at 2026-11-10]" in page
     assert "8 indexed; cap 5 per language (the cap stops new imports only" in page
     assert "download is not a PDF ×4" in page and "Last success" in page

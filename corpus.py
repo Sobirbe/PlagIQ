@@ -664,6 +664,42 @@ def diagnose(db, num, passage=''):
                         'boilerplate_windows': result['boilerplate_windows']}}
 
 
+PRUNABLE = ('wikipedia',)        # only general-reference collections; never journals, theses or deposits
+
+
+def prune_collection(db, collection, keep_per_language, dry_run=True, chunk=100):
+    """Remove texts of a general-reference collection (only Wikipedia), keeping the longest
+    `keep_per_language` per language. Never touches journals, theses, CyberLeninka or deposits.
+    Deletes in chunks with a WAL checkpoint after each, so a large removal cannot fill the disk.
+    Returns {"remove": {lang: n}, "keep": {lang: n}, "removed": [{title, url, language, words}]}."""
+    if collection not in PRUNABLE:
+        raise ValueError(f'Only these collections can be pruned: {", ".join(PRUNABLE)}')
+    keep_per_language = max(0, int(keep_per_language))
+    groups = {}
+    for num, identifier, raw in db.execute('SELECT num, id, metadata FROM sources'):
+        m = json.loads(raw)
+        if category(m) == collection and m.get('rights_basis') not in DEPOSITS:
+            groups.setdefault(m.get('language', '?'), []).append((int(m.get('words') or 0), num, identifier, m))
+    plan, removed = {'remove': {}, 'keep': {}}, []
+    doomed = []
+    for lang, items in groups.items():
+        items.sort(key=lambda x: (-x[0], x[1]))          # longest first: most text per article kept
+        plan['keep'][lang] = min(len(items), keep_per_language)
+        plan['remove'][lang] = len(items) - plan['keep'][lang]
+        for words, num, identifier, m in items[keep_per_language:]:
+            doomed.append(num)
+            removed.append({'title': m.get('title', ''), 'url': m.get('url', ''), 'language': lang, 'words': words})
+    if not dry_run:
+        for start in range(0, len(doomed), chunk):
+            part = doomed[start:start + chunk]
+            marks = ','.join('?' * len(part))
+            with db:
+                db.execute(f'DELETE FROM windows WHERE source IN ({marks})', part)
+                db.execute(f'DELETE FROM sources WHERE num IN ({marks})', part)
+            db.execute('PRAGMA wal_checkpoint(TRUNCATE)')
+    return {**plan, 'removed': removed}
+
+
 def inventory(db):
     rows = [json.loads(raw) for (raw,) in db.execute('SELECT metadata FROM sources')]
     return sorted(rows, key=lambda m: (m['language'], m.get('title', '')))

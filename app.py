@@ -569,6 +569,26 @@ async def admin_page(request: Request):
                         headers={"Cache-Control": "no-store"})
 
 
+@app.post("/admin/prune", response_class=HTMLResponse)
+async def admin_prune(request: Request, keep: int = Form(100, ge=0, le=100000), confirm_text: str = Form("", max_length=40)):
+    """Owner-only: preview, or with the typed confirmation remove, Wikipedia articles beyond `keep` per language."""
+    owner(request)
+    confirm = confirm_text.strip().upper() == admin.CONFIRM_WORDS
+    result, error = None, ""
+    if confirm_text.strip() and not confirm:
+        error = f"The confirmation text did not match: type {admin.CONFIRM_WORDS} exactly. Nothing was removed."
+    try:
+        result = await engine_client.prune(keep, confirm)
+    except EngineError as exc:
+        error = str(exc)
+    data = await engine_library() if corpus_configured() else None
+    inventory = await engine_client.inventory() if data is not None else None
+    LIBRARY_CACHE["at"] = 0                                     # public counts refresh at once
+    return HTMLResponse(admin.page({"available": data is not None, **(data or {})}, "", inventory, "",
+                                   admin.prune_form(inventory, result, error, keep)),
+                        headers={"Cache-Control": "no-store"})
+
+
 @app.post("/admin/diagnostic", response_class=HTMLResponse)
 async def admin_diagnostic(request: Request, doi: str = Form("", max_length=300), title: str = Form("", max_length=500),
                            passage: str = Form("", max_length=5000)):
