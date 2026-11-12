@@ -10,6 +10,7 @@ import os
 import aidetect
 import auth
 import institutions
+import payments
 import verify
 import websearch
 from engine_client import configured as engine_configured
@@ -73,6 +74,10 @@ def checklist(library, probe=""):
          "PANGRAM_API_KEY on the website (Part 3j)"),
         ("Protected archive", engine_configured() and auth.enabled(), "on" if engine_configured() and auth.enabled() else "needs the engine and sign-in",
          "engine (Part 2) and Telegram sign-in (Part 3i); privacy notice reviewed (Part 3k)"),
+        ("Payments (test mode only)", payments.enabled() or (None if os.environ.get("PAYMENTS_ENABLED") != "1" else False),
+         "on: " + ", ".join(payments.providers()) + " (sandbox; no real money)" if payments.enabled() else
+         "off (optional)" if os.environ.get("PAYMENTS_ENABLED") != "1" else payments.problem(),
+         "PAYMENTS_ENABLED=1, PAYMENTS_MODE=test and the Payme and/or Click test keys on the website (Part 3o)"),
         ("Partner universities", bool(institutions.configured()) or None, ", ".join(institutions.configured()) or "none yet (optional)",
          "INSTITUTIONS on the website (Part 3l)"),
     ]
@@ -120,10 +125,19 @@ def page(library, probe=""):
         use = (f"<table><tr><th>Accounts</th><td>{stats['users']:,}</td></tr><tr><th>Checks today</th><td>{stats['checks_today']:,}</td></tr>"
                f"<tr><th>Checks in the last 7 days</th><td>{stats['checks_week']:,} ({esc(modes)})</td></tr>"
                f"<tr><th>Checks in total</th><td>{stats['checks_total']:,}</td></tr></table>")
+    pay = "<p>Payments are off.</p>"
+    pstats = payments.stats() if payments.enabled() else None
+    if pstats:
+        rows_paid = "".join(f"<tr><th>{esc(p['provider'])} ({esc(p['mode'])})</th><td>{p['orders']:,} paid top-ups, "
+                            f"{p['uzs']:,} so'm</td></tr>" for p in pstats["paid"]) or "<tr><th>Paid top-ups</th><td>none yet</td></tr>"
+        pay = (f"<p class=\"warn\">Test mode: amounts are sandbox payments, not real money.</p><table>{rows_paid}"
+               f"<tr><th>Unpaid orders</th><td>{pstats['pending']:,}</td></tr>"
+               f"<tr><th>Paid checks</th><td>{pstats['checks_charged']:,} ({pstats['charged_uzs']:,} so'm after refunds)</td></tr>"
+               f"<tr><th>Balances held for users</th><td>{pstats['balances_uzs']:,} so'm</td></tr></table>")
     backup = ('<ul><li><a href="/admin/backup/archive.jsonl.gz">Download the archive deposits</a> (students\' and universities\' '
               'works: the only library content that cannot be downloaded again). Restore with '
               '<code>python corpus.py --db /data/corpus.sqlite3 --restore-archive FILE</code> in the engine shell.</li>'
-              '<li><a href="/admin/backup/accounts.sqlite3">Download the accounts database</a> (Telegram names and check log).</li></ul>'
+              '<li><a href="/admin/backup/accounts.sqlite3">Download the accounts database</a> (Telegram names, check log, balances and payment records).</li></ul>'
               '<p>Keep backups encrypted (for example in a password-protected archive) in a place only you control. '
               'Also turn on Railway volume backups for the engine and the website (DEPLOYMENT.md, Part 5b).</p>')
     return (f'<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
@@ -133,5 +147,5 @@ def page(library, probe=""):
             f'th,td{{text-align:left;padding:7px 8px;border-bottom:1px solid #e6eeed;vertical-align:top}}td.h{{color:#7a4a00;font-size:13px}}'
             f'.warn{{color:#9b2c16;font-weight:700}}code{{background:#f2f4f4;padding:1px 4px;border-radius:4px}}</style></head><body><main>'
             f'<h1>PlagIQ owner dashboard</h1><section><h2>Setup checklist</h2><table>{rows}</table></section>'
-            f'<section><h2>Library</h2>{lib}</section><section><h2>Usage</h2>{use}</section>'
+            f'<section><h2>Library</h2>{lib}</section><section><h2>Usage</h2>{use}</section><section><h2>Payments</h2>{pay}</section>'
             f'<section><h2>Backups</h2>{backup}</section></main></body></html>')

@@ -27,6 +27,7 @@ import institutions
 import admin
 from fastapi.responses import FileResponse, StreamingResponse
 import pricing
+import payments
 import verify
 import extract
 from discovery import discover
@@ -291,7 +292,8 @@ def verify_page(request: Request, ui: str = ""):
 def health():
     return {"status":"ok","version":VERSION,"corpus_engine_configured":corpus_configured(),
             "web_search":websearch.settings()[0],"web_providers":websearch.providers(),"web_max_excerpts":websearch.max_queries(),
-            "login":auth.public_config(),"ai_detector":aidetect.settings(),"archive":corpus_configured() and auth.enabled()}
+            "login":auth.public_config(),"ai_detector":aidetect.settings(),"archive":corpus_configured() and auth.enabled(),
+            "payments":{"enabled":payments.enabled(),"mode":payments.mode() if payments.enabled() else ""}}
 
 
 def _secure(request):
@@ -513,7 +515,108 @@ def admin_backup_accounts(request: Request):
 
 @app.get("/api/pricing")
 def pricing_config():
-    return pricing.public_config()
+    config = pricing.public_config()
+    if payments.enabled():
+        config.update(payments_enabled=True, status=payments.mode())
+    return config
+
+
+# ------------------------------------------------------------- payments (test mode only)
+
+def signed_in(request):
+    user = auth.read(request.cookies.get(auth.COOKIE))
+    if not user:
+        raise ApiError(401, "login_required", "Sign in with Telegram first.")
+    return user
+
+
+@app.get("/api/payments")
+async def payments_overview(request: Request):
+    user = auth.read(request.cookies.get(auth.COOKIE))
+    config = payments.public_config()
+    if user and config["enabled"]:
+        config["account"] = await run_in_threadpool(payments.account, user)
+    return config
+
+
+@app.post("/api/payments/order")
+async def payments_order(request: Request):
+    user = signed_in(request)
+    try:
+        data = await request.json()
+    except ValueError:
+        raise ApiError(400, "invalid_request", "Invalid request.")
+    if not isinstance(data, dict):
+        raise ApiError(400, "invalid_request", "Invalid request.")
+    try:
+        return await run_in_threadpool(payments.create_order, user, str(data.get("provider", "")),
+                                       data.get("amount_uzs"), str(data["package"]) if data.get("package") else None)
+    except payments.PaymentError as exc:
+        raise ApiError(400 if exc.code == "invalid_amount" else 503, exc.code, str(exc))
+
+
+@app.get("/api/payments/order/{order_id}")
+async def payments_order_status(order_id: str, request: Request):
+    user = signed_in(request)
+    row = await run_in_threadpool(payments.order, user, order_id)
+    if not row:
+        raise ApiError(404, "not_found", "Order not found.")
+    row.pop("provider_ref", None)
+    return row
+
+
+@app.get("/payments/receipt/{order_id}", response_class=HTMLResponse)
+async def payments_receipt(order_id: str, request: Request):
+    user = signed_in(request)
+    row = await run_in_threadpool(payments.order, user, order_id)
+    if not row or row["state"] not in ("paid", "refunded"):
+        raise ApiError(404, "not_found", "No paid order with this number.")
+    return HTMLResponse(payments_receipt_html(row, user))
+
+
+def payments_receipt_html(row, user):
+    esc = html.escape
+    when = datetime.fromtimestamp(row["paid"] / 1000, timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    seller = os.environ.get("SELLER_NAME", "PlagIQ")
+    tin = os.environ.get("SELLER_TIN", "")
+    test = row["mode"] == "test"
+    lines = [("Order / Buyurtma / Заказ", row["id"]), ("Date / Sana / Дата", when),
+             ("Customer / Mijoz / Клиент", user["name"]),
+             ("Paid with / To‘lov / Оплата", {"payme": "Payme", "click": "Click"}.get(row["provider"], row["provider"])),
+             ("Paid / To‘langan / Оплачено", f"{row['pay_uzs']:,} so'm".replace(",", " ")),
+             ("Added to balance / Balansga / На баланс", f"{row['credit_uzs']:,} so'm".replace(",", " ")),
+             ("Provider reference", row.get("provider_ref") or "—"),
+             ("Status", "refunded / qaytarildi / возвращено" if row["state"] == "refunded" else "paid / to‘langan / оплачено")]
+    table = "".join(f"<tr><th>{esc(a)}</th><td>{esc(str(b))}</td></tr>" for a, b in lines)
+    banner = ('<p class="test">TEST PAYMENT — no real money was taken. Sinov to‘lovi — haqiqiy pul olinmadi. '
+              'Тестовый платёж — реальные деньги не списаны.</p>') if test else ""
+    return (f'<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+            f'<title>PlagIQ receipt {esc(row["id"])}</title><style>body{{font-family:system-ui,sans-serif;background:#f7f9f7;color:#122a32;margin:0}}'
+            f'main{{max-width:620px;margin:24px auto;background:#fff;border:1px solid #dce6e5;border-radius:14px;padding:22px}}'
+            f'table{{border-collapse:collapse;width:100%;font-size:14px}}th,td{{text-align:left;padding:8px;border-bottom:1px solid #e6eeed}}'
+            f'.test{{background:#fff3cd;color:#7a4a00;padding:10px;border-radius:8px;font-weight:700}}small{{color:#51676a}}'
+            f'@media print{{button{{display:none}}}}</style></head><body><main><h1>{esc(seller)} — receipt</h1>'
+            + (f"<p>TIN / STIR / ИНН: {esc(tin)}</p>" if tin else "") + banner +
+            f'<table>{table}</table><p><small>Balance top-up for PlagIQ checks. This page is a payment confirmation, '
+            f'not a fiscal receipt; the fiscal receipt, when issued, comes from the payment provider.</small></p>'
+            f'<button onclick="print()">Print / Chop etish / Печать</button></main></body></html>')
+
+
+@app.post("/payments/payme")
+async def payme_endpoint(request: Request):
+    # Payme expects HTTP 200 with a JSON-RPC body in every case, errors included.
+    body = await request.body()
+    reply = await run_in_threadpool(payments.payme, body, request.headers.get("authorization", ""))
+    return JSONResponse(reply, 200)
+
+
+@app.post("/payments/click/{stage}")
+async def click_endpoint(stage: str, request: Request):
+    if stage not in ("prepare", "complete"):
+        raise ApiError(404, "not_found", "Not found")
+    form = await request.form()
+    reply = await run_in_threadpool(payments.click, {k: v for k, v in form.items() if isinstance(v, str)}, stage)
+    return JSONResponse(reply, 200)
 
 
 @app.post("/api/quote")
@@ -581,16 +684,50 @@ async def check(request:Request, submission:UploadFile=File(...),
     if active_scans >= scan_capacity():
         raise ApiError(503, "server_busy", "PlagIQ is processing other documents. Try again in a minute.")
     rate_limit(request)
+    original, price, charge_id = None, 0, None
+    if payments.enabled():
+        # The price is known from the word count before anything is checked; it is taken from the
+        # balance first and given back if the check fails.
+        if not user:
+            raise ApiError(401, "login_required", "Sign in with Telegram to run a check.")
+        original = await read_file(submission)
+        words = pricing.count_words(original)
+        price = payments.price_for(mode, words, ai_check)
+        if price is None:
+            raise ApiError(413, "too_long_for_plans", "The document is larger than the biggest plan. Contact us.")
+        try:
+            charge_id = await run_in_threadpool(payments.charge, user, price, f"{mode} check, {words} words"
+                                                + (", AI detector" if ai_check else ""))
+        except payments.PaymentError as exc:
+            raise ApiError(402, exc.code, str(exc))
     active_scans += 1
     try:
         result = await analyse(submission, reference, reference_text, language, mode, options, web_search, ai_check,
-                               auth.owner_id(user), deposit)
+                               auth.owner_id(user), deposit, original)
+    except BaseException:
+        if charge_id:
+            await run_in_threadpool(payments.refund, user, charge_id, price, "check failed")
+        raise
     finally:
         active_scans -= 1
+    if charge_id:
+        unused = unused_ai_price(result, words, ai_check)
+        if unused:
+            await run_in_threadpool(payments.refund, user, charge_id, unused, "AI detector did not run")
+        result["charged_uzs"] = price - unused
     response = finish(request, result)
     if user:
         await run_in_threadpool(auth.log_check, user, result, response.headers.get("x-report-id", ""))
+    if charge_id:
+        await run_in_threadpool(payments.attach_report, charge_id, response.headers.get("x-report-id", ""))
     return response
+
+
+def unused_ai_price(result, words, ai_check):
+    """The AI-detector part of a price when the detector gave no estimate (Uzbek, too long, error)."""
+    if not ai_check or (result.get("ai") or {}).get("status") == "done":
+        return 0
+    return pricing.ai_price(words)
 
 
 async def search_library(result, original, language, owner):
@@ -642,8 +779,9 @@ def mark_own(source, owner):
 
 
 async def analyse(submission, reference, reference_text, language, mode, options=None, web_search=False, ai_check=False,
-                  owner="", archive=None):
-    original = await read_file(submission)
+                  owner="", archive=None, original=None):
+    if original is None:
+        original = await read_file(submission)
     # The menu defaults to Uzbek; when the text clearly is another language, use that
     # (search filter and normalization depend on it) and say so in the result.
     chosen = language

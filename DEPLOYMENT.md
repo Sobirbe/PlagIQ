@@ -370,7 +370,7 @@ A check now takes a little longer (usually a few seconds, at most `FULLTEXT_SECO
 
 ## Part 3d — Prices shown on the website
 
-The website shows the word count and the **planned** price as soon as a file is chosen, plus a price table and calculator. **No money is taken.** There is no payment system, and the page says checks are free during the pilot.
+The website shows the word count and the **planned** price as soon as a file is chosen, plus a price table and calculator. **No money is taken** while payments are off (the default), and the page says checks are free during the pilot. Payments in the providers' **test mode** are described in Part 3o.
 
 Default plans: Free up to 1,000 words (0 UZS), Researcher 1,001–3,500 words (15,000 UZS), Extended 3,501–15,000 words (25,000 UZS), Thesis 15,001–40,000 words (35,000 UZS). Larger documents are shown as "contact us". Other services shown: AI detector 3 UZS per word (minimum 6,000), certificate with QR code included free, packages "10 checks → +2 free" and "20 checks → +5 free". For comparison, antiplag.uz (November 2026) charges 46,000 UZS per plagiarism check, 4 UZS per word for its AI detector (minimum 10,000), 6,000 UZS for a certificate, and gives +1 free for 10 checks and +3 for 20.
 
@@ -384,7 +384,30 @@ To change the plans, add a `PRICING_TIERS` variable to the website service in Ra
 
 `PRICING_PACKAGES` changes the packages, for example `[{"checks":10,"bonus":2},{"checks":20,"bonus":5}]`.
 
-Keep the ids `free`, `researcher`, `extended` and `thesis`, which have names and descriptions in all three languages. Change only the numbers. If the value is invalid, the site quietly uses the defaults. Before charging real money, measure the real cost per check and add a payment provider (Payme, Click or Uzum) in a separate, reviewed change.
+Keep the ids `free`, `researcher`, `extended` and `thesis`, which have names and descriptions in all three languages. Change only the numbers. If the value is invalid, the site quietly uses the defaults. Before charging real money, measure the real cost per check; switching from test mode to real payments needs a separate, reviewed change (Part 3o).
+
+## Part 3o — Payments with Payme and Click (TEST MODE ONLY)
+
+This version takes **sandbox payments only**: it refuses to switch on unless `PAYMENTS_MODE=test`, it sends Payme users to the Payme sandbox (test.paycom.uz), and every page, receipt and the /admin dashboard says "TEST MODE". Real payments need a later, separately reviewed change. Uzum Bank is not included yet.
+
+**How it works.** A signed-in user tops up a balance (any amount between `TOPUP_MIN` and `TOPUP_MAX`, or a package: "10 checks + 2 free" means paying 10 × the plan price and getting 12 × the plan price on the balance). Each check costs its plan price (Part 3d), plus the AI-detector price if chosen; Free-plan checks cost nothing. The price is taken before the check and given back automatically if the check fails, or (for the AI part) if the AI detector could not run, for example for Uzbek text. Each paid top-up has a printable receipt in the account menu. This receipt confirms the payment; it is not a fiscal receipt.
+
+**Payme sandbox** (business.paycom.uz → your cashbox → "Песочница"/sandbox; docs: developer.help.paycom.uz):
+1. In the Payme cabinet, set the **endpoint URL** to `https://plagiq-production.up.railway.app/payments/payme`, the account field to **`order_id`**, and the account type to **one-time** ("Одноразовый").
+2. On the **website** service in Railway → **Variables**, add: `PAYMENTS_ENABLED=1`, `PAYMENTS_MODE=test`, `PAYME_MERCHANT_ID` (the cashbox ID) and `PAYME_TEST_KEY` (the **test** key from the cabinet). Type the key only into Railway; never paste it into a chat or a file.
+3. Open the sandbox and run its tests: wrong key (−32504), wrong amount (−31001), non-existent order (−31050), then create, repeat create, perform, cancel. For an order number and amount, start a top-up on the site and copy the order number from the sandbox checkout page.
+4. Optional, for Payme's fiscal data: `PAYME_IKPU` (the IKPU/MXIK code of the service), `PAYME_PACKAGE_CODE`, `PAYME_VAT_PERCENT`.
+
+**Click** (docs: docs.click.uz/shop-api):
+1. Ask Click for a **test service** and give them the Prepare URL `…/payments/click/prepare` and the Complete URL `…/payments/click/complete`.
+2. Add `CLICK_SERVICE_ID`, `CLICK_MERCHANT_ID` and `CLICK_SECRET_KEY` to the website service.
+3. Use Click's Playground (docs.click.uz/testing/playground) to send Prepare and Complete requests. Click has no separate sandbox website, so **use only the test service's keys**. A live service's keys would take real money even though PlagIQ says "test".
+
+**Optional:** `TOPUP_MIN` (default 1000), `TOPUP_MAX` (default 2000000), `SELLER_NAME` and `SELLER_TIN` (shown on receipts).
+
+**What is stored:** orders, provider transactions and the balance ledger, in the accounts database on the website's `/data` volume (it is included in the accounts backup on /admin). These records are kept when a user deletes their account, for accounting. Card details never reach PlagIQ. The privacy notice says this; have the retention period confirmed by your lawyer.
+
+**Turning it off:** set `PAYMENTS_ENABLED=0` (or delete it). Checks become free again; balances stay stored.
 
 ## Part 5a — Owner dashboard (/admin)
 
