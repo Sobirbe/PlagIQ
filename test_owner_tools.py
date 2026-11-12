@@ -97,3 +97,20 @@ def test_privacy_page_public_in_three_languages(monkeypatch):
     assert page.status_code == 200
     for expected in ("Maxfiylik siyosati", "Политика конфиденциальности", "Privacy notice", "ZRU-547", "Pangram", "DRAFT"):
         assert expected in page.text
+
+
+@pytest.mark.parametrize("url, key, expected", [
+    ("", "k" * 40, "ENGINE_URL is empty"),
+    ("http://${{engine.RAILWAY_PRIVATE_DOMAIN}}:8000", "k" * 40, "unresolved"),
+    ("http://:8000", "k" * 40, "host is “empty”"),
+    ("http://plagiq-engine.example.com:8000", "k" * 40, "does not point to the engine"),
+    ("http://engine.railway.internal:8000", "", "ENGINE_API_KEY is empty"),
+    ("http://engine.railway.internal:8000", "short-key", "only 9 characters"),
+    ("http://engine.railway.internal:8000", "k" * 40, ""),
+])
+def test_engine_problem_explains_what_is_wrong(monkeypatch, url, key, expected):
+    import admin
+    monkeypatch.setenv("ENGINE_URL", url)
+    monkeypatch.setenv("ENGINE_API_KEY", key)
+    problem = admin.engine_problem()
+    assert (expected in problem) if expected else problem == ""
