@@ -151,7 +151,49 @@ def evaluate(name, flores, abstracts, target="ru", seed=7):
             row[tag + "fa_academic"] = float(np.mean(ok("academic", neg_all["academic"]))) if len(neg_acad) else None
         sweep.append(row)
     result["sweep"] = sweep
+    if os.environ.get("CROSSLANG_SENTENCE_FIRST") == "1":
+        result["sentence_first"] = sentence_first(model, name, library, positives, mixed, news_negatives, academic_negatives)
     return result
+
+
+def sentence_first(model, name, library, positives, mixed, news_negatives, academic_negatives):
+    """Search sentence by sentence (no passage gate): a query is flagged for a library item when at least
+    `need` of its sentences each find their best match in that item with similarity >= cutoff."""
+    import numpy as np
+    lib_sents, owner = [], []
+    for i, text in enumerate(library):
+        for sent in sentences(text):
+            lib_sents.append(sent)
+            owner.append(i)
+    owner = np.array(owner)
+    lib_vec = embed(model, name, lib_sents)
+
+    def best_items(queries):
+        out = []
+        for q in queries:
+            qv = embed(model, name, sentences(q))
+            sims = qv @ lib_vec.T
+            out.append((owner[sims.argmax(1)], sims.max(1)))
+        return out
+
+    groups = {k: best_items(v) for k, v in (("full", positives), ("mixed", mixed), ("news", news_negatives),
+                                             ("academic", academic_negatives))}
+    rows = []
+    for cutoff in (0.75, 0.80, 0.85):
+        for need in (2, 3):
+            def flagged(items, scores, target=None):
+                hits = items[scores >= cutoff]
+                if not len(hits):
+                    return False
+                values, counts = np.unique(hits, return_counts=True)
+                return counts.max() >= need and (target is None or values[counts.argmax()] == target)
+            row = {"cutoff": cutoff, "sentences_needed": need}
+            for kind in ("full", "mixed"):
+                row[kind] = float(np.mean([flagged(i, s, n) for n, (i, s) in enumerate(groups[kind])]))
+            for kind in ("news", "academic"):
+                row["fa_" + kind] = float(np.mean([flagged(i, s) for i, s in groups[kind]])) if groups[kind] else None
+            rows.append(row)
+    return rows
 
 
 def main():
