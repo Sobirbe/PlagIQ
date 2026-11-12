@@ -135,7 +135,7 @@ try:
             messages = []
             page.once('dialog', lambda d: (messages.append(d.message), d.accept()))
             page.locator('#account .menu button', has_text='Delete my account').click()
-            page.wait_for_selector('#account button.tg')
+            page.wait_for_selector('#account summary.signin-open')
             assert 'unspent balance of 5,000 UZS is lost' in messages[0], messages
             page.goto(BASE + '/login#tgAuthResult=' + tg_result(42 + width))
             page.wait_for_function('() => document.querySelector("#account summary").textContent.includes("UZS")')

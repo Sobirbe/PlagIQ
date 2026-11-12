@@ -96,14 +96,14 @@ try:
                 page.locator('#account summary.signin-open').click()
                 page.locator('#account button.tg').click()
             assert popup.value.url.startswith('https://oauth.telegram.org/auth?bot_id=123456789&origin=http%3A%2F%2F127.0.0.1%3A8146')
-            page.wait_for_function("() => (document.querySelector('#account summary')||{}).textContent.includes('Dilnoza')")  # PlagIQ tab stays open
+            page.wait_for_function("() => ((document.querySelector('#account summary')||{}).textContent||'').includes('Dilnoza')")  # PlagIQ tab stays open
             assert 'Dilnoza Karimova' in page.locator('#account summary').inner_text()
             assert page.locator('#status').inner_text() == ''                        # "sign in first" message cleared
             page.locator('#account summary').click()
             page.locator('#account .menu button', has_text='Sign out').click()
             page.wait_for_selector('#account summary.signin-open')
             page.goto('http://127.0.0.1:8146/login#tgAuthResult=' + tg_result())    # redirect fallback still works
-            page.wait_for_function("() => (document.querySelector('#account summary')||{}).textContent.includes('Dilnoza')")
+            page.wait_for_function("() => ((document.querySelector('#account summary')||{}).textContent||'').includes('Dilnoza')")
             assert 'Dilnoza Karimova' in page.locator('#account summary').inner_text() and page.url.endswith('/')
             assert page.locator('#login-note').is_hidden()
             # AI detector mode
