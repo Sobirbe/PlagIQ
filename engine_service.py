@@ -262,7 +262,7 @@ def library():
     allowed = {f'wikipedia-{lang}' for lang in LANGUAGES} | set(LANGUAGES) | {'cyberleninka', 'uz-journals', 'disk'}
     status = {name: {k: v for k, v in info.items() if k in (
                   'finished', 'imported', 'updated', 'failed', 'staged_total', 'failed_total', 'listing_complete',
-                  'dump_complete', 'estimated_cost_usd', 'error', 'language_corrected', 'staged', 'skipped',
+                  'dump_complete', 'estimated_cost_usd', 'error', 'note', 'language_corrected', 'staged', 'skipped',
                   'journals', 'downloaded', 'surveyed', 'approved')}
               for name, info in import_job.read_status().items() if name in allowed and isinstance(info, dict)}
     db_path = os.environ.get('CORPUS_DB', 'corpus.sqlite3')
