@@ -155,15 +155,10 @@ def harvest_batch(out, max_records=200, set_spec=None, since=None, fetcher=None)
 def import_entries(out, entries, db_path=None):
     """Index staged entries (all-or-nothing); returns how many were imported."""
     import corpus
+    import staging
     if not entries:
         return 0
-    batch = Path(out) / ".batch-manifest.json"
-    batch.write_text(json.dumps(entries, ensure_ascii=False), "utf-8")
-    try:
-        with closing(corpus.connect(db_path)) as db:
-            return len(corpus.import_manifest(db, batch))
-    finally:
-        batch.unlink(missing_ok=True)
+    return staging.import_and_clear(out, entries, db_path)["imported"]
 
 
 def _delay():
@@ -188,11 +183,18 @@ def run(batch=200, set_spec=None, since=None, db_path=None, root=None, fetcher=N
     root = Path(root or import_job.staging_root())
     out = root / "cyberleninka"
     status = {"started": date.today().isoformat(), "imported": 0, "staged": 0, "skipped": 0, "error": None}
+    import staging
     try:
+        retry = staging.import_and_clear(out, staging.leftover(out), db_path)    # files left by a failed run
+        if retry["stopped"]:
+            raise ValueError(retry["stopped"])
         added, review = harvest_batch(out, batch, set_spec, since, fetcher)
         status["staged"] = len(added)
         status["skipped"] = sum(1 for r in review if r["status"] in ("skipped", "review"))
-        status["imported"] = import_entries(out, added, db_path)
+        result = staging.import_and_clear(out, added, db_path)
+        status["imported"] = retry["imported"] + result["imported"]
+        if result["stopped"]:
+            status["error"] = result["stopped"]
     except (HarvestError, OSError, ValueError) as exc:
         status["error"] = str(exc)[:300]
     status["finished"] = date.today().isoformat()

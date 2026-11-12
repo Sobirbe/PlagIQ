@@ -21,6 +21,7 @@ from fastapi.responses import StreamingResponse
 from corpus import DEPOSITS, LANGUAGES, category, connect, corpus_version, deposits, ingest, inventory, remove_deposit, search
 from security import SecurityMiddleware
 import import_job
+import staging
 import wikipedia_import
 import cyberleninka
 import uz_journals
@@ -33,6 +34,17 @@ def import_loop():
     """Background OpenAlex import when AUTO_IMPORT is set. Runs, then sleeps AUTO_IMPORT_HOURS."""
     while not import_stop.is_set():
         langs, batch, hours, cost = import_job.settings()
+        if staging.low_disk():
+            freed = staging.purge_leftovers(import_job.staging_root())
+            if freed:
+                log.warning("low disk: removed %s MB of downloaded files that were not yet indexed", freed // (1024 * 1024))
+        paused = staging.low_disk()
+        if paused:
+            log.warning("imports paused: %s", paused)
+            import_job.write_status(import_job.staging_root(), "disk", {"error": paused})
+            import_stop.wait(min(hours, 6) * 3600)
+            continue
+        import_job.write_status(import_job.staging_root(), "disk", {"error": None})
         for language in langs:
             if import_stop.is_set():
                 return
@@ -227,7 +239,7 @@ def library():
     by_source = {}
     for m in rows:
         by_source[category(m)] = by_source.get(category(m), 0) + 1
-    allowed = {f'wikipedia-{lang}' for lang in LANGUAGES} | set(LANGUAGES) | {'cyberleninka', 'uz-journals'}
+    allowed = {f'wikipedia-{lang}' for lang in LANGUAGES} | set(LANGUAGES) | {'cyberleninka', 'uz-journals', 'disk'}
     status = {name: {k: v for k, v in info.items() if k in (
                   'finished', 'imported', 'updated', 'failed', 'staged_total', 'failed_total', 'listing_complete',
                   'dump_complete', 'estimated_cost_usd', 'error', 'language_corrected', 'staged', 'skipped',
@@ -237,6 +249,7 @@ def library():
     try:
         usage = shutil.disk_usage(os.path.dirname(os.path.abspath(db_path)))
         disk = {'db_bytes': os.path.getsize(db_path) if os.path.exists(db_path) else 0,
+                'staging_bytes': staging.size(import_job.staging_root()),
                 'free_bytes': usage.free, 'total_bytes': usage.total}
     except OSError:
         disk = None

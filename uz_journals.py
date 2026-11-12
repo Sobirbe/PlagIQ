@@ -132,7 +132,11 @@ def harvest_all(out, batch=50, do_import=False, db_path=None, fetcher_factory=No
     import corpus
     out = Path(out)
     totals = {"journals": 0, "downloaded": 0, "imported": 0, "errors": 0}
+    import staging
     for row in approved(out):
+        if do_import and staging.low_disk(db_path):
+            totals["stopped"] = staging.low_disk(db_path)
+            break
         slug = re.sub(r"[^A-Za-z0-9]+", "_", urlsplit(row["endpoint"]).netloc + urlsplit(row["endpoint"]).path)[:80]
         folder = out / slug
         manifest = folder / "manifest.json"
@@ -146,23 +150,14 @@ def harvest_all(out, batch=50, do_import=False, db_path=None, fetcher_factory=No
             continue
         entries = json.loads(manifest.read_text("utf-8"))[before:] if manifest.exists() else []
         totals["downloaded"] += len(entries)
-        if do_import and entries:
-            batch_file = folder / ".batch-manifest.json"
-            batch_file.write_text(json.dumps(entries, ensure_ascii=False), "utf-8")
-            try:
-                with closing(corpus.connect(db_path)) as db:
-                    totals["imported"] += len(corpus.import_manifest(db, batch_file))
-            except ValueError:
-                # One bad record must not block the others: import the valid ones one by one.
-                for entry in entries:
-                    batch_file.write_text(json.dumps([entry], ensure_ascii=False), "utf-8")
-                    try:
-                        with closing(corpus.connect(db_path)) as db:
-                            totals["imported"] += len(corpus.import_manifest(db, batch_file))
-                    except ValueError:
-                        totals["errors"] += 1
-            finally:
-                batch_file.unlink(missing_ok=True)
+        if do_import:
+            import staging
+            result = staging.import_and_clear(folder, staging.leftover(folder), db_path)   # new and earlier leftovers
+            totals["imported"] += result["imported"]
+            totals["errors"] += result["failed"]
+            if result["stopped"]:
+                totals["stopped"] = result["stopped"]
+                break
     return totals
 
 
@@ -185,7 +180,10 @@ def run(batch=50, db_path=None, root=None):
             rows = survey(out)
             status["surveyed"] = len(rows)
             status["approved"] = sum(r["status"] == "ok" for r in rows)
-        status.update(harvest_all(out, batch, True, db_path))
+        totals = harvest_all(out, batch, True, db_path)
+        status.update({k: v for k, v in totals.items() if k != "stopped"})
+        if totals.get("stopped"):
+            status["error"] = totals["stopped"]
     except (HarvestError, OSError, ValueError, ParseError) as exc:
         status["error"] = str(exc)[:300]
     status["finished"] = date.today().isoformat()

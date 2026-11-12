@@ -184,6 +184,7 @@ def remember(user):
 
 def log_check(user, result, report_id):
     ai = (result.get("ai") or {}).get("fraction_ai")
+    remember(user)                     # the account row may be missing (e.g. signed in before the volume existed)
     with _lock, _connect() as db:
         db.execute("INSERT INTO checks (user, date, mode, words, percent, ai, report) VALUES (?, ?, ?, ?, ?, ?, ?)",
                    (user["id"], _now(), result.get("mode", ""), int(result.get("total_tokens") or 0),

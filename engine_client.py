@@ -287,7 +287,7 @@ async def library():
         finished = [str(v.get("finished"))[:25] for v in imports.values() if isinstance(v, dict) and v.get("finished")]
         return {"language_counts": {lang: _int(counts.get(lang, 0), 0, 10**9) for lang in LANGUAGES},
                 "total": _int(data.get("total", 0), 0, 10**9),
-                "disk": {k: _int((data.get("disk") or {}).get(k, 0), 0, 10**15) for k in ("db_bytes", "free_bytes", "total_bytes")}
+                "disk": {k: _int((data.get("disk") or {}).get(k, 0), 0, 10**15) for k in ("db_bytes", "staging_bytes", "free_bytes", "total_bytes")}
                         if isinstance(data.get("disk"), dict) else None,
                 "imports": {str(k)[:40]: {f: v.get(f) for f in ("finished", "imported", "error", "staged", "journals", "downloaded")
                                           if isinstance(v.get(f), (int, str, type(None)))}
