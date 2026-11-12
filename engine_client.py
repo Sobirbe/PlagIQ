@@ -372,3 +372,20 @@ async def diagnostic(doi="", title="", passage=""):
     if not isinstance(data, dict) or not isinstance(data.get("results"), list):
         raise EngineError("The engine gave an unexpected answer.", "engine_unavailable")
     return data
+
+
+async def prune(keep_per_language, confirm=False):
+    """Owner-only Wikipedia pruning through the engine (preview unless confirm). Raises EngineError."""
+    if not configured():
+        raise EngineError("Private corpus engine is not configured.", "engine_not_configured")
+    try:
+        async with _owner_client(timeout=600.0) as client:
+            response = await client.post("/v1/prune", json={"collection": "wikipedia", "keep_per_language": int(keep_per_language),
+                                                            "confirm": bool(confirm)})
+    except httpx.HTTPError as exc:
+        raise EngineError("The engine did not answer (" + type(exc).__name__ + ").", "engine_unavailable")
+    if response.status_code == 429:
+        raise EngineError("The engine is busy; try again in a minute.", "engine_busy")
+    if response.status_code != 200:
+        raise EngineError(f"The engine answered {response.status_code}.", "engine_unavailable")
+    return response.json()

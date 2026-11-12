@@ -143,11 +143,21 @@ def run(lang, batch=1000, min_words=300, source=None, db_path=None, root=None):
     try:
         with closing(connect(db_path)) as db, closing(open_dump(source)) as stream:
             have = count_category(db, "wikipedia", lang)
+            wiki_all = count_category(db, "wikipedia")
+            total = db.execute("SELECT COUNT(*) FROM sources").fetchone()[0]
+            share = max_share()
             for position, (page_id, title, rev, year, markup) in enumerate(iter_articles(stream), 1):
                 if position <= state["position"]:
                     continue                                   # done in an earlier run
                 if have + counts["imported"] >= cap and not state["pages"].get(str(page_id)):
                     note = f"Wikipedia limit reached ({cap} {lang} articles, WIKIPEDIA_MAX_ARTICLES): not a fault"
+                    position -= 1
+                    break
+                if (share < 1 and not state["pages"].get(str(page_id))
+                        and wiki_all + counts["imported"] + 1 > share * (total + counts["imported"] + 1)):
+                    note = (f"Wikipedia share limit reached ({wiki_all + counts['imported']:,} of "
+                            f"{total + counts['imported']:,} texts; WIKIPEDIA_MAX_SHARE={share:.0%}): not a fault. "
+                            "More journal and university texts make room.")
                     position -= 1
                     break
                 if counts["imported"] + counts["updated"] >= batch:
@@ -196,10 +206,8 @@ def run(lang, batch=1000, min_words=300, source=None, db_path=None, root=None):
     state_path.write_text(json.dumps(state), "utf-8")
     status = {"language": lang, "source": "wikipedia", "finished": datetime.now(timezone.utc).isoformat(timespec="seconds"),
               **counts, "failure_examples": failures, "dump_complete": finished, "error": error, "note": note, "corpus_sources": sources, "corpus_version": version}
-    status_path = root / "import-status.json"
-    data = json.loads(status_path.read_text("utf-8")) if status_path.exists() else {}
-    data[f"wikipedia-{lang}"] = status
-    status_path.write_text(json.dumps(data, ensure_ascii=False, indent=1), "utf-8")
+    import import_job
+    import_job.write_status(root, f"wikipedia-{lang}", status)     # keeps last success and error time
     return status
 
 
@@ -209,6 +217,15 @@ def max_articles():
         return max(0, int(os.environ.get("WIKIPEDIA_MAX_ARTICLES", "2000")))
     except ValueError:
         return 2000
+
+
+def max_share():
+    """Wikipedia's ceiling as a share of the whole library (WIKIPEDIA_MAX_SHARE, percent, default 10).
+    New articles are not imported while Wikipedia is at or above it; 100 turns the ceiling off."""
+    try:
+        return min(max(float(os.environ.get("WIKIPEDIA_MAX_SHARE", "10")), 0.0), 100.0) / 100
+    except ValueError:
+        return 0.10
 
 
 def settings():

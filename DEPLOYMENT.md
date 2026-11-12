@@ -557,6 +557,39 @@ The repository cannot deploy for you. Use a separate Railway **staging environme
 
 No payment, sign-in or report variables change.
 
+## Part 5e — Wikipedia as a small supplementary collection (ceiling and pruning)
+
+For an academic checker, journal articles, dissertations and theses, conference papers and university repositories come first. Wikipedia stays only as a small supplement.
+
+**Ceiling on new imports (engine):**
+- `WIKIPEDIA_MAX_SHARE` (percent of the whole library, default **10**). While Wikipedia is at or above it, no new Wikipedia article is imported. /admin shows "Wikipedia share limit reached … not a fault".
+- Academic sources are never limited by it, and every academic text added makes room again.
+- `100` turns the ceiling off. A new, empty library therefore gets no Wikipedia until it holds academic texts.
+- `WIKIPEDIA_MAX_ARTICLES` (per language) still applies as well.
+- To stop Wikipedia entirely, leave `AUTO_IMPORT_WIKIPEDIA` empty.
+
+**Pruning what is already indexed:** /admin → **Wikipedia share**.
+1. **Back up first:** Railway → engine → volume → Backups → create one, or check that automatic backups are on. Also download the archive deposits from /admin → Backups.
+2. Enter how many Wikipedia articles to **keep per language**, leave the confirmation empty, and press **Preview or remove**. Nothing is removed; you see how many go and the resulting share.
+   - For example, keeping 50 per language leaves 100 articles. That is under 10% once the library has 1,000 or more texts.
+3. To remove them, type **DELETE WIKIPEDIA** and press the button again.
+
+What it does:
+- removes only texts classified as Wikipedia; journals, theses, CyberLeninka and the authors' and universities' archives are never touched;
+- keeps the **longest** articles in each language;
+- deletes in chunks of 100 and gives the write-ahead space back after each chunk, so it cannot fill a nearly full disk;
+- first saves the list of removed articles (title, address, language, words) in the engine's staging folder as `pruned-wikipedia-<date>.json`.
+
+The library file does not shrink after pruning, because SQLite reuses the freed space for later imports. /admin's "library file" size stays about the same; the counts drop at once.
+
+**Verify:**
+- /admin → Library details: the Wikipedia share is near your target, and the other collections' counts are unchanged;
+- the source check on a known journal article still says "found".
+
+| Service | Variable | Default | Purpose |
+|---|---|---|---|
+| engine | `WIKIPEDIA_MAX_SHARE` | 10 | Wikipedia's ceiling, in percent of the library, for new imports (100 = off) |
+
 ## Part 4 — Checks before you approve the pull request
 
 Use only harmless sample text. Tick each item:
