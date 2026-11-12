@@ -15,6 +15,7 @@ from test_auth_ai import EN, TOKEN, sign_in
 
 KEY = "sandbox-test-key-not-real"
 CLICK_SECRET = "click-sandbox-secret"
+UZUM_PASSWORD = "uzum-test-password"
 
 
 @pytest.fixture()
@@ -23,9 +24,11 @@ def pay(monkeypatch, tmp_path):
                         "USERS_DB": str(tmp_path / "users.sqlite3"), "PAYMENTS_ENABLED": "1", "PAYMENTS_MODE": "test",
                         "PAYME_MERCHANT_ID": "5e730e8e0b852a417aa49ceb", "PAYME_TEST_KEY": KEY,
                         "CLICK_SERVICE_ID": "101", "CLICK_MERCHANT_ID": "202", "CLICK_SECRET_KEY": CLICK_SECRET,
+                        "UZUM_SERVICE_ID": "101202", "UZUM_LOGIN": "uzum-test", "UZUM_PASSWORD": UZUM_PASSWORD,
+                        "UZUM_SERVICE_NAME": "PlagIQ test",
                         "PUBLIC_ORIGIN": "https://plagiq.example"}.items():
         monkeypatch.setenv(name, value)
-    for name in ("LOGIN_REQUIRED", "SESSION_SECRET", "PRIVATE_PILOT_USER", "PRIVATE_PILOT_PASSWORD", "PAYME_IKPU"):
+    for name in ("LOGIN_REQUIRED", "SESSION_SECRET", "PRIVATE_PILOT_USER", "PRIVATE_PILOT_PASSWORD", "PAYME_IKPU", "PAYME_PACKAGE_CODE"):
         monkeypatch.delenv(name, raising=False)
     web.RATE.clear(); web.results.clear()
     return TestClient(web.app, base_url="https://plagiq.example")
@@ -77,7 +80,7 @@ def test_order_needs_login_and_valid_amount(pay):
     assert pay.post("/api/payments/order", json={"provider": "payme", "amount_uzs": 5000}).status_code == 401
     sign_in(pay)
     assert pay.post("/api/payments/order", json={"provider": "payme", "amount_uzs": 10}).json()["code"] == "invalid_amount"
-    assert pay.post("/api/payments/order", json={"provider": "uzum", "amount_uzs": 5000}).json()["code"] == "provider_unavailable"
+    assert pay.post("/api/payments/order", json={"provider": "paypal", "amount_uzs": 5000}).json()["code"] == "provider_unavailable"
 
 
 # ------------------------------------------------------------- Payme sandbox scenarios
@@ -173,9 +176,10 @@ def test_payme_fiscal_detail_only_when_configured(pay, monkeypatch):
     order = new_order(pay)
     params = {"amount": 2000000, "account": {"order_id": order["id"]}}
     assert "detail" not in rpc(pay, "CheckPerformTransaction", params)["result"]
-    monkeypatch.setenv("PAYME_IKPU", "10305008002000000")
+    monkeypatch.setenv("PAYME_IKPU", "12345678901234567")
+    monkeypatch.setenv("PAYME_PACKAGE_CODE", "000000")    # dummy test values, not real codes
     item = rpc(pay, "CheckPerformTransaction", params)["result"]["detail"]["items"][0]
-    assert item["code"] == "10305008002000000" and item["price"] == 2000000 and item["count"] == 1
+    assert item["code"] == "12345678901234567" and item["price"] == 2000000 and item["count"] == 1
 
 
 # ------------------------------------------------------------- Click
@@ -310,3 +314,149 @@ def test_packages_credit_bonus(pay):
     assert first["pay_uzs"] == 150000 and first["credit_uzs"] == 180000
     order = new_order(pay, package=first["id"], amount=None)
     assert order["pay_uzs"] == 150000 and order["credit_uzs"] == 180000
+
+
+# ------------------------------------------------------------- erasure
+
+def test_delete_account_erases_payment_records(pay):
+    sign_in(pay)
+    top_up(pay, 20000)
+    run_check(pay, EN * 7)
+    click_order = new_order(pay, "click", 15000)
+    assert balance(pay) == 5000
+    assert pay.delete("/api/me").status_code == 200
+    import sqlite3
+    with sqlite3.connect(auth.db_file()) as db:
+        for table in ("orders", "ledger", "payme_tx", "click_tx"):
+            assert db.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0] == 0, table
+    sign_in(pay)                                   # same Telegram ID signs in again: nothing is left
+    account = pay.get("/api/payments").json()["account"]
+    assert account == {"balance_uzs": 0, "ledger": [], "orders": []}
+    assert pay.post("/payments/click/prepare", data=click_form(click_order["id"], "15000", 0)).json()["error"] == -5
+
+
+def test_delete_refused_while_payment_in_progress(pay):
+    sign_in(pay)
+    order = new_order(pay)
+    rpc(pay, "CreateTransaction", {"id": "g" * 24, "time": 1, "amount": 2000000, "account": {"order_id": order["id"]}})
+    r = pay.delete("/api/me")
+    assert r.status_code == 409 and r.json()["code"] == "payment_in_progress"
+    assert pay.get("/api/me").json()["user"]                                     # account kept
+    rpc(pay, "CancelTransaction", {"id": "g" * 24, "reason": 3})
+    assert pay.delete("/api/me").status_code == 200
+
+
+def test_delete_without_payments_tables(pay, monkeypatch):
+    monkeypatch.setenv("PAYMENTS_ENABLED", "0")
+    sign_in(pay)
+    assert pay.delete("/api/me").status_code == 200
+
+
+def test_fiscal_detail_needs_both_codes(pay, monkeypatch):
+    sign_in(pay)
+    order = new_order(pay)
+    params = {"amount": 2000000, "account": {"order_id": order["id"]}}
+    monkeypatch.setenv("PAYME_IKPU", "12345678901234567")
+    monkeypatch.delenv("PAYME_PACKAGE_CODE", raising=False)
+    assert "detail" not in rpc(pay, "CheckPerformTransaction", params)["result"]
+
+
+# ------------------------------------------------------------- Uzum Bank Merchant API
+
+TRANS = "5c398d7e-76b6-11ee-96da-f3a095c6289d"
+
+
+def uzum(client, method, body, password=UZUM_PASSWORD, raw=None):
+    headers = {"Content-Type": "application/json"}
+    if password:
+        headers["Authorization"] = "Basic " + base64.b64encode(f"uzum-test:{password}".encode()).decode()
+    r = client.post(f"/payments/uzum/{method}", content=raw if raw is not None else json.dumps(body), headers=headers)
+    return r.status_code, r.json()
+
+
+def uzum_body(order_id, **extra):
+    return {"serviceId": 101202, "timestamp": int(time.time() * 1000), "params": {"account": order_id}, **extra}
+
+
+def test_uzum_order_has_no_link_but_app_steps(pay):
+    sign_in(pay)
+    order = new_order(pay, "uzum", 15000)
+    assert order["pay_url"] is None and order["service_name"] == "PlagIQ test"
+
+
+def test_uzum_auth_json_params_service(pay):
+    sign_in(pay)
+    order = new_order(pay, "uzum", 15000)
+    assert uzum(pay, "check", uzum_body(order["id"]), password="wrong") == (400, {"serviceId": None, "status": "FAILED",
+                                                                                  "errorCode": "10001"})
+    assert uzum(pay, "check", {}, raw="{oops")[1]["errorCode"] == "10002"
+    assert uzum(pay, "pay", uzum_body(order["id"]))[1]["errorCode"] == "10003"
+    assert uzum(pay, "check", {"serviceId": 101202, "timestamp": 1})[1]["errorCode"] == "10005"
+    assert uzum(pay, "check", {**uzum_body(order["id"]), "serviceId": 999})[1]["errorCode"] == "10006"
+    assert uzum(pay, "check", uzum_body("123"))[1]["errorCode"] == "10007"
+
+
+def test_uzum_full_flow_and_reverse(pay):
+    sign_in(pay)
+    order = new_order(pay, "uzum", 15000)
+    status, check = uzum(pay, "check", uzum_body(order["id"]))
+    assert status == 200 and check["status"] == "OK" and check["data"]["account"] == {"value": order["id"]}
+    assert uzum(pay, "create", uzum_body(order["id"], transId=TRANS, amount=100))[1]["errorCode"] == "10011"
+    status, created = uzum(pay, "create", uzum_body(order["id"], transId=TRANS, amount=1500000))
+    assert status == 200 and created["status"] == "CREATED" and created["amount"] == 1500000 and created["serviceId"] == 101202
+    assert uzum(pay, "create", uzum_body(order["id"], transId=TRANS, amount=1500000))[1]["errorCode"] == "10010"
+    other = uzum(pay, "create", uzum_body(order["id"], transId="other-trans", amount=1500000))[1]
+    assert other["errorCode"] == "10008"                       # the order is already being paid
+    status, confirmed = uzum(pay, "confirm", {"serviceId": 101202, "timestamp": 1, "transId": TRANS,
+                                              "paymentSource": "UZCARD", "phone": "998901234567"})
+    assert status == 200 and confirmed["status"] == "CONFIRMED"
+    assert balance(pay) == 15000
+    assert uzum(pay, "confirm", {"serviceId": 101202, "timestamp": 1, "transId": TRANS})[1]["errorCode"] == "10016"
+    assert uzum(pay, "check", uzum_body(order["id"]))[1]["errorCode"] == "10008"            # already paid
+    assert uzum(pay, "status", {"serviceId": 101202, "timestamp": 1, "transId": TRANS})[1]["status"] == "CONFIRMED"
+    status, reversed_ = uzum(pay, "reverse", {"serviceId": 101202, "timestamp": 1, "transId": TRANS})
+    assert status == 200 and reversed_["status"] == "REVERSED"
+    assert balance(pay) == 0
+    assert uzum(pay, "reverse", {"serviceId": 101202, "timestamp": 1, "transId": TRANS})[1]["errorCode"] == "10018"
+    assert uzum(pay, "status", {"serviceId": 101202, "timestamp": 1, "transId": "nope"})[1]["errorCode"] == "10014"
+    assert "Uzum Bank" in pay.get(f"/payments/receipt/{order['id']}").text
+
+
+def test_uzum_spent_top_up_cannot_be_reversed(pay):
+    sign_in(pay)
+    order = new_order(pay, "uzum", 15000)
+    uzum(pay, "create", uzum_body(order["id"], transId=TRANS, amount=1500000))
+    uzum(pay, "confirm", {"serviceId": 101202, "timestamp": 1, "transId": TRANS})
+    assert run_check(pay, EN * 7).status_code == 200
+    assert uzum(pay, "reverse", {"serviceId": 101202, "timestamp": 1, "transId": TRANS})[1]["errorCode"] == "10017"
+
+
+def test_uzum_unconfirmed_after_30_minutes_fails(pay, monkeypatch):
+    sign_in(pay)
+    order = new_order(pay, "uzum", 15000)
+    uzum(pay, "create", uzum_body(order["id"], transId=TRANS, amount=1500000))
+    later = time.time() + 31 * 60
+    monkeypatch.setattr(payments.time, "time", lambda: later)
+    assert uzum(pay, "confirm", {"serviceId": 101202, "timestamp": 1, "transId": TRANS})[1]["errorCode"] == "10015"
+    assert uzum(pay, "status", {"serviceId": 101202, "timestamp": 1, "transId": TRANS})[1]["errorCode"] == "10015"
+    status, created = uzum(pay, "create", uzum_body(order["id"], transId="second-try", amount=1500000))
+    assert status == 200 and created["status"] == "CREATED"   # a new attempt is allowed
+    assert balance(pay) == 0
+
+
+def test_uzum_payment_in_progress_blocks_deletion(pay):
+    sign_in(pay)
+    order = new_order(pay, "uzum", 15000)
+    uzum(pay, "create", uzum_body(order["id"], transId=TRANS, amount=1500000))
+    assert pay.delete("/api/me").status_code == 409
+    uzum(pay, "reverse", {"serviceId": 101202, "timestamp": 1, "transId": TRANS})
+    assert pay.delete("/api/me").status_code == 200
+    import sqlite3
+    with sqlite3.connect(auth.db_file()) as db:
+        assert db.execute("SELECT COUNT(*) FROM uzum_tx").fetchone()[0] == 0
+
+
+def test_uzum_callback_bypasses_pilot_password(pay, monkeypatch):
+    monkeypatch.setenv("PRIVATE_PILOT_USER", "pilot")
+    monkeypatch.setenv("PRIVATE_PILOT_PASSWORD", "a-long-pilot-password")
+    assert uzum(pay, "status", {"serviceId": 101202, "timestamp": 1, "transId": "x"})[1]["errorCode"] == "10014"
