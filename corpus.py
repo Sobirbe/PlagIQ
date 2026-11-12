@@ -220,10 +220,19 @@ def compare_texts(text, sources, language):
     by_fp = {}
     for f, i in windows(q):
         by_fp.setdefault(f, []).append(i)
+    lexed = [lexical(source_text, language) if source_text else [] for source_text in sources]
+    source_windows = [windows(s) for s in lexed]
+    limit = boilerplate_sources()
+    common = set()
+    if limit and len(sources) >= limit:
+        counts = {}
+        for ws in source_windows:
+            for f in {f for f, _ in ws if f in by_fp}:
+                counts[f] = counts.get(f, 0) + 1
+        common = {f for f, n in counts.items() if n >= limit}
     results, covered, union = [], set(), []
-    for source_text in sources:
-        s = lexical(source_text, language) if source_text else []
-        hits = [(i, j) for f, j in windows(s) for i in by_fp.get(f, ())]
+    for source_text, s, ws in zip(sources, lexed, source_windows):
+        hits = [(i, j) for f, j in ws if f not in common for i in by_fp.get(f, ())]
         evidence = match_source(q, s, source_text, hits) if hits else None
         if evidence:
             covered |= evidence['covered']
@@ -256,16 +265,24 @@ def corpus_version(db):
     return hashlib.sha256((str(NORMALIZATION_VERSION) + ':' + ','.join(ids)).encode()).hexdigest()[:12]
 
 
-def search(db, text, language, max_passages=5, exclude=()):
+def search(db, text, language, max_passages=5, exclude=(), ignore=()):
     """Read-only lookup. The manuscript is fingerprinted in memory and never written.
     `exclude`: SHA-256 ids of deposits to skip (the same document deposited earlier). Published
-    sources are never skipped: an exact copy of a published work must still be found."""
+    sources are never skipped: an exact copy of a published work must still be found.
+    `ignore`: source numbers hidden completely (used only by evaluation/real_eval.py)."""
     q = lexical(text, language)
-    hits, seen = {}, {}
+    hits, seen, common = {}, {}, set()
+    limit = boilerplate_sources()
     for f, i in windows(q):
         if f not in seen:
             seen[f] = db.execute('SELECT source, token_index FROM windows WHERE fingerprint=?', (f,)).fetchall()
+            if limit and len({num for num, _ in seen[f]}) >= limit:
+                common.add(f)
+        if f in common:
+            continue                                    # boilerplate shared by many texts
         for num, j in seen[f]:
+            if ignore and num in ignore:
+                continue
             hits.setdefault(num, []).append((i, j))
     sources, union = [], []
     for num, pairs in hits.items():
@@ -291,7 +308,7 @@ def search(db, text, language, max_passages=5, exclude=()):
     counts = {lang: 0 for lang in LANGUAGES}
     for (raw,) in db.execute('SELECT metadata FROM sources'):
         counts[json.loads(raw)['language']] += 1
-    return {'query_text_length': len(text), 'unique_passages': merge(union),
+    return {'query_text_length': len(text), 'unique_passages': merge(union), 'boilerplate_windows': len(common),
             'sources': sorted(sources, key=lambda s: (-s['matched_words'], s['title'])),
             'corpus_sources': sum(counts.values()), 'language_counts': counts,
             'corpus_version': corpus_version(db),
@@ -402,6 +419,16 @@ def _insert(db, metadata, text):
                      (identifier, json.dumps(metadata, ensure_ascii=False), text)).lastrowid
     _store_windows(db, num, text, metadata['language'])
     return identifier
+
+
+def boilerplate_sources():
+    """A seven-word sequence found in this many different texts is treated as boilerplate (journal
+    headers, licence lines, website banners, Wikipedia navigation boxes) and not counted as a match.
+    Measured on real texts in evaluation/REAL_RESULTS.md. 0 turns the filter off."""
+    try:
+        return max(0, int(os.environ.get('BOILERPLATE_SOURCES', '3')))
+    except ValueError:
+        return 3
 
 
 def max_deposits():

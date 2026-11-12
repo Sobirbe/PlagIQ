@@ -265,3 +265,30 @@ def test_sentences_with_numbers_still_match():
     assert evidence[0]["matched_words"] == 16 and len(covered) == 16
     uz = "2020 yilda 15 foiz o‘sish 3 ta viloyatda kuzatildi va bu 2021 yilda davom etdi"
     assert corpus.compare_texts(uz, [uz], "uz")[1][0]["matched_words"] == len(uz.split())
+
+
+def test_boilerplate_shared_by_many_texts_is_not_a_match(tmp_path, monkeypatch):
+    """Journal headers, licence lines and site banners matched unrelated real articles (evaluation/REAL_RESULTS.md)."""
+    import corpus
+    header = "Society and innovations journal home page this is an open access article under the attribution licence"
+    bodies = ["Remittances change rural household budgets in the Fergana valley through seasonal consumption smoothing",
+              "Cotton cooperatives in Khorezm reorganised their irrigation schedules after the water reform of the decade",
+              "Primary school teachers in Samarkand adopted new reading methods with measurable gains in comprehension",
+              "Small business credit in Tashkent province grew after banks simplified collateral rules for new firms"]
+    monkeypatch.delenv("BOILERPLATE_SOURCES", raising=False)
+    db = corpus.connect(str(tmp_path / "c.db"))
+    for i, body in enumerate(bodies[:3]):
+        corpus.ingest(db, {"title": f"A{i}", "authors": "X", "year": 2020, "language": "en", "url": f"https://j.uz/{i}",
+                           "rights_basis": "open_license", "permission_reference": "CC BY"}, header + ". " + body + ".")
+    unrelated = header + ". " + bodies[3] + "."
+    report = corpus.search(db, unrelated, "en")
+    assert report["sources"] == [] and report["boilerplate_windows"] > 0          # the shared header is ignored
+    copied = header + ". " + bodies[1] + "."
+    assert [s["title"] for s in corpus.search(db, copied, "en")["sources"]] == ["A1"]   # real copying still found
+    monkeypatch.setenv("BOILERPLATE_SOURCES", "0")
+    assert len(corpus.search(db, unrelated, "en")["sources"]) == 3                 # filter off: header matches all
+    # the same rule across fetched texts (OpenAlex full texts, web pages)
+    monkeypatch.delenv("BOILERPLATE_SOURCES")
+    texts = [header + ". " + b + "." for b in bodies[:3]]
+    _, evidence, covered, _ = corpus.compare_texts(unrelated, texts, "en")
+    assert evidence == [None, None, None] and not covered
