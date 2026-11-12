@@ -56,3 +56,24 @@ def test_low_disk_threshold(monkeypatch, tmp_path):
     assert "Paused: only 0 MB free of 433 MB" in staging.low_disk(str(tmp_path / "c.db"))
     monkeypatch.setattr(staging.shutil, "disk_usage", lambda p: Usage(5 * 2**30, 2**30, 4 * 2**30))
     assert staging.low_disk(str(tmp_path / "c.db")) is None
+
+
+def test_engine_starts_on_a_full_disk(tmp_path, monkeypatch):
+    """The live engine stopped answering on a full volume; startup must purge leftovers and never crash."""
+    from collections import namedtuple
+    from fastapi.testclient import TestClient
+    import engine_service
+    monkeypatch.setenv("CORPUS_DB", str(tmp_path / "c.db"))
+    monkeypatch.setenv("STAGING_DIR", str(tmp_path / "staging"))
+    monkeypatch.setenv("ENGINE_API_KEY", "k" * 32)
+    folder = tmp_path / "staging" / "cyberleninka"
+    stage(folder, 2)
+    Usage = namedtuple("Usage", "total used free")
+    monkeypatch.setattr(staging.shutil, "disk_usage", lambda p: Usage(433 * 2**20, 433 * 2**20, 0))
+    real_connect = engine_service.connect
+    monkeypatch.setattr(engine_service, "connect", lambda *a: (_ for _ in ()).throw(
+        __import__("sqlite3").OperationalError("database or disk is full")))
+    with TestClient(engine_service.app) as client:                    # startup runs inside the context
+        assert client.get("/health").json() == {"status": "ok"}
+    assert staging.leftover(folder) == []                             # leftovers removed at startup
+    monkeypatch.setattr(engine_service, "connect", real_connect)

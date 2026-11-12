@@ -104,7 +104,18 @@ async def lifespan(app):
             finally:
                 lock.release()
     task = asyncio.create_task(cleanup())
-    connect().close()                                    # run any index upgrade before serving or importing
+    # A full volume must not stop the engine from starting: free re-downloadable files first,
+    # and never let the startup check crash the service (searches still work on a full disk).
+    if staging.low_disk():
+        try:
+            freed = staging.purge_leftovers(import_job.staging_root())
+            log.warning("startup on low disk: removed %s MB of downloaded files not yet indexed", freed // (1024 * 1024))
+        except OSError as exc:
+            log.warning("startup cleanup failed: %s", exc)
+    try:
+        connect().close()                                # run any index upgrade before serving or importing
+    except Exception as exc:
+        log.warning("startup database check failed: %s: %s", type(exc).__name__, str(exc)[:300])
     worker = None
     if (import_job.settings()[0] or wikipedia_import.settings()[0] or cyberleninka.settings()[0]
             or uz_journals.settings()[0]):
