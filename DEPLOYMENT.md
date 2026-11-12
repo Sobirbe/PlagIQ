@@ -253,6 +253,7 @@ Users sign in with their Telegram account before running a check. PlagIQ stores 
 3. Railway → **website** service → **Settings → Volumes** → add a volume mounted at **`/data`**. Accounts are kept there, so they survive redeploys. Without a volume, accounts are lost at each deploy.
 4. Railway → **website** service → **Variables**: add `TELEGRAM_BOT_TOKEN` = the token, and `TELEGRAM_BOT_USERNAME` = the bot username without @. Deploy.
 5. Open the site. "Sign in with Telegram" appears at the top. Checks need sign-in by default; set `LOGIN_REQUIRED=0` to make it optional.
+6. Recommended: make the bot answer people who open it and press **/start** (otherwise it stays silent, and they think sign-in is broken). Add `TELEGRAM_BOT_REPLIES=1` on the website service and redeploy. At start-up the site registers its address (`PUBLIC_ORIGIN` + `/telegram/webhook`) with Telegram. From then on the bot replies, in the user's Telegram language, with how to sign in and a button that opens the site. /admin shows "Bot answers /start" ✅ once Telegram has accepted it. The bot stores nothing. Do not turn this on if the same bot is already used by another program, because a bot can have only one webhook.
 
 The QR verification page (`/verify`) stays public, so supervisors can scan certificates without an account.
 
@@ -338,7 +339,7 @@ Partner universities can deposit their past theses, diploma and course works. Th
    ```json
    [{"name":"TDIU","agreement":"No. 12/2026, 01.11.2026","admins":[123456789,987654321]}]
    ```
-4. Redeploy. When those staff sign in, they see a **"University deposit"** section. They choose files (any number; each is sent separately, 2 MB maximum) and press "Deposit files". A file named `Author - Title.docx` fills in the author and title, and the language is detected automatically. They can also list and remove their university's works.
+4. Redeploy. When those staff sign in, they see a **"University deposit"** section. They choose files (any number; each is sent separately, 20 MB maximum) and press "Deposit files". A file named `Author - Title.docx` fills in the author and title, and the language is detected automatically. They can also list and remove their university's works.
 
 **Whole archives (hundreds of files):** on the engine service, open a shell (Railway → engine → the "⋯" menu → Shell, or `railway run`). Upload the folder and a `works.csv` with the columns `file,title,authors,year,language` (language may be left empty), then run:
 ```bash
@@ -372,19 +373,19 @@ A check now takes a little longer (usually a few seconds, at most `FULLTEXT_SECO
 
 The website shows the word count and the **planned** price as soon as a file is chosen, plus a price table and calculator. **No money is taken** while payments are off (the default), and the page says checks are free during the pilot. Payments in the providers' **test mode** are described in Part 3o.
 
-Default plans: Free up to 1,000 words (0 UZS), Researcher 1,001–3,500 words (15,000 UZS), Extended 3,501–15,000 words (25,000 UZS), Thesis 15,001–40,000 words (35,000 UZS). Larger documents are shown as "contact us". Other services shown: AI detector 3 UZS per word (minimum 6,000), certificate with QR code included free, packages "10 checks → +2 free" and "20 checks → +5 free". For comparison, antiplag.uz (November 2026) charges 46,000 UZS per plagiarism check, 4 UZS per word for its AI detector (minimum 10,000), 6,000 UZS for a certificate, and gives +1 free for 10 checks and +3 for 20.
+Default plans: Free up to 1,000 words (0 UZS), Researcher 1,001–3,500 words (15,000 UZS), Extended 3,501–15,000 words (25,000 UZS), Thesis 15,001–40,000 words (35,000 UZS), PhD/DSc dissertation 40,001–150,000 words (39,000 UZS). Uploads may be up to 20 MB per file and 500 PDF pages, so a whole PhD or DSc dissertation can be checked before submission to the OAK. Larger documents are shown as "contact us". Other services shown: AI detector 3 UZS per word (minimum 6,000), certificate with QR code included free, packages "10 checks → +2 free" and "20 checks → +5 free". For comparison, antiplag.uz (November 2026) charges 46,000 UZS per plagiarism check, 4 UZS per word for its AI detector (minimum 10,000), 6,000 UZS for a certificate, and gives +1 free for 10 checks and +3 for 20.
 
 **AI detector cost:** Pangram's list price is $0.05 per 100 words, which is about 6 UZS per word at 12,500 UZS/$. At 3 UZS per word you cover the cost only with Pangram's **Professional** plan ($65 a month including $200 of API credits, so about 2 UZS per word while those credits last). On the pay-as-you-go price, every AI check loses money. Set `AI_PRICE_PER_WORD` and `AI_MIN_PRICE` to your own figures, and check the current exchange rate.
 
 To change the plans, add a `PRICING_TIERS` variable to the website service in Railway, for example:
 
 ```json
-[{"id":"free","max_words":1000,"price_uzs":0},{"id":"researcher","max_words":3500,"price_uzs":15000},{"id":"extended","max_words":15000,"price_uzs":25000},{"id":"thesis","max_words":40000,"price_uzs":35000}]
+[{"id":"free","max_words":1000,"price_uzs":0},{"id":"researcher","max_words":3500,"price_uzs":15000},{"id":"extended","max_words":15000,"price_uzs":25000},{"id":"thesis","max_words":40000,"price_uzs":35000},{"id":"phd","max_words":150000,"price_uzs":39000}]
 ```
 
 `PRICING_PACKAGES` changes the packages, for example `[{"checks":10,"bonus":2},{"checks":20,"bonus":5}]`.
 
-Keep the ids `free`, `researcher`, `extended` and `thesis`, which have names and descriptions in all three languages. Change only the numbers. If the value is invalid, the site quietly uses the defaults. Before charging real money, measure the real cost per check; switching from test mode to real payments needs a separate, reviewed change (Part 3o).
+Keep the ids `free`, `researcher`, `extended`, `thesis` and `phd`, which have names and descriptions in all three languages. Change only the numbers. If the value is invalid, the site quietly uses the defaults. Before charging real money, measure the real cost per check; switching from test mode to real payments needs a separate, reviewed change (Part 3o).
 
 ## Part 3o — Payments with Payme and Click (TEST MODE ONLY)
 

@@ -8,9 +8,10 @@ import olefile
 import pymupdf as fitz
 from docx import Document
 
-MAX_DOCX_MEMBERS = 1000
-MAX_DOCX_EXPANDED = 20 * 1024 * 1024
-MAX_PDF_PAGES = 40
+MAX_DOCX_MEMBERS = 5000
+MAX_DOCX_EXPANDED = 300 * 1024 * 1024      # everything, images included
+MAX_DOCX_XML = 80 * 1024 * 1024            # the parts that are parsed as text
+MAX_PDF_PAGES = 500                        # a PhD/DSc dissertation with appendices
 
 # A word split across lines by a hyphen in PDF layout ("приме-\nнение").
 # Only joined when the next line starts with a lower-case letter, so a
@@ -181,8 +182,9 @@ def extract_text(name, content, max_pages=MAX_PDF_PAGES):
     try:
         if name.endswith(".docx"):
             with zipfile.ZipFile(io.BytesIO(content)) as archive:
-                if (len(archive.infolist()) > MAX_DOCX_MEMBERS or
-                        sum(item.file_size for item in archive.infolist()) > MAX_DOCX_EXPANDED):
+                items = archive.infolist()
+                if (len(items) > MAX_DOCX_MEMBERS or sum(item.file_size for item in items) > MAX_DOCX_EXPANDED or
+                        sum(item.file_size for item in items if item.filename.endswith((".xml", ".rels"))) > MAX_DOCX_XML):
                     raise ExtractError(413, "docx_expanded", "Expanded DOCX exceeds safe limits")
             return docx_text(Document(io.BytesIO(content)))
         with fitz.open(stream=content, filetype="pdf") as pdf:

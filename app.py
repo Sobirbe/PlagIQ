@@ -28,6 +28,7 @@ import admin
 from fastapi.responses import FileResponse, StreamingResponse
 import pricing
 import payments
+import telegram_bot
 import verify
 import extract
 from discovery import discover
@@ -51,6 +52,8 @@ async def lifespan(app):
             await asyncio.sleep(30)
             purge_reports()
     task = asyncio.create_task(cleanup())
+    if telegram_bot.enabled():                 # let the bot answer /start (TELEGRAM_BOT_REPLIES=1), in the background
+        asyncio.get_running_loop().run_in_executor(None, telegram_bot.register)
     try:
         yield
     finally:
@@ -65,8 +68,8 @@ app.add_middleware(SecurityMiddleware)
 results = {}
 REPORT_TTL = 900
 MAX_REPORTS = 50
-MAX_BYTES = 2 * 1024 * 1024
-MAX_CHARS = 300000
+MAX_BYTES = 20 * 1024 * 1024      # dissertations with figures
+MAX_CHARS = 1_200_000             # about 150,000 words
 MIN_TOKENS = 7
 WINDOW = 7
 RATE = {}
@@ -329,6 +332,18 @@ async def telegram_login(request: Request):
     return response
 
 
+@app.post("/telegram/webhook")
+async def telegram_webhook(request: Request):
+    if not telegram_bot.authorised(request.headers.get("x-telegram-bot-api-secret-token", "")):
+        raise ApiError(403, "forbidden", "Forbidden")
+    try:
+        update = await request.json()
+    except ValueError:
+        return {"ok": True}
+    await run_in_threadpool(telegram_bot.handle, update)
+    return {"ok": True}
+
+
 @app.post("/auth/logout")
 def logout():
     response = JSONResponse({"signed_out": True})
@@ -398,7 +413,7 @@ def my_institutions(request: Request):
 @app.post("/api/institution/deposit")
 async def institution_deposit(request: Request, institution: str = Form(..., max_length=80), file: UploadFile = File(...),
                               year: int = Form(...), authors: str = Form("", max_length=300), title: str = Form("", max_length=300)):
-    """One work per request (the browser sends files one by one; each request is capped at 5 MB)."""
+    """One work per request (the browser sends files one by one; each request is capped at 45 MB)."""
     user = auth.read(request.cookies.get(auth.COOKIE))
     if not institutions.allowed(user, institution):
         raise ApiError(403, "institution_forbidden", "This account may not deposit works for this institution.")

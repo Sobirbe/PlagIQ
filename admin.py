@@ -11,6 +11,7 @@ import aidetect
 import auth
 import institutions
 import payments
+import telegram_bot
 import verify
 import websearch
 from engine_client import configured as engine_configured
@@ -51,6 +52,11 @@ def checklist(library, probe=""):
     rows = [
         ("Telegram sign-in", auth.enabled(), "on, @" + auth.public_config()["bot_username"] if auth.enabled() else "off",
          "TELEGRAM_BOT_TOKEN and TELEGRAM_BOT_USERNAME on the website (Part 3i)"),
+        ("Bot answers /start", telegram_bot.STATUS["ok"] if telegram_bot.enabled() else None,
+         ("on" if telegram_bot.STATUS["ok"] else "being registered with Telegram" if telegram_bot.STATUS["ok"] is None
+          else "Telegram refused the webhook: " + telegram_bot.STATUS["detail"])
+         if telegram_bot.enabled() else "off (people who press /start in the bot get no reply)",
+         "TELEGRAM_BOT_REPLIES=1 on the website, then redeploy (Part 3i)"),
         ("Accounts kept across deploys", bool(stats and stats["on_volume"]),
          "stored on the /data volume" if stats and stats["on_volume"] else "not on a volume: accounts are lost at each deploy",
          "attach a volume at /data to the website service (Part 3i)"),

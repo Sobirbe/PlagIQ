@@ -51,7 +51,7 @@ def test_report_ownership_expiry_delete():
 def test_cross_site_and_large_request():
     client = TestClient(web.app)
     assert client.post('/api/check', headers={'Origin':'https://evil.example'}).status_code == 403
-    assert client.post('/api/check', content=b'x'*(5*1024*1024+1)).status_code == 413
+    assert client.post('/api/check', content=b'x'*(45*1024*1024+1)).status_code == 413
 
 
 def test_rights_required_and_idempotent(tmp_path):
@@ -139,7 +139,7 @@ def test_docx_expansion_rejected():
     import zipfile
     payload=io.BytesIO()
     with zipfile.ZipFile(payload,'w',zipfile.ZIP_DEFLATED) as z:
-        z.writestr('large.xml',b'x'*(21*1024*1024))
+        z.writestr('large.xml',b'x'*(81*1024*1024))
     response=TestClient(web.app).post('/api/check',data={'mode':'reference','reference_text':'source'},
                                     files={'submission':('test.docx',payload.getvalue())})
     assert response.status_code == 413

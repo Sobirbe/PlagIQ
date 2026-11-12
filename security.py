@@ -4,7 +4,7 @@ import base64
 import secrets
 from starlette.responses import JSONResponse
 
-MAX_REQUEST = 5 * 1024 * 1024
+MAX_REQUEST = 45 * 1024 * 1024       # a 20 MB document plus a 20 MB reference
 
 
 class SecurityMiddleware:
@@ -18,7 +18,7 @@ class SecurityMiddleware:
         pilot_user, pilot_password = os.getenv('PRIVATE_PILOT_USER', ''), os.getenv('PRIVATE_PILOT_PASSWORD', '')
         # /verify only shows signed report facts, so QR codes work for supervisors without the pilot login.
         # Payment providers call /payments/payme and /payments/click/* with their own authentication.
-        callback = scope['path'] == '/payments/payme' or scope['path'].startswith('/payments/click/')
+        callback = scope['path'] in ('/payments/payme', '/telegram/webhook') or scope['path'].startswith('/payments/click/')
         if (pilot_user or pilot_password) and scope['path'] not in ('/health', '/verify', '/privacy') and not callback:
             expected = b'Basic ' + base64.b64encode((pilot_user + ':' + pilot_password).encode())
             if (not pilot_user or len(pilot_password) < 16 or
@@ -42,7 +42,7 @@ class SecurityMiddleware:
                     return
                 size += len(message.get('body', b''))
                 if size > MAX_REQUEST:
-                    return await JSONResponse({'detail': 'Request exceeds 5 MB', 'code': 'request_too_large'}, 413)(scope, receive, send)
+                    return await JSONResponse({'detail': 'Request exceeds 45 MB', 'code': 'request_too_large'}, 413)(scope, receive, send)
                 chunks.append(message)
                 if not message.get('more_body', False):
                     break
