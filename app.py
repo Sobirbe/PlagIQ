@@ -168,10 +168,10 @@ async def read_file(upload, kind="document"):
         raise ApiError(400, "unsupported_type", "Only TXT, DOC, DOCX and text-based PDF supported")
     content = await upload.read(MAX_BYTES + 1)
     if len(content) > MAX_BYTES:
-        raise ApiError(413, "file_too_large", "File exceeds 2 MB")
+        raise ApiError(413, "file_too_large", f"File exceeds {MAX_BYTES // (1024 * 1024)} MB")
     text = await run_in_threadpool(extract_text, name, content)
     if len(text) > MAX_CHARS:
-        raise ApiError(413, "text_too_long", "Extracted text exceeds the 300,000-character pilot limit")
+        raise ApiError(413, "text_too_long", f"Extracted text exceeds the {MAX_CHARS:,}-character limit")
     if not text.strip():
         raise ApiError(400, "no_text", "No readable text detected. Scanned or image-only PDFs need OCR first.")
     return text
@@ -196,12 +196,24 @@ def client_key(request):
     return request.client.host if request.client else "unknown"
 
 
-def rate_limit(request):
-    # Temporary in-memory safeguard; NOT a substitute for production perimeter limits.
-    key = client_key(request)
+def hourly_limit(name, default):
+    try:
+        return max(1, int(os.environ.get(name, default)))
+    except ValueError:
+        return default
+
+
+def rate_limit(request, user=None, purpose="check"):
+    """Hourly allowance (in memory; NOT a substitute for production perimeter limits).
+    Signed-in users are counted per account (CHECKS_PER_HOUR_ACCOUNT, default 30), so students behind one
+    university address do not share an allowance; others per address (CHECKS_PER_HOUR, default 12)."""
+    if user:
+        key, limit = f"{purpose}:user:{user['id']}", hourly_limit("CHECKS_PER_HOUR_ACCOUNT", 30)
+    else:
+        key, limit = f"{purpose}:ip:{client_key(request)}", hourly_limit("CHECKS_PER_HOUR", RATE_LIMIT)
     now = time.monotonic()
     history = [t for t in RATE.get(key, []) if now-t < 3600]
-    if len(history) >= RATE_LIMIT:
+    if len(history) >= limit:
         raise ApiError(429, "rate_limited", "Hourly pilot scan allowance reached.")
     history.append(now)
     RATE[key] = history
@@ -349,7 +361,7 @@ async def _account_form(request):
 async def email_register(request: Request):
     """Email + password account. Nothing is sent to the address and it is not verified."""
     data = await _account_form(request)
-    rate_limit(request)                        # the hourly pilot limit also caps account creation
+    rate_limit(request, purpose="register")    # also caps account creation
     try:
         user = await run_in_threadpool(auth.register_email, data.get("email"), data.get("password"), data.get("name", ""))
     except auth.AccountError as exc:
@@ -762,7 +774,17 @@ async def check(request:Request, submission:UploadFile=File(...),
             raise ApiError(400, "consent_required", "Explicit consent is required for private corpus processing.")
     if active_scans >= scan_capacity():
         raise ApiError(503, "server_busy", "PlagIQ is processing other documents. Try again in a minute.")
-    rate_limit(request)
+    rate_limit(request, user)
+    active_scans += 1                          # reserve the slot before any await, so overlapping requests cannot all pass
+    try:
+        return await _run_check(request, user, anonymous, submission, reference, reference_text, language, mode,
+                                options, web_search, ai_check, deposit)
+    finally:
+        active_scans -= 1
+
+
+async def _run_check(request, user, anonymous, submission, reference, reference_text, language, mode, options,
+                     web_search, ai_check, deposit):
     original, price, charge_id = None, 0, None
     if anonymous:                              # short texts can be checked without an account
         original = await read_file(submission)
@@ -785,7 +807,6 @@ async def check(request:Request, submission:UploadFile=File(...),
                                                 + (", AI detector" if ai_check else ""))
         except payments.PaymentError as exc:
             raise ApiError(402, exc.code, str(exc))
-    active_scans += 1
     try:
         result = await analyse(submission, reference, reference_text, language, mode, options, web_search, ai_check,
                                auth.owner_id(user), deposit, original)
@@ -793,8 +814,6 @@ async def check(request:Request, submission:UploadFile=File(...),
         if charge_id:
             await run_in_threadpool(payments.refund, user, charge_id, price, "check failed")
         raise
-    finally:
-        active_scans -= 1
     if charge_id:
         unused = unused_ai_price(result, words, ai_check)
         if unused:
@@ -887,7 +906,7 @@ async def analyse(submission, reference, reference_text, language, mode, options
         if not source.strip():
             raise ApiError(400, "reference_missing", "Provide a reference document or text, or choose academic discovery")
         if len(source) > MAX_CHARS:
-            raise ApiError(413, "reference_too_long", "Reference exceeds pilot limit")
+            raise ApiError(413, "reference_too_long", f"Reference exceeds the {MAX_CHARS:,}-character limit")
         require_tokens(source, language, "reference_too_short",
                        "The reference needs at least 7 words of readable text.")
         result = await run_in_threadpool(compare, original, source, language)

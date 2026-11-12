@@ -165,6 +165,13 @@ class Deposit(BaseModel):
     collection: str = Field(default='', max_length=120)
 
 
+def queue_seconds():
+    try:
+        return max(0.0, min(float(os.environ.get('ENGINE_QUEUE_SECONDS', '60')), 150.0))
+    except ValueError:
+        return 60.0
+
+
 @app.get('/health')
 def health():
     return {'status': 'ok'}
@@ -172,8 +179,10 @@ def health():
 
 @app.post('/v1/checks', status_code=202, dependencies=[Depends(authorize)])
 def check(query: Query):
-    # Serialize bounded pilot jobs to limit CPU/memory; deploy a queue before scaling.
-    if not lock.acquire(blocking=False):
+    # One search at a time limits CPU and memory. Other requests wait their turn (up to
+    # ENGINE_QUEUE_SECONDS, default 60) instead of failing at once; FastAPI runs this sync
+    # endpoint in its thread pool, so waiting requests do not block the event loop.
+    if not lock.acquire(timeout=queue_seconds()):
         raise HTTPException(429, 'Engine busy')
     try:
         now = time.monotonic()
