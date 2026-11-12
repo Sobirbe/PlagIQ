@@ -91,6 +91,23 @@ class _Redirect(urllib.request.HTTPRedirectHandler):
         return super().redirect_request(req, fp, code, msg, headers, newurl)
 
 
+def to_uri(url):
+    """Web addresses with non-ASCII characters (Uzbek ‘ ʼ, Cyrillic, spaces) made safe for HTTP:
+    the host in IDNA form, path and query percent-encoded. Already-encoded parts are kept."""
+    from urllib.parse import quote, urlunsplit
+    if url.isascii() and " " not in url:
+        return url
+    parts = urlsplit(url.strip())
+    host = parts.hostname or ""
+    try:
+        host = host.encode("idna").decode("ascii")
+    except UnicodeError:
+        pass
+    netloc = host + (f":{parts.port}" if parts.port else "")
+    return urlunsplit((parts.scheme, netloc, quote(parts.path, safe="/%:@!$&'()*+,;="),
+                       quote(parts.query, safe="=&%:/?@!$'()*+,;"), quote(parts.fragment, safe="")))
+
+
 class Fetcher:
     """HTTPS GETs with robots.txt, crawl delay, size caps and same-host redirects."""
 
@@ -100,6 +117,7 @@ class Fetcher:
         self.openers = {flag: urllib.request.build_opener(_Redirect(flag, self.allow_http_hosts)) for flag in (False, True)}
 
     def _check_url(self, url):
+        url = to_uri(url)
         parts = urlsplit(url)
         if parts.scheme != "https" and not (parts.scheme == "http" and parts.hostname in self.allow_http_hosts):
             raise HarvestError(f"HTTPS required: {url}")
@@ -132,6 +150,7 @@ class Fetcher:
 
     def get(self, url, limit, robots=True, cross_host=False, headers=None):
         """robots=False only for documented APIs; cross_host=True for publisher links found via an API."""
+        url = to_uri(url)
         parts = self._check_url(url)
         if cross_host and parts.hostname not in self.allow_http_hosts and not public_host(parts.hostname):
             raise HarvestError(f"refused non-public host: {parts.hostname}")

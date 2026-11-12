@@ -41,7 +41,7 @@ def import_loop():
                 log.warning("import %s: %s imported, %s failed, corpus %s sources, error=%s", language,
                             status["imported"], status["failed"], status["corpus_sources"], status["error"])
             except Exception as exc:                     # never let the import stop the engine
-                log.warning("import %s failed: %s", language, type(exc).__name__)
+                log.warning("import %s failed: %s: %s", language, type(exc).__name__, str(exc)[:300])
                 import_job.write_status(import_job.staging_root(), language,
                                         {"language": language, "error": type(exc).__name__ + ": " + str(exc)[:200]})
         wiki_langs, wiki_batch, min_words = wikipedia_import.settings()
@@ -53,14 +53,18 @@ def import_loop():
                 log.warning("wikipedia %s: %s new, %s updated, corpus %s sources, error=%s", language,
                             status["imported"], status["updated"], status["corpus_sources"], status["error"])
             except Exception as exc:
-                log.warning("wikipedia %s failed: %s", language, type(exc).__name__)
+                log.warning("wikipedia %s failed: %s: %s", language, type(exc).__name__, str(exc)[:300])
+                import_job.write_status(import_job.staging_root(), f"wikipedia-{language}",
+                                        {"language": language, "error": type(exc).__name__ + ": " + str(exc)[:200]})
         enabled, cl_batch, cl_set, cl_from = cyberleninka.settings()
         if enabled and not import_stop.is_set():
             try:
                 status = cyberleninka.run(cl_batch, cl_set, cl_from)
                 log.warning("cyberleninka: %s imported, %s staged, error=%s", status["imported"], status["staged"], status["error"])
             except Exception as exc:
-                log.warning("cyberleninka failed: %s", type(exc).__name__)
+                log.warning("cyberleninka failed: %s: %s", type(exc).__name__, str(exc)[:300])
+                import_job.write_status(import_job.staging_root(), "cyberleninka",
+                                        {"error": type(exc).__name__ + ": " + str(exc)[:200]})
         uz_enabled, uz_batch = uz_journals.settings()
         if uz_enabled and not import_stop.is_set():
             try:
@@ -68,7 +72,9 @@ def import_loop():
                 log.warning("uz journals: %s imported from %s journals, error=%s", status.get("imported"),
                             status.get("journals"), status["error"])
             except Exception as exc:
-                log.warning("uz journals failed: %s", type(exc).__name__)
+                log.warning("uz journals failed: %s: %s", type(exc).__name__, str(exc)[:300])
+                import_job.write_status(import_job.staging_root(), "uz-journals",
+                                        {"error": type(exc).__name__ + ": " + str(exc)[:200]})
         import_stop.wait(hours * 3600)
 
 @asynccontextmanager
