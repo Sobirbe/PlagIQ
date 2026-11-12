@@ -183,3 +183,16 @@ def test_uz_journals_survey_and_harvest(journal, tmp_path):
         assert search(db, "Oliy ta'lim muassasalarida sifat muhim va dolzarb masala hisoblanadi", 'uz')['sources']
     assert uz_journals.endpoint_for('http://x.uz/index.php/j/about') == 'https://x.uz/index.php/j/oai'
     assert uz_journals.endpoint_for('https://x.uz/') is None
+
+
+def test_addresses_with_uzbek_and_cyrillic_characters(journal):
+    """A live import stopped on a link containing the Uzbek ‘ (UnicodeEncodeError); such links must work."""
+    base, routes = journal
+    assert harvest.to_uri("https://j.uz/index.php/j/article/download/1/O‘zbek tili.pdf") == \
+        "https://j.uz/index.php/j/article/download/1/O%E2%80%98zbek%20tili.pdf"
+    assert harvest.to_uri("https://журнал.рф/статья?q=тест") == \
+        "https://" + "журнал.рф".encode("idna").decode() + "/%D1%81%D1%82%D0%B0%D1%82%D1%8C%D1%8F?q=%D1%82%D0%B5%D1%81%D1%82"
+    assert harvest.to_uri("https://j.uz/a%20b?x=1") == "https://j.uz/a%20b?x=1"           # ASCII left alone
+    routes['/files/O%E2%80%98zbek%20tili.pdf'] = (200, 'application/pdf', pdf(TEXT['uz']))
+    body, _ = fetcher().get(base + '/files/O‘zbek tili.pdf', 10_000_000)
+    assert body.startswith(b'%PDF')
