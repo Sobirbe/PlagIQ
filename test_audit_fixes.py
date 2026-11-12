@@ -63,3 +63,12 @@ def test_limit_messages_match_settings():
     client = TestClient(web.app)
     big = client.post("/api/quote", files={"submission": ("a.txt", b"x" * (web.MAX_BYTES + 1))}).json()
     assert big["code"] == "file_too_large" and "20 MB" in big["detail"]
+
+
+def test_admin_shows_proxy_setting(monkeypatch):
+    import admin
+    monkeypatch.delenv("TRUSTED_PROXY_HOPS", raising=False)
+    row = next(r for r in admin.checklist(None) if r[0].startswith("Visitors told apart"))
+    assert row[1] is False and "share one allowance" in row[2]
+    monkeypatch.setenv("TRUSTED_PROXY_HOPS", "1")
+    assert next(r for r in admin.checklist(None) if r[0].startswith("Visitors told apart"))[1] is True
