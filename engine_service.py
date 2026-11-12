@@ -145,7 +145,7 @@ def authorize(authorization: str = Header('')):
 
 
 class Query(BaseModel):
-    query_text: str = Field(min_length=1, max_length=300000)
+    query_text: str = Field(min_length=1, max_length=1_200_000)
     language: str = Field(pattern='^(uz|ru|en)$')
     exclude: list[str] = Field(default_factory=list, max_length=5)
 
@@ -154,7 +154,7 @@ OWNER = r'^(user|org):[0-9a-f]{24}$'
 
 
 class Deposit(BaseModel):
-    text: str = Field(min_length=1, max_length=300000)
+    text: str = Field(min_length=1, max_length=1_200_000)
     language: str = Field(pattern='^(uz|ru|en)$')
     title: str = Field(min_length=1, max_length=300)
     authors: str = Field(min_length=1, max_length=300)

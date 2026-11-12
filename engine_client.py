@@ -48,7 +48,7 @@ def safe_path(value):
 
 async def run_check(text: str, language: str, exclude=()) -> dict:
     base=engine_base_url()
-    if len(text) > 300000:
+    if len(text) > 1_200_000:
         raise EngineError("Document exceeds pilot engine limit.")
     segmentation=language
     if not configured():
@@ -109,9 +109,9 @@ def summarize(report: dict, max_sources=25) -> dict:
     try:
         if not isinstance(report, dict):
             raise ValueError()
-        document_length = _int(report["query_text_length"], 1, 300000)
+        document_length = _int(report["query_text_length"], 1, 1_200_000)
         intervals = report["unique_passages"]
-        if not isinstance(intervals, list) or len(intervals) > 300000:
+        if not isinstance(intervals, list) or len(intervals) > 1_200_000:
             raise ValueError()
         for pair in intervals:
             if (not isinstance(pair, (list, tuple)) or len(pair) != 2

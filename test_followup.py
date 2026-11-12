@@ -87,7 +87,7 @@ def test_index_migrates_v04_database(tmp_path):
     ('a.txt', b'', 'empty_file'),
     ('a.txt', 'Привет мир как дела у тебя сегодня'.encode('cp1251'), 'txt_encoding'),
     ('a.txt', b'too short', 'too_short'),
-    ('a.txt', b'x' * (2 * 1024 * 1024 + 1), 'file_too_large'),
+    ('a.txt', b'x' * (20 * 1024 * 1024 + 1), 'file_too_large'),
     ('a.pdf', b'%PDF-not really', 'extract_failed'),
     ('a.docx', b'not a zip', 'extract_failed'),
 ])
@@ -133,7 +133,7 @@ def test_validation_error_does_not_echo_input():
 def test_middleware_errors_have_codes():
     client = TestClient(web.app)
     assert client.post('/api/check', headers={'Origin': 'https://evil.example'}).json()['code'] == 'origin_rejected'
-    assert client.post('/api/check', content=b'x' * (5 * 1024 * 1024 + 1)).json()['code'] == 'request_too_large'
+    assert client.post('/api/check', content=b'x' * (45 * 1024 * 1024 + 1)).json()['code'] == 'request_too_large'
 
 
 def test_uploads_are_kept_in_memory():

@@ -6,7 +6,8 @@ can change them in Railway without code changes, e.g.
   [{"id": "free", "max_words": 1000, "price_uzs": 0},
    {"id": "researcher", "max_words": 3500, "price_uzs": 15000},
    {"id": "extended", "max_words": 15000, "price_uzs": 25000},
-   {"id": "thesis", "max_words": 40000, "price_uzs": 35000}]
+   {"id": "thesis", "max_words": 40000, "price_uzs": 35000},
+   {"id": "phd", "max_words": 150000, "price_uzs": 39000}]
 
 Other services (also display only):
   AI_PRICE_PER_WORD=3      AI detector, so'm per word
@@ -31,6 +32,7 @@ DEFAULT_TIERS = [
     {"id": "researcher", "max_words": 3500, "price_uzs": 15000},
     {"id": "extended", "max_words": 15000, "price_uzs": 25000},
     {"id": "thesis", "max_words": 40000, "price_uzs": 35000},
+    {"id": "phd", "max_words": 150000, "price_uzs": 39000},         # PhD/DSc dissertations
 ]
 DEFAULT_PACKAGES = [{"checks": 10, "bonus": 2}, {"checks": 20, "bonus": 5}]
 # A word: letters/digits, with apostrophes inside (Uzbek ta'lim, o‘qish; English don't).

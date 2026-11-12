@@ -21,7 +21,7 @@ def test_tiers_and_boundaries(monkeypatch):
     assert pricing.quote(3500)['id'] == 'researcher'
     assert pricing.quote(3501)['id'] == 'extended' and pricing.quote(3501)['price_uzs'] == 25000
     assert pricing.quote(15000)['id'] == 'extended'
-    assert pricing.quote(15001)['id'] == 'thesis' and pricing.quote(40001) == {'id': 'contact', 'max_words': None, 'price_uzs': None, 'words': 40001, 'fits': False}
+    assert pricing.quote(15001)['id'] == 'thesis' and pricing.quote(40001)['id'] == 'phd' and pricing.quote(150001) == {'id': 'contact', 'max_words': None, 'price_uzs': None, 'words': 150001, 'fits': False}
 
 
 def test_owner_configuration_and_invalid_fallback(monkeypatch):
@@ -42,7 +42,7 @@ def test_quote_endpoint_counts_words_and_stores_nothing(monkeypatch):
     assert not web.results and not web.RATE                       # no report, no scan allowance used
     assert client.post('/api/quote', files={'submission': ('a.exe', b'x')}).json()['code'] == 'unsupported_type'
     config = client.get('/api/pricing').json()
-    assert config['payments_enabled'] is False and config['status'] == 'planned' and len(config['tiers']) == 4
+    assert config['payments_enabled'] is False and config['status'] == 'planned' and len(config['tiers']) == 5
 
 
 def test_check_result_includes_plan():
