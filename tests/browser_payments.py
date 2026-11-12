@@ -50,7 +50,8 @@ tmp = tempfile.mkdtemp()
 env = {k: v for k, v in os.environ.items() if k not in ('ENGINE_URL', 'PRIVATE_PILOT_USER', 'PRIVATE_PILOT_PASSWORD')}
 env.update(TELEGRAM_BOT_TOKEN=TOKEN, TELEGRAM_BOT_USERNAME="plagiq_bot", USERS_DB=tmp + "/users.sqlite3",
            PAYMENTS_ENABLED="1", PAYMENTS_MODE="test", PAYME_MERCHANT_ID="5e730e8e0b852a417aa49ceb", PAYME_TEST_KEY=KEY,
-           PUBLIC_ORIGIN=BASE)
+           PUBLIC_ORIGIN=BASE, UZUM_SERVICE_ID="101202", UZUM_LOGIN="uzum-test", UZUM_PASSWORD="uzum-test-password",
+           UZUM_SERVICE_NAME="PlagIQ test")
 web = start('app', PORT, env)
 try:
     with sync_playwright() as p:
@@ -81,6 +82,13 @@ try:
             if SHOTS:
                 page.evaluate('scrollTo(0,0)')
                 page.screenshot(path=str(SHOTS / f'balance-menu-{width}.png'))
+            # Uzum Bank has no payment link: the menu shows how to pay in the app with the order number.
+            menu.locator('button', has_text='Pay with Uzum Bank').click()
+            page.wait_for_selector('#account .menu .pay p[role=status]')
+            steps = page.locator('#account .menu .pay p[role=status]').inner_text()
+            assert 'Uzum Bank app' in steps and '“PlagIQ test”' in steps and 'order number' in steps, steps
+            if SHOTS:
+                page.locator('#account .menu').screenshot(path=str(SHOTS / f'uzum-steps-{width}.png'))
             menu.locator('input[type=number]').fill('20000')
             context.route('https://test.paycom.uz/**', lambda route: route.fulfill(status=200, content_type='text/html',
                                                                                   body='<h1>Payme sandbox stub</h1>'))

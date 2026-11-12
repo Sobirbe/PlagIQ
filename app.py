@@ -589,7 +589,7 @@ def payments_receipt_html(row, user):
     test = row["mode"] == "test"
     lines = [("Order / Buyurtma / Заказ", row["id"]), ("Date / Sana / Дата", when),
              ("Customer / Mijoz / Клиент", user["name"]),
-             ("Paid with / To‘lov / Оплата", {"payme": "Payme", "click": "Click"}.get(row["provider"], row["provider"])),
+             ("Paid with / To‘lov / Оплата", {"payme": "Payme", "click": "Click", "uzum": "Uzum Bank"}.get(row["provider"], row["provider"])),
              ("Paid / To‘langan / Оплачено", f"{row['pay_uzs']:,} so'm".replace(",", " ")),
              ("Added to balance / Balansga / На баланс", f"{row['credit_uzs']:,} so'm".replace(",", " ")),
              ("Provider reference", row.get("provider_ref") or "—"),
@@ -615,6 +615,13 @@ async def payme_endpoint(request: Request):
     body = await request.body()
     reply = await run_in_threadpool(payments.payme, body, request.headers.get("authorization", ""))
     return JSONResponse(reply, 200)
+
+
+@app.post("/payments/uzum/{method}")
+async def uzum_endpoint(method: str, request: Request):
+    body = await request.body()
+    status, reply = await run_in_threadpool(payments.uzum, method, body, request.headers.get("authorization", ""))
+    return JSONResponse(reply, status)
 
 
 @app.post("/payments/click/{stage}")

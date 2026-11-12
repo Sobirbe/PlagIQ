@@ -21,12 +21,17 @@ Click (SHOP API, docs.click.uz/shop-api):
     checkout  https://my.click.uz/services/pay?service_id&merchant_id&amount&transaction_param&return_url
     Click has no separate sandbox host: use the test service Click issues for the sandbox and its
     Playground (docs.click.uz/testing/playground). Never put a live service's keys here.
-Uzum Bank: not implemented in this version.
+Uzum Bank (Merchant API webhooks, developer.uzumbank.uz/merchant):
+    endpoints POST /payments/uzum/check, /create, /confirm, /reverse, /status (Basic auth)
+    account   params.account = order number. There is no checkout link: the customer pays in the
+              Uzum Bank app (Payments -> the PlagIQ service -> order number). Uzum has no public
+              sandbox: use the test service and credentials Uzum's team issues.
 
 Settings (website service; keys are secrets, set them only in Railway):
     PAYMENTS_ENABLED=1, PAYMENTS_MODE=test
     PAYME_MERCHANT_ID, PAYME_TEST_KEY          (Payme sandbox merchant ID and test key)
     CLICK_SERVICE_ID, CLICK_MERCHANT_ID, CLICK_SECRET_KEY
+    UZUM_SERVICE_ID, UZUM_LOGIN, UZUM_PASSWORD, UZUM_SERVICE_NAME (name shown in the Uzum Bank app)
     TOPUP_MIN=1000, TOPUP_MAX=2000000          (so'm)
     PAYME_IKPU, PAYME_PACKAGE_CODE, PAYME_VAT_PERCENT   (optional fiscal data; both codes from tasnif.soliq.uz)
 Data is kept in the accounts database (auth.db_file()), tables orders, payme_tx, click_tx, ledger.
@@ -47,6 +52,7 @@ import pricing
 
 PAYME_CHECKOUT = "https://test.paycom.uz"           # sandbox only
 CLICK_CHECKOUT = "https://my.click.uz/services/pay"
+UZUM_CONFIRM_MS = 30 * 60 * 1000                  # Uzum: unconfirmed after 30 minutes means failed
 PAYME_TIMEOUT_MS = 43_200_000                      # 12 h: Payme cancels unperformed transactions after this
 ORDER_DAYS = 1                                     # an unpaid order can be started within a day
 _lock = threading.Lock()
@@ -74,7 +80,8 @@ def problem():
     if not auth.enabled():
         return "Telegram sign-in is needed for balances"
     if not providers():
-        return "no provider configured (PAYME_MERCHANT_ID + PAYME_TEST_KEY, or CLICK_SERVICE_ID + CLICK_MERCHANT_ID + CLICK_SECRET_KEY)"
+        return ("no provider configured (PAYME_MERCHANT_ID + PAYME_TEST_KEY, CLICK_SERVICE_ID + CLICK_MERCHANT_ID + "
+                "CLICK_SECRET_KEY, or UZUM_SERVICE_ID + UZUM_LOGIN + UZUM_PASSWORD)")
     return ""
 
 
@@ -90,8 +97,12 @@ def click_ready():
     return all(os.environ.get(k, "").strip() for k in ("CLICK_SERVICE_ID", "CLICK_MERCHANT_ID", "CLICK_SECRET_KEY"))
 
 
+def uzum_ready():
+    return all(os.environ.get(k, "").strip() for k in ("UZUM_SERVICE_ID", "UZUM_LOGIN", "UZUM_PASSWORD"))
+
+
 def providers():
-    return [name for name, ok in (("payme", payme_ready()), ("click", click_ready())) if ok]
+    return [name for name, ok in (("payme", payme_ready()), ("click", click_ready()), ("uzum", uzum_ready())) if ok]
 
 
 def _int_env(name, default):
@@ -155,6 +166,9 @@ def _connect():
         CREATE TABLE IF NOT EXISTS click_tx (prepare_id INTEGER PRIMARY KEY AUTOINCREMENT, click_trans_id TEXT NOT NULL,
             order_id TEXT NOT NULL, amount TEXT NOT NULL, state TEXT NOT NULL, created INTEGER NOT NULL,
             confirmed INTEGER);
+        CREATE TABLE IF NOT EXISTS uzum_tx (id TEXT PRIMARY KEY, order_id TEXT NOT NULL, amount INTEGER NOT NULL,
+            state TEXT NOT NULL, trans_time INTEGER NOT NULL, confirm_time INTEGER, reverse_time INTEGER);
+        CREATE INDEX IF NOT EXISTS uzum_order ON uzum_tx (order_id);
         CREATE TABLE IF NOT EXISTS ledger (id INTEGER PRIMARY KEY AUTOINCREMENT, user INTEGER NOT NULL,
             time INTEGER NOT NULL, amount_uzs INTEGER NOT NULL, kind TEXT NOT NULL, ref TEXT, note TEXT,
             mode TEXT NOT NULL);
@@ -209,8 +223,11 @@ def create_order(user, provider, amount_uzs=None, package=None):
                 break
         db.execute("INSERT INTO orders (id, user, provider, pay_uzs, credit_uzs, package, mode, state, created) "
                    "VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?)", (order_id, user["id"], provider, pay, credit, package, mode(), _ms()))
-    return {"id": order_id, "provider": provider, "pay_uzs": pay, "credit_uzs": credit,
-            "pay_url": checkout_url(provider, order_id, pay)}
+    result = {"id": order_id, "provider": provider, "pay_uzs": pay, "credit_uzs": credit,
+              "pay_url": checkout_url(provider, order_id, pay)}
+    if provider == "uzum":                         # paid inside the Uzum Bank app with the order number
+        result["service_name"] = os.environ.get("UZUM_SERVICE_NAME", "").strip() or "PlagIQ"
+    return result
 
 
 def _return_url(order_id):
@@ -219,6 +236,9 @@ def _return_url(order_id):
 
 
 def checkout_url(provider, order_id, pay_uzs):
+    """The provider's payment page, or None for Uzum (no link: the customer pays in the Uzum Bank app)."""
+    if provider == "uzum":
+        return None
     back = _return_url(order_id)
     if provider == "payme":
         params = f"m={os.environ['PAYME_MERCHANT_ID'].strip()};ac.order_id={order_id};a={pay_uzs * 100};l=uz" + (f";c={back}" if back else "")
@@ -299,11 +319,14 @@ def _in_progress(db, orders):
     marks = ",".join("?" * len(orders))
     return bool(db.execute(f"SELECT 1 FROM payme_tx WHERE state=1 AND order_id IN ({marks})", orders).fetchone()
                 or db.execute(f"SELECT 1 FROM click_tx WHERE state='prepared' AND created>? AND order_id IN ({marks})",
-                              [_ms() - 3_600_000] + orders).fetchone())
+                              [_ms() - 3_600_000] + orders).fetchone()
+                or db.execute(f"SELECT 1 FROM uzum_tx WHERE state='CREATED' AND trans_time>? AND order_id IN ({marks})",
+                              [_ms() - UZUM_CONFIRM_MS] + orders).fetchone())
 
 
 def in_progress(user):
-    """True while a Payme transaction is open or a Click payment was prepared in the last hour."""
+    """True while a Payme transaction is open, a Click payment was prepared in the last hour, or an
+    Uzum transaction awaits confirmation (30 minutes)."""
     if not has_records(user):
         return False
     with _lock, closing(_connect()) as db:
@@ -323,6 +346,7 @@ def forget(user):
             if orders:
                 db.execute(f"DELETE FROM payme_tx WHERE order_id IN ({marks})", orders)
                 db.execute(f"DELETE FROM click_tx WHERE order_id IN ({marks})", orders)
+                db.execute(f"DELETE FROM uzum_tx WHERE order_id IN ({marks})", orders)
             db.execute("DELETE FROM orders WHERE user=?", (user["id"],))
             db.execute("DELETE FROM ledger WHERE user=?", (user["id"],))
             db.execute("COMMIT")
@@ -657,3 +681,157 @@ def _click_complete(db, form, amount, error):
     db.execute("UPDATE click_tx SET state='confirmed', confirmed=? WHERE prepare_id=?", (_ms(), prepare_id))
     _credit(db, row, "click:" + form["click_trans_id"])
     return _click_reply(0, form, merchant_confirm_id=prepare_id)
+
+
+# ------------------------------------------------------------- Uzum Bank Merchant API
+
+UZUM_METHODS = ("check", "create", "confirm", "reverse", "status")
+
+
+class UzumError(Exception):
+    def __init__(self, code, **fields):
+        super().__init__(code)
+        self.code, self.fields = code, fields
+
+
+def _uzum_authorised(header):
+    login, password = os.environ.get("UZUM_LOGIN", ""), os.environ.get("UZUM_PASSWORD", "")
+    if not login or not password or not header.startswith("Basic "):
+        return False
+    expected = "Basic " + base64.b64encode(f"{login}:{password}".encode()).decode()
+    return hmac.compare_digest(header.encode(), expected.encode())
+
+
+def uzum(method, body, auth_header):
+    """Handle one Uzum webhook. Returns (HTTP status, JSON body): 200 on success, 400 with
+    {"status": "FAILED", "errorCode": "<code>"} on errors, as the Merchant API specifies."""
+    service = None
+    try:
+        if not enabled() or not uzum_ready() or not _uzum_authorised(auth_header or ""):
+            raise UzumError("10001")
+        try:
+            data = json.loads(body)
+        except ValueError:
+            raise UzumError("10002")
+        if not isinstance(data, dict) or method not in UZUM_METHODS:
+            raise UzumError("10002" if method in UZUM_METHODS else "10003")
+        service = data.get("serviceId")
+        needed = ["serviceId", "timestamp"] + (["params"] if method == "check" else
+                                                ["transId", "params", "amount"] if method == "create" else ["transId"])
+        if any(data.get(k) in (None, "", {}) for k in needed):
+            raise UzumError("10005")
+        if str(service) != os.environ["UZUM_SERVICE_ID"].strip():
+            raise UzumError("10006")
+        with _lock, closing(_connect()) as db:
+            db.execute("BEGIN IMMEDIATE")
+            try:
+                reply = globals()["_uzum_" + method](db, data)
+                db.execute("COMMIT")
+            except UzumError:
+                db.execute("COMMIT")               # keep a 30-minute expiry recorded before the error
+                raise
+            except BaseException:
+                db.execute("ROLLBACK")
+                raise
+        return 200, {"serviceId": service, **reply}
+    except UzumError as exc:
+        return 400, {"serviceId": service, **exc.fields, "status": "FAILED", "errorCode": exc.code}
+    except (sqlite3.Error, KeyError, TypeError, ValueError):
+        return 400, {"serviceId": service, "status": "FAILED", "errorCode": "99999"}
+
+
+def _uzum_data(row):
+    return {"account": {"value": row["id"]}, "amount": {"value": str(row["pay_uzs"])}}
+
+
+def _uzum_order(db, params):
+    account = params.get("account") if isinstance(params, dict) else None
+    row = db.execute("SELECT * FROM orders WHERE id=? AND provider='uzum'", (str(account or ""),)).fetchone()
+    if not row:
+        raise UzumError("10007")
+    if row["state"] == "paid":
+        raise UzumError("10008")
+    if row["state"] != "pending" or row["created"] < _ms() - ORDER_DAYS * 86_400_000:
+        raise UzumError("10009")
+    return row
+
+
+def _uzum_expire(db, tx):
+    """An unconfirmed transaction older than 30 minutes is failed (Uzum's state model)."""
+    if tx["state"] == "CREATED" and _ms() - tx["trans_time"] > UZUM_CONFIRM_MS:
+        db.execute("UPDATE uzum_tx SET state='FAILED' WHERE id=?", (tx["id"],))
+        return True
+    return False
+
+
+def _uzum_check(db, data):
+    row = _uzum_order(db, data["params"])
+    return {"timestamp": _ms(), "status": "OK", "data": _uzum_data(row)}
+
+
+def _uzum_create(db, data):
+    trans_id = str(data["transId"])
+    fields = {"transId": trans_id}
+    if db.execute("SELECT 1 FROM uzum_tx WHERE id=?", (trans_id,)).fetchone():
+        raise UzumError("10010", **fields)
+    try:
+        row = _uzum_order(db, data["params"])
+    except UzumError as exc:
+        raise UzumError(exc.code, **fields)
+    amount = data["amount"]
+    if type(amount) is not int or amount != row["pay_uzs"] * 100:
+        raise UzumError("10011", **fields)
+    for other in db.execute("SELECT * FROM uzum_tx WHERE order_id=? AND state='CREATED'", (row["id"],)).fetchall():
+        if not _uzum_expire(db, other):
+            raise UzumError("10008", **fields)     # this one-time order is already being paid
+    now = _ms()
+    db.execute("INSERT INTO uzum_tx (id, order_id, amount, state, trans_time) VALUES (?, ?, ?, 'CREATED', ?)",
+               (trans_id, row["id"], amount, now))
+    return {"transId": trans_id, "status": "CREATED", "transTime": now, "data": _uzum_data(row), "amount": amount}
+
+
+def _uzum_tx(db, data):
+    tx = db.execute("SELECT * FROM uzum_tx WHERE id=?", (str(data["transId"]),)).fetchone()
+    if not tx:
+        raise UzumError("10014", transId=str(data["transId"]))
+    return tx
+
+
+def _uzum_confirm(db, data):
+    tx = _uzum_tx(db, data)
+    fields = {"transId": tx["id"]}
+    if tx["state"] == "CONFIRMED":
+        raise UzumError("10016", **fields)
+    if tx["state"] != "CREATED" or _uzum_expire(db, tx):
+        raise UzumError("10015", **fields)
+    row = db.execute("SELECT * FROM orders WHERE id=?", (tx["order_id"],)).fetchone()
+    if row["state"] != "pending":
+        raise UzumError("10015", **fields)
+    now = _ms()
+    db.execute("UPDATE uzum_tx SET state='CONFIRMED', confirm_time=? WHERE id=?", (now, tx["id"]))
+    _credit(db, row, "uzum:" + tx["id"])
+    return {"transId": tx["id"], "status": "CONFIRMED", "confirmTime": now, "data": _uzum_data(row), "amount": tx["amount"]}
+
+
+def _uzum_reverse(db, data):
+    tx = _uzum_tx(db, data)
+    fields = {"transId": tx["id"]}
+    if tx["state"] == "REVERSED":
+        raise UzumError("10018", **fields)
+    row = db.execute("SELECT * FROM orders WHERE id=?", (tx["order_id"],)).fetchone()
+    if tx["state"] == "CONFIRMED" and not _reverse(db, row, "uzum-reverse:" + tx["id"]):
+        raise UzumError("10017", **fields)         # the top-up was already spent on checks
+    now = _ms()
+    db.execute("UPDATE uzum_tx SET state='REVERSED', reverse_time=? WHERE id=?", (now, tx["id"]))
+    return {"transId": tx["id"], "status": "REVERSED", "reverseTime": now, "data": _uzum_data(row), "amount": tx["amount"]}
+
+
+def _uzum_status(db, data):
+    tx = _uzum_tx(db, data)
+    _uzum_expire(db, tx)
+    tx = _uzum_tx(db, data)
+    times = {"transTime": tx["trans_time"], "confirmTime": tx["confirm_time"], "reverseTime": tx["reverse_time"]}
+    if tx["state"] == "FAILED":
+        raise UzumError("10015", transId=tx["id"], **times)
+    row = db.execute("SELECT * FROM orders WHERE id=?", (tx["order_id"],)).fetchone()
+    return {"transId": tx["id"], "status": tx["state"], **times, "data": _uzum_data(row), "amount": tx["amount"]}
