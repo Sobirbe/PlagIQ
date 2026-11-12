@@ -56,6 +56,8 @@ def parse_article(page):
         end = page.find('<div class="full', start)
         body = page[start:end if end != -1 else len(page)]
         body = re.sub(r'(?s)<div class="ocr-banner">.*?</div>', " ", body)
+        # CyberLeninka's own "Не можете найти то, что вам нужно? Попробуйте сервис подбора литературы" box
+        body = re.sub(r'(?s)<div class="bibloid[^"]*">.*?</span>\s*</div>', " ", body)
         import websearch
         text = websearch.html_text(body.encode(), "text/html; charset=utf-8")
     year = re.match(r"\d{4}", (meta.get("citation_publication_date") or [""])[0])

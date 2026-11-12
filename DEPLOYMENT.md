@@ -405,6 +405,16 @@ The library's imported texts can be downloaded again from their sources. **Stude
 2. **Restore** deposits into an engine with: `python corpus.py --db /data/corpus.sqlite3 --restore-archive plagiq-archive-YYYYMMDD.jsonl.gz` (engine shell). To restore accounts, put the downloaded file back on the website volume at `/data/plagiq-users.sqlite3`.
 3. **Railway volume backups:** in Railway, open each volume (engine and website), go to **Backups**, and turn on a schedule (daily or weekly) if your plan offers it. Check what your plan includes.
 
+## Part 5c — Measure accuracy on your own library
+
+`evaluation/REAL_RESULTS.md` reports how much copying PlagIQ finds on real texts, and how often it flags text that was not copied (measured in November 2026 on 215 real open-licence texts). To measure **your live library**, open the engine shell (Railway → engine → ⋮ → Shell) and run:
+```bash
+python evaluation/real_eval.py --db /data/corpus.sqlite3 --out /data/REAL_RESULTS.md
+```
+The script sets aside 25 library texts per language as "articles PlagIQ has never seen" and hides them from every search during the test. It copies real passages in seven ways (unchanged, reformatted, Latin↔Cyrillic, look-alike letters, light and heavy edits, reordered), and prints a table. It changes nothing in the library and takes a few minutes. Re-run it after large imports and keep the results; universities will ask for them.
+
+**Boilerplate filter:** a seven-word sequence found in 3 or more different library texts (journal headers, licence lines, website banners) is not counted as a match. `BOILERPLATE_SOURCES` (engine and website) changes the number; `0` turns the filter off.
+
 ## Part 4 — Checks before you approve the pull request
 
 Use only harmless sample text. Tick each item:
