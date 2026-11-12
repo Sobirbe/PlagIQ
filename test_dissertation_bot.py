@@ -99,10 +99,10 @@ def test_start_gets_reply_with_site_button(client, bot):
     assert r.status_code == 200 and len(bot) == 1
     url, payload = bot[0]
     assert url == f"https://api.telegram.org/bot{TOKEN}/sendMessage" and payload["chat_id"] == 777
-    assert "Telegram orqali kirish" in payload["text"]
-    assert payload["reply_markup"]["inline_keyboard"][0][0]["url"] == "https://plagiq.example/"
+    assert "Telegram orqali kirish" in payload["text"] and "https://plagiq.example/" in payload["text"]
+    assert payload["reply_markup"]["keyboard"][0][0] == {"text": "📱 Raqamni yuborish", "request_contact": True}
     client.post("/telegram/webhook", json=update(lang="ru"), headers={"X-Telegram-Bot-Api-Secret-Token": secret})
-    assert "Войти через Telegram" in bot[1][1]["text"]
+    assert "Войти через Telegram" in bot[1][1]["text"] and "Отправить номер" in bot[1][1]["text"]
     client.post("/telegram/webhook", json=update(chat_type="group"), headers={"X-Telegram-Bot-Api-Secret-Token": secret})
     assert len(bot) == 2                                   # groups are ignored
 

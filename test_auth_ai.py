@@ -66,11 +66,13 @@ def test_session_cookie_cannot_be_forged(login):
 
 
 def test_login_required_for_checks_and_history_recorded(login):
-    files = {"submission": ("m.txt", EN.encode())}
+    files = {"submission": ("m.txt", (EN * 7).encode())}                     # over 1,000 words: sign-in needed
     blocked = login.post("/api/check", data={"mode": "reference", "language": "en", "reference_text": EN}, files=files)
-    assert blocked.status_code == 401 and blocked.json()["code"] == "login_required"
-    assert login.get("/api/me").json()["auth"] == {"enabled": True, "required": True, "bot_id": "123456789",
-                                                   "bot_username": "plagiq_bot"}
+    assert blocked.status_code == 401 and blocked.json()["code"] == "login_required_long"
+    config = login.get("/api/me").json()["auth"]
+    assert {k: config[k] for k in ("enabled", "required", "bot_id", "bot_username", "telegram", "email", "anon_max_words")} == {
+        "enabled": True, "required": True, "bot_id": "123456789", "bot_username": "plagiq_bot", "telegram": True,
+        "email": True, "anon_max_words": 1000}
     response = sign_in(login)
     assert response.status_code == 200 and response.json()["user"]["name"] == "Dilnoza Karimova"
     assert "httponly" in response.headers["set-cookie"].lower() and "samesite=strict" in response.headers["set-cookie"].lower()

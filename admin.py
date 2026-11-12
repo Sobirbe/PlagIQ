@@ -52,6 +52,11 @@ def checklist(library, probe=""):
     rows = [
         ("Telegram sign-in", auth.enabled(), "on, @" + auth.public_config()["bot_username"] if auth.enabled() else "off",
          "TELEGRAM_BOT_TOKEN and TELEGRAM_BOT_USERNAME on the website (Part 3i)"),
+        ("Email + password sign-in", auth.email_enabled() or None, "on (no email is sent; addresses are not verified)"
+         if auth.email_enabled() else "off", "on by default; EMAIL_LOGIN=0 turns it off (Part 3i)"),
+        ("Checks without an account", True if auth.anon_max_words() else None,
+         f"up to {auth.anon_max_words():,} words (plagiarism only)" if auth.anon_max_words() else "off: every check needs sign-in",
+         "ANON_MAX_WORDS on the website (Part 3i)"),
         ("Bot answers /start", telegram_bot.STATUS["ok"] if telegram_bot.enabled() else None,
          ("on" if telegram_bot.STATUS["ok"] else "being registered with Telegram" if telegram_bot.STATUS["ok"] is None
           else "Telegram refused the webhook: " + telegram_bot.STATUS["detail"])

@@ -83,25 +83,27 @@ try:
             page.on('pageerror', lambda e: errors.append(str(e)))
             page.goto('http://127.0.0.1:8146')
             page.locator('[data-lang=en]').click()
-            page.wait_for_selector('#account button.tg')
-            assert page.locator('#account').inner_text() == 'Sign in with Telegram'
-            assert 'Sign in with Telegram to run a check' in page.locator('#login-note').inner_text()
-            page.locator('#submission').set_input_files({'name': 'essay.txt', 'mimeType': 'text/plain', 'buffer': EN.encode()})
+            page.wait_for_selector('#account summary.signin-open')
+            assert page.locator('#account summary').inner_text() == 'Sign in'
+            assert 'up to 1,000 words can be checked without signing in' in page.locator('#login-note').inner_text()
+            page.locator('#submission').set_input_files({'name': 'essay.txt', 'mimeType': 'text/plain', 'buffer': (EN * 7).encode()})
+            page.wait_for_function("() => document.querySelector('#quote').textContent.includes('1,1')")
             page.locator('#consent').check()
             page.locator('button[type=submit]').click()
-            assert 'Please sign in with Telegram' in page.locator('#status').inner_text()
+            assert 'need sign-in' in page.locator('#status').inner_text(), page.locator('#status').inner_text()
             page.context.route('https://oauth.telegram.org/**', telegram_popup)
             with page.expect_popup() as popup:
+                page.locator('#account summary.signin-open').click()
                 page.locator('#account button.tg').click()
             assert popup.value.url.startswith('https://oauth.telegram.org/auth?bot_id=123456789&origin=http%3A%2F%2F127.0.0.1%3A8146')
-            page.wait_for_selector('#account summary')                              # PlagIQ tab stays open
+            page.wait_for_function("() => (document.querySelector('#account summary')||{}).textContent.includes('Dilnoza')")  # PlagIQ tab stays open
             assert 'Dilnoza Karimova' in page.locator('#account summary').inner_text()
             assert page.locator('#status').inner_text() == ''                        # "sign in first" message cleared
             page.locator('#account summary').click()
             page.locator('#account .menu button', has_text='Sign out').click()
-            page.wait_for_selector('#account button.tg')
+            page.wait_for_selector('#account summary.signin-open')
             page.goto('http://127.0.0.1:8146/login#tgAuthResult=' + tg_result())    # redirect fallback still works
-            page.wait_for_selector('#account summary')
+            page.wait_for_function("() => (document.querySelector('#account summary')||{}).textContent.includes('Dilnoza')")
             assert 'Dilnoza Karimova' in page.locator('#account summary').inner_text() and page.url.endswith('/')
             assert page.locator('#login-note').is_hidden()
             # AI detector mode
@@ -134,7 +136,7 @@ try:
                 page.evaluate('scrollTo(0,0)')
                 page.screenshot(path=str(SHOTS / 'account-menu.png'), clip={'x': 700, 'y': 0, 'width': 740, 'height': 330})
             page.locator('#account .menu button', has_text='Sign out').click()
-            page.wait_for_selector('#account button.tg')
+            page.wait_for_selector('#account summary.signin-open')
             assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), (width, 'overflow')
             assert not errors, errors
             page.context.close()

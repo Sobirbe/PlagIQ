@@ -62,7 +62,7 @@ try:
             page.on('pageerror', lambda e: errors.append(str(e)))
             page.goto(BASE + '/login#tgAuthResult=' + tg_result(42 + width))
             page.locator('[data-lang=en]').click()
-            page.wait_for_selector('#account summary')
+            page.wait_for_selector('#account summary:not(.signin-open)')
             page.wait_for_function('() => document.querySelector("#account summary").textContent.includes("UZS")')
             assert '0 UZS' in page.locator('#account summary').inner_text()
             assert 'TEST MODE' in page.locator('#pilot-bar').inner_text()
