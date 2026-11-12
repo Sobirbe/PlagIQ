@@ -396,7 +396,11 @@ This version takes **sandbox payments only**: it refuses to switch on unless `PA
 1. In the Payme cabinet, set the **endpoint URL** to `https://plagiq-production.up.railway.app/payments/payme`, the account field to **`order_id`**, and the account type to **one-time** ("Одноразовый").
 2. On the **website** service in Railway → **Variables**, add: `PAYMENTS_ENABLED=1`, `PAYMENTS_MODE=test`, `PAYME_MERCHANT_ID` (the cashbox ID) and `PAYME_TEST_KEY` (the **test** key from the cabinet). Type the key only into Railway; never paste it into a chat or a file.
 3. Open the sandbox and run its tests: wrong key (−32504), wrong amount (−31001), non-existent order (−31050), then create, repeat create, perform, cancel. For an order number and amount, start a top-up on the site and copy the order number from the sandbox checkout page.
-4. Optional, for Payme's fiscal data: `PAYME_IKPU` (the IKPU/MXIK code of the service), `PAYME_PACKAGE_CODE`, `PAYME_VAT_PERCENT`.
+4. Optional: fiscal (tax) data sent to Payme with each payment. PlagIQ sends it only when both codes are set:
+   - `PAYME_IKPU`: the 17-digit IKPU (MXIK) code of the service. Find it on **tasnif.soliq.uz**: search for the service (for example "dasturiy ta'minot" / "программное обеспечение" / information services), open the result that describes it, and copy its code. Your accountant should confirm the choice; PlagIQ cannot pick it for you.
+   - `PAYME_PACKAGE_CODE`: the package (unit) code shown in the details of that same IKPU entry on tasnif.soliq.uz.
+   - `PAYME_VAT_PERCENT`: your VAT rate, for example `0` if you are not a VAT payer. Ask your accountant.
+   Payme puts these on the fiscal receipt it issues.
 
 **Click** (docs: docs.click.uz/shop-api):
 1. Ask Click for a **test service** and give them the Prepare URL `…/payments/click/prepare` and the Complete URL `…/payments/click/complete`.
@@ -405,7 +409,7 @@ This version takes **sandbox payments only**: it refuses to switch on unless `PA
 
 **Optional:** `TOPUP_MIN` (default 1000), `TOPUP_MAX` (default 2000000), `SELLER_NAME` and `SELLER_TIN` (shown on receipts).
 
-**What is stored:** orders, provider transactions and the balance ledger, in the accounts database on the website's `/data` volume (it is included in the accounts backup on /admin). These records are kept when a user deletes their account, for accounting. Card details never reach PlagIQ. The privacy notice says this; have the retention period confirmed by your lawyer.
+**What is stored:** orders, provider transactions and the balance ledger, in the accounts database on the website's `/data` volume (it is included in the accounts backup on /admin). **Deleting an account deletes all of its payment records** (orders, Payme and Click transactions, ledger), and any unspent balance is lost; the confirmation says so and shows the balance. Deletion is refused while a payment is still in progress (an open Payme transaction, or a Click payment prepared in the last hour), so a provider never confirms money for a deleted order. After deletion, Payme's statement (GetStatement) no longer lists that user's transactions; keep your own exports from the Payme and Click cabinets if your accountant needs them. Card details never reach PlagIQ.
 
 **Turning it off:** set `PAYMENTS_ENABLED=0` (or delete it). Checks become free again; balances stay stored.
 

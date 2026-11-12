@@ -121,6 +121,17 @@ try:
             page.locator('[data-lang=uz]').click()
             assert 'SINOV REJIMI' in page.locator('#pilot-bar').inner_text()
             assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), (width, 'overflow')
+            # Deleting the account warns about the balance, then erases it with the payment records.
+            page.locator('[data-lang=en]').click()
+            page.locator('#account summary').click()
+            messages = []
+            page.once('dialog', lambda d: (messages.append(d.message), d.accept()))
+            page.locator('#account .menu button', has_text='Delete my account').click()
+            page.wait_for_selector('#account button.tg')
+            assert 'unspent balance of 5,000 UZS is lost' in messages[0], messages
+            page.goto(BASE + '/login#tgAuthResult=' + tg_result(42 + width))
+            page.wait_for_function('() => document.querySelector("#account summary").textContent.includes("UZS")')
+            assert '· 0 UZS' in page.locator('#account summary').inner_text()
             assert not errors, errors
             context.close()
         browser.close()
