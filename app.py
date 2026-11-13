@@ -1004,7 +1004,10 @@ async def analyse(submission, reference, reference_text, language, mode, options
     result["highlight_html"] = ""
     if result.get("percent") is not None:
         review = await run_in_threadpool(citations.assess, original, language, intervals, **(options or {}))
-        result["highlight_html"] = highlight(original, review.pop("segments"), result.get("sources"))
+        marks = marks_for(original, review.pop("segments"), result.get("sources"))
+        result["highlight_html"] = highlight(original, None, marks=marks)
+        # For the PDF appendix only: kept with the report in memory (see finish), never sent twice or stored.
+        result["_text"], result["_marks"] = original, [list(m) for m in marks]
         result["citation"] = review
         result["percent_all"] = review["percent_all"]
         result["percent"] = review["percent_counted"]
@@ -1049,17 +1052,27 @@ def source_ranks(sources):
     return ranked
 
 
-def highlight(text, segments, sources=None):
-    """Escaped manuscript with matched words wrapped in <mark>; class names and a numeric
-    data-s (source rank) only, no user markup."""
+def marks_for(text, segments, sources=None):
+    """[(start, end, class, source rank or None)] for each highlighted stretch, in text order:
+    the same marks the page shows and the PDF appendix prints."""
     ranked = source_ranks(sources)
     out, pos = [], 0
     for start, end, where, reason in segments:
         if start < pos:
             continue
-        out.append(html.escape(text[pos:start]))
         cls = MARK_CLASS[where] + (" x" if reason else "")
         rank = next((r for r, spans in ranked if any(s < end and start < e for s, e in spans)), None)
+        out.append((start, end, cls, rank))
+        pos = end
+    return out
+
+
+def highlight(text, segments, sources=None, marks=None):
+    """Escaped manuscript with matched words wrapped in <mark>; class names and a numeric
+    data-s (source rank) only, no user markup."""
+    out, pos = [], 0
+    for start, end, cls, rank in (marks if marks is not None else marks_for(text, segments, sources)):
+        out.append(html.escape(text[pos:start]))
         attr = f' data-s="{min(rank, SOURCE_COLOURS)}"' if rank is not None else ""
         out.append(f'<mark class="{cls}"{attr}>' + html.escape(text[start:end]) + "</mark>")
         pos = end
@@ -1067,7 +1080,9 @@ def highlight(text, segments, sources=None):
     return "".join(out).replace("\n", "<br>")
 
 
-# Manuscript text shown to the user once, never kept in the report cache or PDF.
+# Shown to the user once and never kept in the report cache. The manuscript itself ("_text", "_marks")
+# is kept with the report in memory for its 15 minutes, only for the PDF appendix: never on disk,
+# never in the browser reply a second time, gone when the report expires or is deleted.
 PRIVATE_FIELDS = ("highlight_html", "search_phrases", "integrity_examples", "ai_passages")
 
 
@@ -1076,8 +1091,8 @@ def finish(request, result):
     while len(results) >= MAX_REPORTS:
         results.pop(next(iter(results)))
     owner = request.cookies.get("plagiq_session") or secrets.token_urlsafe(32)
-    response = JSONResponse({"report_id":identifier, **result}, headers={"x-report-id": identifier})
-    # Do not retain manuscript highlights or raw text in the report cache.
+    response = JSONResponse({"report_id": identifier, **{k: v for k, v in result.items() if not k.startswith("_")}},
+                            headers={"x-report-id": identifier})
     cached = {k:v for k,v in result.items() if k not in PRIVATE_FIELDS}
     if cached.get("sources"):           # manuscript excerpts of the side-by-side view are never cached
         cached["sources"] = [{**s, "passages": [{k: v for k, v in p.items() if k != "query_excerpt"}

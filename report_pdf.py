@@ -1,8 +1,9 @@
 """PDF report: a certificate of the check (certificate.py) followed by the scope-limited evidence.
 Never an originality certificate.
 
-Rendered from the cached report summary only: it contains source excerpts
-from the authorized corpus, never the manuscript text itself.
+Rendered from the in-memory report cache: source excerpts from the authorized corpus and, for the
+appendix, the manuscript with its matches highlighted. The manuscript is kept in memory only for the
+life of the report (15 minutes) and only for its owner's browser session; it is never written to disk.
 """
 import html
 import io
@@ -15,6 +16,7 @@ from reportlab.lib.units import mm
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.pdfgen import canvas as pdfcanvas
+from reportlab.graphics.shapes import Drawing, Rect
 from reportlab.platypus import KeepTogether, PageBreak, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from certificate import CertificatePage
@@ -439,6 +441,154 @@ def _plagiarism_sections(result, mode, t, st, table, esc, headline, basis, lang)
     return story
 
 
+# Same colours as the results page (index.html): one per source in list order, quotations and bibliography apart.
+PALETTE = ["#FFD166", "#9BE7C4", "#A9C8FF", "#FFB3C7", "#D4B5FF", "#FFCF9E", "#B8E986", "#8FE3F0", "#E0E0E0"]
+QUOTE_BG, BIB_BG, BADGE = "#D9ECFF", "#E6E1F5", "#B4442C"
+COUNTED, EXCLUDED, ORIGINAL = "#E4572E", "#8FB8DE", "#9FD8CF"
+
+VIEW_T = {
+    "en": dict(overview="Overview", counted="Matched and counted", excluded="Matched but excluded (quotations, bibliography)",
+               original="No match found in the searched scope", bar_note="The three parts add up to 100% of the document's words. "
+               "“No match found” describes only the scope searched; it is not a certificate of originality.",
+               src_title="Sources by share of the document", no="№", source="Source", coverage="Coverage",
+               share="Share of document", share_note="A source's share counts the document's words found in it; "
+               "several sources can contain the same words, so shares may add up to more than the total.",
+               doc_title="Appendix: your document with matches highlighted",
+               doc_note="Highlighted words lie inside a verified match of at least seven consecutive words. The colour and the "
+               "number show the source (as numbered in the list above and in section 4). This text is printed in your PDF only: "
+               "PlagIQ keeps it in memory for the life of the report (15 minutes) and never stores it.",
+               legend_q="quotation", legend_b="bibliography", legend_x="match not counted (excluded by your options)",
+               none="No matched passages in this document.", more="further sources share this colour"),
+    "ru": dict(overview="Обзор", counted="Совпадения (учтены)", excluded="Совпадения, исключённые (цитаты, список литературы)",
+               original="Совпадений в проверенном охвате не найдено", bar_note="Три части в сумме дают 100% слов документа. "
+               "«Совпадений не найдено» относится только к проверенному охвату и не является сертификатом оригинальности.",
+               src_title="Источники по доле в документе", no="№", source="Источник", coverage="Охват",
+               share="Доля в документе", share_note="Доля источника — слова документа, найденные в нём; одни и те же слова могут "
+               "встречаться в нескольких источниках, поэтому сумма долей может превышать итог.",
+               doc_title="Приложение: ваш документ с выделенными совпадениями",
+               doc_note="Выделены слова, входящие в подтверждённое совпадение не короче семи слов подряд. Цвет и номер указывают "
+               "источник (как в списке выше и в разделе 4). Этот текст есть только в вашем PDF: PlagIQ держит его в памяти, пока "
+               "существует отчёт (15 минут), и никогда не сохраняет.",
+               legend_q="цитата", legend_b="список литературы", legend_x="совпадение не учтено (исключено вашими настройками)",
+               none="В документе нет совпадающих фрагментов.", more="остальные источники отмечены этим цветом"),
+    "uz": dict(overview="Umumiy ko‘rinish", counted="Moslik (hisobga olingan)", excluded="Moslik, chiqarib tashlangan (iqtiboslar, adabiyotlar)",
+               original="Tekshirilgan doirada moslik topilmadi", bar_note="Uch qism birga hujjat so‘zlarining 100% ini tashkil etadi. "
+               "«Moslik topilmadi» faqat tekshirilgan doiraga tegishli; bu originallik sertifikati emas.",
+               src_title="Manbalar hujjatdagi ulushi bo‘yicha", no="№", source="Manba", coverage="Qamrov",
+               share="Hujjatdagi ulushi", share_note="Manba ulushi — hujjatning shu manbada topilgan so‘zlari; bir xil so‘zlar bir nechta "
+               "manbada bo‘lishi mumkin, shuning uchun ulushlar yig‘indisi umumiy natijadan katta bo‘lishi mumkin.",
+               doc_title="Ilova: mosliklar belgilangan hujjatingiz",
+               doc_note="Kamida yetti ketma-ket so‘zli tasdiqlangan moslik ichidagi so‘zlar belgilangan. Rang va raqam manbani "
+               "ko‘rsatadi (yuqoridagi ro‘yxat va 4-bo‘limdagi raqam). Bu matn faqat sizning PDF faylingizda: PlagIQ uni hisobot "
+               "mavjud bo‘lgan 15 daqiqa xotirada saqlaydi va hech qachon diskka yozmaydi.",
+               legend_q="iqtibos", legend_b="adabiyotlar ro‘yxati", legend_x="moslik hisobga olinmagan (sozlamalaringiz bo‘yicha)",
+               none="Hujjatda mos parchalar yo‘q.", more="qolgan manbalar shu rangda"),
+}
+
+
+def _ranked_sources(result):
+    """Sources in list order (most matched words first), as numbered in the PDF and coloured on the page."""
+    return sorted(result.get("sources") or [], key=lambda s: -(s.get("matched_tokens") or 0))
+
+
+def overview_section(result, lang, st, esc, t):
+    """A three-part bar (counted / excluded / no match) and the sources by their share of the document."""
+    v = VIEW_T.get(lang, VIEW_T["en"])
+    percent = result.get("percent")
+    if percent is None or result.get("mode") == "ai":
+        return []
+    c = result.get("citation") or {}
+    total_pct = float(c.get("percent_all", percent) or 0)
+    counted = float(percent or 0)
+    excluded = max(0.0, total_pct - counted)
+    original = max(0.0, 100.0 - total_pct)
+    width, height = 170 * mm, 9 * mm
+    bar = Drawing(width, height)
+    x = 0.0
+    for value, colour in ((counted, COUNTED), (excluded, EXCLUDED), (original, ORIGINAL)):
+        w = width * value / 100.0
+        if w > 0:
+            bar.add(Rect(x, 0, w, height, fillColor=colors.HexColor(colour), strokeColor=None))
+        x += w
+    swatch = lambda colour: f'<font backColor="{colour}">\u00a0\u00a0\u00a0\u00a0</font>'
+    rows = [[Paragraph(swatch(colour) + "\u00a0 " + esc(label), st["cell"]), Paragraph(f"<b>{value:.1f}%</b>", st["cell"])]
+            for label, value, colour in ((v["counted"], counted, COUNTED), (v["excluded"], excluded, EXCLUDED),
+                                         (v["original"], original, ORIGINAL))]
+    legend = Table(rows, colWidths=[140 * mm, 30 * mm], hAlign="LEFT")
+    legend.setStyle(TableStyle([("LINEBELOW", (0, 0), (-1, -1), 0.4, LINE), ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                                ("TOPPADDING", (0, 0), (-1, -1), 3), ("BOTTOMPADDING", (0, 0), (-1, -1), 4)]))
+    story = [Paragraph(esc(v["overview"]), st["h"]), bar, Spacer(1, 4), legend, Paragraph(esc(v["bar_note"]), st["small"])]
+    words = result.get("total_tokens") or 0
+    matched = [s for s in _ranked_sources(result) if s.get("matched_tokens")]
+    if matched and words:
+        head = [Paragraph(f"<b>{esc(h)}</b>", st["cell"]) for h in (v["no"], v["source"], v["coverage"], v["share"])]
+        body = []
+        for n, source in enumerate(matched[:PDF_SOURCES], 1):
+            colour = PALETTE[min(n - 1, len(PALETTE) - 1)]
+            title = esc(t["pasted"] if source.get("title") == "Pasted reference" else (source.get("title") or "—"))
+            link = f'<br/><font size="7" color="#4C6368">{esc(source["url"])}</font>' if source.get("url") else ""
+            coverage = t["cov_web"] if source.get("coverage") == "web" else t["cov"].get(source.get("coverage"), t["cov_full"])
+            body.append([Paragraph(f'<font backColor="{colour}">\u00a0{n}\u00a0</font>', st["cell"]),
+                         Paragraph(title + link, st["cell"]), Paragraph(esc(coverage), st["cell"]),
+                         Paragraph(f"<b>{100.0 * source['matched_tokens'] / words:.2f}%</b>", st["cell"])])
+        table = Table([head] + body, colWidths=[12 * mm, 104 * mm, 30 * mm, 24 * mm], hAlign="LEFT", repeatRows=1)
+        table.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, 0), TINT), ("LINEBELOW", (0, 0), (-1, -1), 0.4, LINE),
+                                   ("BOX", (0, 0), (-1, -1), 0.4, LINE), ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                                   ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 5)]))
+        story += [Paragraph(esc(v["src_title"]), st["source"]), table, Paragraph(esc(v["share_note"]), st["small"])]
+    return story
+
+
+def highlighted_section(result, lang, st, esc):
+    """Appendix: the manuscript with matched words highlighted in their source's colour and numbered.
+    Uses the text kept in memory with the report (never stored on disk); empty when it is not available."""
+    v = VIEW_T.get(lang, VIEW_T["en"])
+    text, marks = result.get("_text"), result.get("_marks") or []
+    if not text or result.get("percent") is None:
+        return []
+    legend = (f'<font backColor="{PALETTE[0]}">\u00a0{esc("1")}\u00a0</font> … '
+              f'<font backColor="{QUOTE_BG}">\u00a0{esc(v["legend_q"])}\u00a0</font>\u00a0 '
+              f'<font backColor="{BIB_BG}">\u00a0{esc(v["legend_b"])}\u00a0</font>\u00a0 '
+              f'<u>{esc(v["legend_x"])}</u>')
+    story = [PageBreak(), Paragraph(esc(v["doc_title"]), st["h"]), Paragraph(esc(v["doc_note"]), st["small"]),
+             Paragraph(legend, st["small"]), Spacer(1, 6)]
+    if not marks:
+        story.append(Paragraph(esc(v["none"]), st["body"]))
+    style = ParagraphStyle("doc", parent=st["body"], fontSize=9.5, leading=15, spaceAfter=5)
+    marks = sorted((int(a), int(b), str(cls), r) for a, b, cls, r in marks if 0 <= int(a) < int(b) <= len(text))
+    position = 0
+    for paragraph in text.split("\n"):
+        start, end = position, position + len(paragraph)
+        position = end + 1
+        if not paragraph.strip():
+            continue
+        out, cursor = [], start
+        for a0, b0, cls, rank in marks:
+            if b0 <= start or a0 >= end or b0 <= cursor:
+                continue
+            a, b = max(a0, start, cursor), min(b0, end)
+            if a > cursor:
+                out.append(esc(text[cursor:a]))
+            piece = esc(text[a:b])
+            kind, uncounted = cls.split(" ")[0], " x" in cls
+            if uncounted:
+                piece = f"<u>{piece}</u>"
+            elif kind in ("qc", "qu"):
+                piece = f'<font backColor="{QUOTE_BG}">{piece}</font>'
+            elif kind == "bib":
+                piece = f'<font backColor="{BIB_BG}">{piece}</font>'
+            elif rank is not None:
+                piece = f'<font backColor="{PALETTE[min(int(rank), len(PALETTE) - 1)]}">{piece}</font>'
+            if rank is not None and a == a0:                     # the match begins here: number it once
+                piece = f'<font backColor="{BADGE}" color="#FFFFFF" size="7">\u00a0{int(rank) + 1}\u00a0</font>' + piece
+            out.append(piece)
+            cursor = b
+        if cursor < end:
+            out.append(esc(text[cursor:end]))
+        story.append(Paragraph("".join(out), style))
+    return story
+
+
 def build_pdf(result, identifier, lang="en", minutes_left=15, verify_url=None):
     t = T.get(lang, T["en"])
     st = _styles()
@@ -456,7 +606,7 @@ def build_pdf(result, identifier, lang="en", minutes_left=15, verify_url=None):
 
     heading = [CertificatePage(result, identifier, lang, verify_url, _qr, (REGULAR, BOLD)), PageBreak(),
                Paragraph("PlagIQ", st["title"]), Paragraph(t["subtitle"], st["subtitle"])]
-    story = heading + [
+    story = heading + overview_section(result, lang, st, esc, t) + [
              Paragraph(esc(t["disclaimer"]), st["notice"])]
 
     story += [Paragraph(t["s_document"], st["h"]), table([
@@ -531,6 +681,7 @@ def build_pdf(result, identifier, lang="en", minutes_left=15, verify_url=None):
     if mode != "academic" or metadata_only <= 0:
         limits.pop(1)                                       # no metadata-only records in this report
     story += [Paragraph("• " + esc(item), st["body"]) for item in limits]
+    story += highlighted_section(result, lang, st, esc)
 
     out = io.BytesIO()
     doc = SimpleDocTemplate(out, pagesize=A4, leftMargin=18 * mm, rightMargin=18 * mm, topMargin=16 * mm,

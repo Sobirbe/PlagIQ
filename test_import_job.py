@@ -67,6 +67,8 @@ def test_engine_library_requires_key_and_reports_counts(monkeypatch, tmp_path):
 
 
 def test_engine_starts_import_only_when_enabled(monkeypatch, tmp_path):
+    import staging
+    monkeypatch.setattr(staging, 'low_disk', lambda db_path=None: None)   # independent of the test machine's free disk
     calls = []
     monkeypatch.setenv('CORPUS_DB', str(tmp_path / 'c.db'))
     monkeypatch.setenv('STAGING_DIR', str(tmp_path / 's'))
