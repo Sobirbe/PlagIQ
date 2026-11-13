@@ -1,5 +1,6 @@
 """Bounded text extraction shared by the website and the owner-run importer."""
 import io
+import threading
 import os
 import struct
 import time
@@ -170,11 +171,13 @@ def doc_text(content):
 
 # ------------------------------------------------------------- OCR (scanned PDF pages)
 # Tesseract with the Uzbek (Latin and Cyrillic), Russian and English models. Only pages without a text
-# layer are read. The first scanned page is read with all four models to find the script, the rest with
-# the two that fit (faster and more accurate). Settings: OCR_ENABLED=0 turns it off; OCR_MAX_PAGES (120),
-# OCR_MAX_SECONDS (240) and OCR_DPI (300) bound the work for one upload.
+# layer are read. Scanned pages are read with all four models until one has enough text to tell the script, the rest
+# with the models that fit (faster and more accurate). Settings: OCR_ENABLED=0 turns it off; OCR_MAX_PAGES (120),
+# OCR_MAX_SECONDS (240) and OCR_DPI (300) bound the work for one upload; OCR_QUEUE_SECONDS (60) is how
+# long an upload waits while another one is being read.
 
 OCR_ALL = "uzb+uzb_cyrl+rus+eng"
+_OCR_SLOT = threading.BoundedSemaphore(1)      # one upload at a time: Tesseract is CPU- and memory-heavy
 TESSDATA_DIRS = ("/usr/share/tesseract-ocr/5/tessdata", "/usr/share/tesseract-ocr/4.00/tessdata", "/usr/share/tessdata")
 
 
@@ -227,13 +230,18 @@ def _ocr_pdf(pdf, texts, info):
     limit, budget, dpi = _bounded("OCR_MAX_PAGES", 120, 1, 2000), _bounded("OCR_MAX_SECONDS", 240, 10, 3600), _bounded("OCR_DPI", 300, 150, 400)
     if len(scanned) > limit:
         raise ExtractError(413, "ocr_too_many_pages", f"{len(scanned)} scanned pages; at most {limit} can be read by OCR")
-    started, models = time.monotonic(), OCR_ALL
-    for n, i in enumerate(scanned):
-        if time.monotonic() - started > budget:
-            raise ExtractError(413, "ocr_timeout", f"Reading the scanned pages took longer than {budget} seconds")
-        texts[i] = _ocr_page(pdf[i], models, dpi, tessdata)
-        if n == 0:
-            models = _models_for(texts[i])
+    if not _OCR_SLOT.acquire(timeout=_bounded("OCR_QUEUE_SECONDS", 60, 0, 600)):
+        raise ExtractError(503, "ocr_busy", "Another scanned document is being read. Try again in a minute.")
+    try:
+        started, models = time.monotonic(), OCR_ALL
+        for n, i in enumerate(scanned):
+            if time.monotonic() - started > budget:
+                raise ExtractError(413, "ocr_timeout", f"Reading the scanned pages took longer than {budget} seconds")
+            texts[i] = _ocr_page(pdf[i], models, dpi, tessdata)
+            if models == OCR_ALL:                   # until a page has enough text to tell the script
+                models = _models_for(texts[i])
+    finally:
+        _OCR_SLOT.release()
     info.update(ocr_pages=len(scanned), ocr_models=models, ocr_seconds=round(time.monotonic() - started, 1))
     return texts
 
@@ -253,7 +261,7 @@ def extract_text(name, content, max_pages=MAX_PDF_PAGES, ocr=False, info=None):
         except UnicodeDecodeError:
             raise ExtractError(400, "txt_encoding", "TXT files must be saved as UTF-8 (or UTF-16 with a byte-order mark).")
     if not name.endswith((".docx", ".doc", ".pdf")):
-        raise ExtractError(400, "unsupported_type", "Only TXT, DOC, DOCX and text-based PDF supported")
+        raise ExtractError(400, "unsupported_type", "Only TXT, DOC, DOCX and PDF supported")
     if name.endswith(".doc"):
         if content.startswith(b"PK"):
             name = name + "x"                           # a .docx file renamed to .doc

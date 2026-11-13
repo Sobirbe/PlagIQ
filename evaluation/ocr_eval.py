@@ -4,12 +4,14 @@ Real academic abstracts (OpenAlex; Uzbek Latin, Uzbek Cyrillic made by translite
 English) are typeset on an A4 page, turned into a picture as a scanner would, and read back through
 PlagIQ's own extract_text(ocr=True). Two conditions:
   clean - 200 dpi;
-  poor  - 150 dpi, tilted 0.8 degrees, grey noise, JPEG quality 45 (an office scanner or a phone).
+  poor  - 150 dpi, tilted 0.8 degrees, grey noise, JPEG quality 45 (an office scanner or a phone);
+  rough - 120 dpi, tilted 2 degrees, heavy noise and blur, JPEG quality 30 (a poor phone photo).
 Per script and condition: word accuracy (1 - word error rate), the share of the page's words that
 PlagIQ's seven-word matching still finds against the original (copying detectable after OCR), and
 seconds per page.
 
 Usage: python evaluation/ocr_eval.py --abstracts academic.json --per-script 15 --out evaluation/OCR_RESULTS.json
+       [--conditions clean,poor,rough]
 """
 import argparse
 import difflib
@@ -32,15 +34,16 @@ def scanned_pdf(text, condition, rng):
     source = pymupdf.open()
     page = source.new_page()
     page.insert_textbox(pymupdf.Rect(60, 60, 535, 790), text, fontfile=FONT, fontname="serif", fontsize=11.5)
-    dpi = 200 if condition == "clean" else 150
+    dpi = {"clean": 200, "poor": 150, "rough": 120}[condition]
     pix = page.get_pixmap(dpi=dpi, colorspace=pymupdf.csGRAY)
     image = Image.frombytes("L", (pix.width, pix.height), pix.samples)
-    if condition == "poor":
-        image = image.rotate(0.8, fillcolor=255, resample=Image.BICUBIC)
-        noise = Image.effect_noise(image.size, 28)
-        image = Image.blend(image, noise, 0.12).filter(ImageFilter.GaussianBlur(0.5))
+    if condition in ("poor", "rough"):
+        rough = condition == "rough"
+        image = image.rotate(2.0 if rough else 0.8, fillcolor=255, resample=Image.BICUBIC)
+        noise = Image.effect_noise(image.size, 40 if rough else 28)
+        image = Image.blend(image, noise, 0.2 if rough else 0.12).filter(ImageFilter.GaussianBlur(0.8 if rough else 0.5))
     buffer = io.BytesIO()
-    image.save(buffer, "JPEG", quality=95 if condition == "clean" else 45)
+    image.save(buffer, "JPEG", quality={"clean": 95, "poor": 45, "rough": 30}[condition])
     out = pymupdf.open()
     img = out.new_page(width=page.rect.width, height=page.rect.height)
     img.insert_image(img.rect, stream=buffer.getvalue())
@@ -68,6 +71,7 @@ def main():
     parser.add_argument("--abstracts", required=True)
     parser.add_argument("--per-script", type=int, default=15)
     parser.add_argument("--out", required=True)
+    parser.add_argument("--conditions", default="clean,poor")
     args = parser.parse_args()
     import extract
     from real_eval import uz_latin_to_cyrillic
@@ -82,7 +86,7 @@ def main():
     results = []
     for script, texts in sets.items():
         language = "uz" if script.startswith("uz") else script
-        for condition in ("clean", "poor"):
+        for condition in args.conditions.split(","):
             accuracy, found, seconds, models = [], [], [], {}
             for text in texts:
                 pdf = scanned_pdf(text, condition, rng)
