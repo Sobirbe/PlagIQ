@@ -455,7 +455,7 @@ The Dockerfile installs Tesseract, so after merging, **redeploy the website serv
 - `OCR_DPI` (default 300) — rendering resolution.
 - `OCR_QUEUE_SECONDS` (default 60) — only one upload is OCR'd at a time (Tesseract needs CPU and memory, and the service has 1 GB); another one waits up to this long, then gets "try again in a minute".
 
-On the current plan (2 vCPU), a page takes roughly 3–7 seconds, so 240 seconds covers about 40–80 scanned pages. A whole scanned dissertation needs a higher `OCR_MAX_SECONDS`, or the user uploads the chapter they need.
+In testing (development sandbox; Railway may differ) a page took 2.5–6.5 seconds, so 240 seconds covers roughly 40–90 scanned pages. A whole scanned dissertation needs a higher `OCR_MAX_SECONDS`, or the user uploads the chapter they need.
 
 ## Part 5a — Owner dashboard (/admin)
 

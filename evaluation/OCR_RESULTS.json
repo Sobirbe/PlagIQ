@@ -82,5 +82,65 @@
   "models_chosen": {
    "uzb_cyrl+rus": 15
   }
+ },
+ {
+  "script": "uz_cyrillic",
+  "condition": "poor",
+  "pages": 15,
+  "word_accuracy": 0.9948,
+  "worst_page_accuracy": 0.964,
+  "copying_found": 0.9911,
+  "seconds_per_page": 3.11,
+  "models_chosen": {
+   "uzb_cyrl+rus": 15
+  }
+ },
+ {
+  "script": "uz",
+  "condition": "rough",
+  "pages": 15,
+  "word_accuracy": 0.9125,
+  "worst_page_accuracy": 0.8333,
+  "copying_found": 0.8563,
+  "seconds_per_page": 4.85,
+  "models_chosen": {
+   "uzb+eng": 15
+  }
+ },
+ {
+  "script": "ru",
+  "condition": "rough",
+  "pages": 15,
+  "word_accuracy": 0.9738,
+  "worst_page_accuracy": 0.948,
+  "copying_found": 0.9612,
+  "seconds_per_page": 2.88,
+  "models_chosen": {
+   "rus+eng": 15
+  }
+ },
+ {
+  "script": "en",
+  "condition": "rough",
+  "pages": 15,
+  "word_accuracy": 0.961,
+  "worst_page_accuracy": 0.9235,
+  "copying_found": 0.9528,
+  "seconds_per_page": 2.43,
+  "models_chosen": {
+   "eng": 15
+  }
+ },
+ {
+  "script": "uz_cyrillic",
+  "condition": "rough",
+  "pages": 15,
+  "word_accuracy": 0.9485,
+  "worst_page_accuracy": 0.9078,
+  "copying_found": 0.9069,
+  "seconds_per_page": 2.85,
+  "models_chosen": {
+   "uzb_cyrl+rus": 15
+  }
  }
 ]
