@@ -1,6 +1,8 @@
 """Bounded text extraction shared by the website and the owner-run importer."""
 import io
+import os
 import struct
+import time
 import re
 import zipfile
 
@@ -160,8 +162,80 @@ def doc_text(content):
         ole.close()
 
 
-def extract_text(name, content, max_pages=MAX_PDF_PAGES):
-    """Return text for a .txt/.docx/.pdf payload or raise ExtractError."""
+# ------------------------------------------------------------- OCR (scanned PDF pages)
+# Tesseract with the Uzbek (Latin and Cyrillic), Russian and English models. Only pages without a text
+# layer are read. The first scanned page is read with all four models to find the script, the rest with
+# the two that fit (faster and more accurate). Settings: OCR_ENABLED=0 turns it off; OCR_MAX_PAGES (120),
+# OCR_MAX_SECONDS (240) and OCR_DPI (300) bound the work for one upload.
+
+OCR_ALL = "uzb+uzb_cyrl+rus+eng"
+TESSDATA_DIRS = ("/usr/share/tesseract-ocr/5/tessdata", "/usr/share/tesseract-ocr/4.00/tessdata", "/usr/share/tessdata")
+
+
+def _tessdata():
+    for folder in [os.environ.get("TESSDATA_PREFIX", "")] + list(TESSDATA_DIRS):
+        if folder and all(os.path.isfile(os.path.join(folder, f"{m}.traineddata")) for m in ("uzb", "uzb_cyrl", "rus", "eng")):
+            return folder
+    return None
+
+
+def ocr_available():
+    return os.environ.get("OCR_ENABLED", "1") != "0" and _tessdata() is not None
+
+
+def _bounded(name, default, low, high):
+    try:
+        return min(max(int(os.environ.get(name, default)), low), high)
+    except ValueError:
+        return default
+
+
+def _models_for(sample):
+    """The Tesseract models that fit the text read from the first scanned page."""
+    from corpus import detect_language, script_shares
+    language = detect_language(sample) if len(sample.split()) >= 20 else None
+    cyrillic, _ = script_shares(sample) if sample.strip() else (0, 0)
+    if language == "ru":
+        return "rus+eng"
+    if language == "uz":
+        return "uzb_cyrl+rus" if cyrillic >= 0.5 else "uzb+eng"
+    if language == "en":
+        return "eng"
+    return OCR_ALL
+
+
+def _ocr_page(page, models, dpi, tessdata):
+    textpage = page.get_textpage_ocr(language=models, dpi=dpi, full=True, tessdata=tessdata)
+    return page.get_text(textpage=textpage)
+
+
+def _ocr_pdf(pdf, texts, info):
+    """Fill in the text of pages without a text layer. Raises ExtractError when there are too many
+    scanned pages or the time budget is used up (nothing is guessed)."""
+    scanned = [i for i, text in enumerate(texts) if len(text.strip()) < 25 and pdf[i].get_images()]
+    if not scanned:
+        return texts
+    tessdata = _tessdata()
+    if not tessdata or os.environ.get("OCR_ENABLED", "1") == "0":
+        return texts
+    limit, budget, dpi = _bounded("OCR_MAX_PAGES", 120, 1, 2000), _bounded("OCR_MAX_SECONDS", 240, 10, 3600), _bounded("OCR_DPI", 300, 150, 400)
+    if len(scanned) > limit:
+        raise ExtractError(413, "ocr_too_many_pages", f"{len(scanned)} scanned pages; at most {limit} can be read by OCR")
+    started, models = time.monotonic(), OCR_ALL
+    for n, i in enumerate(scanned):
+        if time.monotonic() - started > budget:
+            raise ExtractError(413, "ocr_timeout", f"Reading the scanned pages took longer than {budget} seconds")
+        texts[i] = _ocr_page(pdf[i], models, dpi, tessdata)
+        if n == 0:
+            models = _models_for(texts[i])
+    info.update(ocr_pages=len(scanned), ocr_models=models, ocr_seconds=round(time.monotonic() - started, 1))
+    return texts
+
+
+def extract_text(name, content, max_pages=MAX_PDF_PAGES, ocr=False, info=None):
+    """Return text for a .txt/.docx/.pdf payload or raise ExtractError. With ocr=True, scanned PDF pages
+    are read by OCR, and `info` (a dict) receives ocr_pages, ocr_models and ocr_seconds."""
+    info = {} if info is None else info
     name = name.lower()
     if not content:
         raise ExtractError(400, "empty_file", "The file is empty.")
@@ -190,7 +264,10 @@ def extract_text(name, content, max_pages=MAX_PDF_PAGES):
         with fitz.open(stream=content, filetype="pdf") as pdf:
             if pdf.page_count > max_pages:
                 raise ExtractError(400, "pdf_pages", f"PDF exceeds {max_pages} pages")
-            return dehyphenate("\n".join(page.get_text() for page in pdf))
+            texts = [page.get_text() for page in pdf]
+            if ocr:
+                texts = _ocr_pdf(pdf, texts, info)
+            return dehyphenate("\n".join(texts))
     except ExtractError:
         raise
     except Exception:
