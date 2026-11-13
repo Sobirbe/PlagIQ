@@ -32,7 +32,7 @@ def test_certificate_facts_match_signed_verification(monkeypatch):
     monkeypatch.setenv("VERIFY_SECRET", "s" * 40)
     url = verify.link(RESULT, ID, "https://plagiq.example")
     text, doc = first_page(RESULT, url=url)
-    for expected in ("CERTIFICATE OF CHECK", "0149-96EE-A688", "thesis.docx", "2026-11-11 07:15 UTC", "3 894", "12.5%",
+    for expected in ("CERTIFICATE OF CHECK", "0149-96EE-A688", "thesis.docx", "2026-11-11 12:15 (Tashkent time, UTC+5)", "3 894", "12.5%",
                      "before exclusions: 14.0%", "Full texts: 2 · abstracts: 2 · web pages: 1", "quotations",
                      "Review suggested (1)", "OpenAlex and the web (Brave)", "Verify this certificate",
                      "not a certificate of originality"):

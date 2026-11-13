@@ -7,6 +7,8 @@ life of the report (15 minutes) and only for its owner's browser session; it is 
 """
 import html
 import io
+
+import timefmt
 from pathlib import Path
 
 from reportlab.lib import colors
@@ -44,7 +46,7 @@ T = {
                "Matches require human review: properly quoted and cited text can match.",
     s_document="1. Document", s_scope="2. Scope and method", s_result="3. Result", s_sources="4. Sources and evidence",
     s_limits="5. Limitations",
-    document="File name", date="Checked (UTC)", sha="SHA-256 of extracted text", language="Manuscript language",
+    document="File name", date="Checked", sha="SHA-256 of extracted text", language="Manuscript language",
     mode="Comparison", method="Method", scope="Searched scope", status="Search status", expiry="Report availability",
     expiry_v="Deleted from PlagIQ within {m} min; downloadable only in the submitting browser session",
     corpus_by_lang="Indexed sources by language", discovered="Records found / with abstract / full texts compared (not stored)",
@@ -102,7 +104,7 @@ T = {
                "Совпадения требуют проверки человеком: корректно оформленные цитаты тоже могут совпадать.",
     s_document="1. Документ", s_scope="2. Охват и метод", s_result="3. Результат", s_sources="4. Источники и доказательства",
     s_limits="5. Ограничения",
-    document="Имя файла", date="Проверено (UTC)", sha="SHA-256 извлечённого текста", language="Язык рукописи",
+    document="Имя файла", date="Проверено", sha="SHA-256 извлечённого текста", language="Язык рукописи",
     mode="Сравнение", method="Метод", scope="Охват поиска", status="Статус поиска", expiry="Доступность отчёта",
     expiry_v="Удаляется из PlagIQ в течение {m} мин; скачивание только в сессии браузера отправителя",
     corpus_by_lang="Индексированные источники по языкам", discovered="Найдено записей / с аннотацией / сравнено полных текстов (не сохранены)",
@@ -160,7 +162,7 @@ T = {
                "Mosliklarni inson tekshirishi kerak: to‘g‘ri iqtibos qilingan matn ham mos kelishi mumkin.",
     s_document="1. Hujjat", s_scope="2. Doira va usul", s_result="3. Natija", s_sources="4. Manbalar va dalillar",
     s_limits="5. Cheklovlar",
-    document="Fayl nomi", date="Tekshirilgan (UTC)", sha="Ajratilgan matnning SHA-256", language="Hujjat tili",
+    document="Fayl nomi", date="Tekshirilgan", sha="Ajratilgan matnning SHA-256", language="Hujjat tili",
     mode="Solishtirish", method="Usul", scope="Qidiruv doirasi", status="Qidiruv holati", expiry="Hisobot mavjudligi",
     expiry_v="PlagIQ’dan {m} daqiqa ichida o‘chiriladi; faqat yuborgan brauzer seansida yuklab olinadi",
     corpus_by_lang="Tillar bo‘yicha indekslangan manbalar", discovered="Topilgan yozuvlar / annotatsiyasi borlari / solishtirilgan to‘liq matnlar (saqlanmagan)",
@@ -610,7 +612,7 @@ def build_pdf(result, identifier, lang="en", minutes_left=15, verify_url=None):
              Paragraph(esc(t["disclaimer"]), st["notice"])]
 
     story += [Paragraph(t["s_document"], st["h"]), table([
-        (t["document"], result.get("document", "")), (t["date"], result.get("date", "")),
+        (t["document"], result.get("document", "")), (t["date"], timefmt.show(result.get("date", ""), lang, seconds=True)),
         (t["language"], str(result.get("language", "")).upper() + (t["lang_detected"].format(
             s=result["language_note"]["selected"].upper()) if result.get("language_note") else "")),
         (t["sha"], result.get("sha256", "")),
