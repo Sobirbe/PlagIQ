@@ -42,7 +42,7 @@ def test_highlight_without_sources_still_works():
 
 def _pdf_text(client, identifier, lang):
     import pymupdf
-    pdf = client.get(f"/api/report/{identifier}.pdf?lang={lang}")
+    pdf = client.get(f"/api/report/{identifier}.pdf?full=1&lang={lang}")
     assert pdf.status_code == 200
     with pymupdf.open(stream=pdf.content, filetype="pdf") as doc:
         return " ".join(" ".join(page.get_text() for page in doc).split())
@@ -68,7 +68,7 @@ def test_pdf_overview_and_highlighted_appendix(monkeypatch):
     uz = _pdf_text(client, data["report_id"], "uz")
     assert "Ilova: mosliklar belgilangan hujjatingiz" in uz and "Umumiy ko‘rinish" in uz
     # Another browser session never gets the report, and deleting it removes the kept text.
-    assert TestClient(web.app).get(f"/api/report/{data['report_id']}.pdf").status_code == 404
+    assert TestClient(web.app).get(f"/api/report/{data['report_id']}.pdf?full=1").status_code == 404
     assert client.delete(f"/api/report/{data['report_id']}").status_code == 200
     assert data["report_id"] not in web.results
 
@@ -84,3 +84,46 @@ def test_appendix_marks_have_colours_and_numbers():
     assert report_pdf.PALETTE[0] in markup and report_pdf.QUOTE_BG in markup and "<u>" in markup
     assert markup.count(report_pdf.BADGE) == 2                           # each match from a source is numbered once
     assert report_pdf.highlighted_section({"percent": None, "_text": "x"}, "en", styles, html.escape) == []
+
+
+def test_short_report_is_three_pages_at_most_even_for_a_thesis():
+    import random
+
+    import pymupdf
+    random.seed(4)
+    vocab = ["".join(random.choice("abdefghijklmnoprstuvxyz") for _ in range(random.randint(3, 9))) for _ in range(5000)]
+    paragraphs = [" ".join(random.choice(vocab) for _ in range(110)) + "." for _ in range(400)]   # about 44,000 words
+    reference = "\n".join(paragraphs[i] for i in range(0, 400, 9))                              # 45 copied paragraphs
+    web.RATE.clear(); web.results.clear()
+    client = TestClient(web.app)
+    data = client.post("/api/check", data={"mode": "reference", "language": "en", "reference_text": reference},
+                       files={"submission": ("thesis.txt", "\n".join(paragraphs).encode())}).json()
+    short = client.get(f"/api/report/{data['report_id']}.pdf?lang=uz")
+    assert short.status_code == 200 and 'filename="PlagIQ-report.pdf"' in short.headers["content-disposition"]
+    with pymupdf.open(stream=short.content, filetype="pdf") as doc:
+        pages = doc.page_count
+        text = " ".join(" ".join(page.get_text() for page in doc).split())
+    assert pages <= 3, pages
+    assert "TEKSHIRUV SERTIFIKATI" in text and f"{data['percent']:.1f}%" in text          # certificate with the result
+    assert "Mosliklar qayerda" in text and "45 ta mos parchadan eng uzun 10 tasi" in text
+    assert "Ilova: mosliklar belgilangan hujjatingiz" not in text                           # no full document
+    full = client.get(f"/api/report/{data['report_id']}.pdf?full=1&lang=uz")
+    with pymupdf.open(stream=full.content, filetype="pdf") as doc:
+        assert doc.page_count > 20 and 'PlagIQ-full-report.pdf' in full.headers["content-disposition"]
+
+
+def test_short_report_without_matches_and_for_ai_mode():
+    web.RATE.clear(); web.results.clear()
+    client = TestClient(web.app)
+    data = client.post("/api/check", data={"mode": "reference", "language": "en", "reference_text": B},
+                       files={"submission": ("m.txt", ("Completely different words about mountains and rivers today. " * 4).encode())}).json()
+    text = _pdf_text_short(client, data["report_id"])
+    assert "No matched passages were found in the searched scope." in text and "Short report." in text
+
+
+def _pdf_text_short(client, identifier):
+    import pymupdf
+    pdf = client.get(f"/api/report/{identifier}.pdf?lang=en")
+    with pymupdf.open(stream=pdf.content, filetype="pdf") as doc:
+        assert doc.page_count <= 3
+        return " ".join(" ".join(page.get_text() for page in doc).split())

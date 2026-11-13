@@ -45,7 +45,7 @@ def test_no_link_without_a_long_secret(monkeypatch):
 def test_pdf_has_qr_and_link_and_verify_page_confirms(monkeypatch):
     client = TestClient(web.app)
     data = make_report(client, monkeypatch)
-    pdf = client.get(f"/api/report/{data['report_id']}.pdf?lang=uz").content
+    pdf = client.get(f"/api/report/{data['report_id']}.pdf?full=1&lang=uz").content
     with fitz.open(stream=pdf, filetype='pdf') as doc:
         page = doc[0]
         text = ' '.join(''.join(p.get_text() for p in doc).split())
@@ -63,7 +63,7 @@ def test_pdf_has_qr_and_link_and_verify_page_confirms(monkeypatch):
 def test_pdf_without_secret_says_not_set_up(monkeypatch):
     client = TestClient(web.app)
     data = make_report(client, monkeypatch, secret=None)
-    pdf = client.get(f"/api/report/{data['report_id']}.pdf?lang=en").content
+    pdf = client.get(f"/api/report/{data['report_id']}.pdf?full=1&lang=en").content
     with fitz.open(stream=pdf, filetype='pdf') as doc:
         text = ' '.join(''.join(p.get_text() for p in doc).split())
     assert 'Not set up on this server' in text and '/verify?' not in text
