@@ -163,8 +163,10 @@ def test_max_records_applies_within_a_page(journal, tmp_path):
     assert [r['oai_id'] for r in rows] == ['oai:j:1', 'oai:j:2']
 
 
-def test_uz_journals_survey_and_harvest(journal, tmp_path):
+def test_uz_journals_survey_and_harvest(journal, tmp_path, monkeypatch):
+    import staging
     import uz_journals
+    monkeypatch.setattr(staging, "low_disk", lambda db_path=None: None)   # independent of the test machine's free disk
     base, routes = journal
     routes['/index.php/k/oai?verb=ListRecords&metadataPrefix=oai_dc'] = (200, 'text/xml', page(
         record(9, ['Copyright the authors']) + record(10, [])).encode())
