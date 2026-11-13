@@ -146,7 +146,7 @@ def test_language_detected_from_text_and_reported(monkeypatch):
     data = client.post('/api/check', data={'mode': 'academic', 'language': 'uz', 'consent': 'true'},
                        files={'submission': ('m.txt', english.encode())}).json()
     assert calls == ['en'] and data['language'] == 'en' and data['language_note'] == {'selected': 'uz', 'detected': 'en'}
-    pdf = client.get(f"/api/report/{data['report_id']}.pdf?lang=uz").content
+    pdf = client.get(f"/api/report/{data['report_id']}.pdf?full=1&lang=uz").content
     with pymupdf.open(stream=pdf, filetype='pdf') as doc:
         text = ' '.join(''.join(p.get_text() for p in doc).split())
     assert 'EN (matndan aniqlandi; tanlangan: UZ)' in text

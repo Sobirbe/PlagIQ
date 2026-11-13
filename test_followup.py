@@ -261,7 +261,7 @@ def test_academic_reason_distinguishes_unavailable_and_no_abstracts(monkeypatch)
 # --- PDF report -------------------------------------------------------------
 
 def pdf_text(client, identifier, lang):
-    response = client.get(f'/api/report/{identifier}.pdf?lang={lang}')
+    response = client.get(f'/api/report/{identifier}.pdf?full=1&lang={lang}')
     assert response.status_code == 200
     with fitz.open(stream=response.content, filetype='pdf') as pdf:
         return ''.join(page.get_text() for page in pdf), pdf.page_count

@@ -36,7 +36,7 @@ from discovery import discover
 import html
 from engine_client import EngineError, configured as corpus_configured, library as engine_library, run_check, summarize
 import engine_client
-from report_pdf import build_pdf
+from report_pdf import build_pdf, build_short_pdf
 from security import SecurityMiddleware, MAX_REQUEST
 
 # The whole request is capped by SecurityMiddleware, so keep uploaded parts in
@@ -1112,14 +1112,20 @@ def owned(identifier, request):
 
 
 @app.get("/api/report/{identifier}.pdf")
-def report(identifier:str, request:Request, lang:str="en"):
+def report(identifier:str, request:Request, lang:str="en", full:int=0):
+    """Short report by default (certificate + one page of matches); full=1 for all evidence and the
+    whole document with matches highlighted."""
     entry = owned(identifier, request)
     remaining = max(0, int((entry["expires"] - time.monotonic()) // 60))
     base = os.getenv("PUBLIC_ORIGIN", "").strip() or str(request.base_url)
-    content = build_pdf(entry["result"], identifier, lang if lang in ("uz", "ru", "en") else "en", remaining,
-                        verify.link(entry["result"], identifier, base))
+    lang = lang if lang in ("uz", "ru", "en") else "en"
+    link = verify.link(entry["result"], identifier, base)
+    if full:
+        content, name = build_pdf(entry["result"], identifier, lang, remaining, link), "PlagIQ-full-report.pdf"
+    else:
+        content, name = build_short_pdf(entry["result"], identifier, lang, link), "PlagIQ-report.pdf"
     return Response(content, media_type="application/pdf",
-        headers={"Content-Disposition":'attachment; filename="PlagIQ-scope-report.pdf"'})
+        headers={"Content-Disposition": f'attachment; filename="{name}"'})
 
 
 @app.delete("/api/report/{identifier}")

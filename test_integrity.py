@@ -149,7 +149,7 @@ def test_check_endpoint_examples_not_cached_or_in_pdf(registry, monkeypatch):
     assert data["integrity"]["status"] == "review" and "XYZZY" in data["integrity_examples"]["chatbot_phrases"][0]
     cached = repr(web.results[data["report_id"]])
     assert "XYZZY" not in cached and "integrity_examples" not in cached and "10.1000/fake.9" in cached
-    pdf = client.get(f"/api/report/{data['report_id']}.pdf?lang=en")
+    pdf = client.get(f"/api/report/{data['report_id']}.pdf?full=1&lang=en")
     import pymupdf
     pdf_text = " ".join("".join(p.get_text() for p in pymupdf.open(stream=pdf.content)).split())
     assert "Review suggested" in pdf_text and "DOI does not exist 10.1000/fake.9" in pdf_text

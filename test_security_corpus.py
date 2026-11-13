@@ -44,7 +44,7 @@ def test_report_ownership_expiry_delete():
     assert owner.get(url).status_code == 404
     identifier = upload(owner).json()['report_id']
     web.results[identifier]['expires'] = time.monotonic()-1
-    assert owner.get(f'/api/report/{identifier}.pdf').status_code == 404
+    assert owner.get(f'/api/report/{identifier}.pdf?full=1').status_code == 404
     assert identifier not in web.results
 
 
@@ -166,7 +166,7 @@ def test_pdf_citation_escapes_unicode_and_long_text():
         'coverage':'indexed full-text source','matched_chars':20,
         'passages':[{'query_start':0,'query_end':20,'source_start':3,'source_end':23,
                      'source_excerpt':'Ўзбекистон <script> & текст'}]}]*20
-    response=client.get(f'/api/report/{identifier}.pdf')
+    response=client.get(f'/api/report/{identifier}.pdf?full=1')
     assert response.status_code == 200
     with fitz.open(stream=response.content,filetype='pdf') as pdf:
         text=''.join(page.get_text() for page in pdf)

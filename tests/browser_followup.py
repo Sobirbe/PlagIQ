@@ -112,7 +112,13 @@ with tempfile.TemporaryDirectory() as tmp:
                 assert 'lang=en' in page.locator('#report').get_attribute('href')
                 page.locator('[data-lang=ru]').click()
                 with page.expect_download() as info:
-                    page.locator('#report').click()
+                    page.locator('#report').click()                     # short report: certificate + one page
+                info.value.save_as(tmp + '/short.pdf')
+                with fitz.open(tmp + '/short.pdf') as pdf:
+                    assert pdf.page_count <= 3 and 'Где найдены совпадения' in ''.join(pg.get_text() for pg in pdf)
+                assert 'full=1' in page.locator('#report-full').get_attribute('href')
+                with page.expect_download() as info:
+                    page.locator('#report-full').click()                # full report: all evidence
                 info.value.save_as(tmp + '/r.pdf')
                 with fitz.open(tmp + '/r.pdf') as pdf:
                     text = ''.join(pg.get_text() for pg in pdf)

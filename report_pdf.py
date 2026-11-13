@@ -460,7 +460,12 @@ VIEW_T = {
                "number show the source (as numbered in the list above and in section 4). This text is printed in your PDF only: "
                "PlagIQ keeps it in memory for the life of the report (15 minutes) and never stores it.",
                legend_q="quotation", legend_b="bibliography", legend_x="match not counted (excluded by your options)",
-               none="No matched passages in this document.", more="further sources share this colour"),
+               none="No matched passages in this document.", more="further sources share this colour",
+               where="Where the matches are", where_note="The {n} longest matched passages of {m}, in document order, with a "
+               "few words of context. The position is how far into the document the passage starts. The full report lists every "
+               "match, all evidence and your whole document with matches highlighted.", position="Position",
+               passage="Passage (matched words highlighted)", searched="Searched", short_note="Short report. Download the "
+               "full report from the results page while it is available (15 minutes).", no_matches="No matched passages were found in the searched scope."),
     "ru": dict(overview="Обзор", counted="Совпадения (учтены)", excluded="Совпадения, исключённые (цитаты, список литературы)",
                original="Совпадений в проверенном охвате не найдено", bar_note="Три части в сумме дают 100% слов документа. "
                "«Совпадений не найдено» относится только к проверенному охвату и не является сертификатом оригинальности.",
@@ -472,7 +477,12 @@ VIEW_T = {
                "источник (как в списке выше и в разделе 4). Этот текст есть только в вашем PDF: PlagIQ держит его в памяти, пока "
                "существует отчёт (15 минут), и никогда не сохраняет.",
                legend_q="цитата", legend_b="список литературы", legend_x="совпадение не учтено (исключено вашими настройками)",
-               none="В документе нет совпадающих фрагментов.", more="остальные источники отмечены этим цветом"),
+               none="В документе нет совпадающих фрагментов.", more="остальные источники отмечены этим цветом",
+               where="Где найдены совпадения", where_note="{n} самых длинных совпадающих фрагментов из {m} в порядке документа, "
+               "с несколькими словами контекста. Позиция — насколько далеко от начала документа начинается фрагмент. Полный отчёт "
+               "содержит все совпадения, все доказательства и весь документ с выделенными совпадениями.", position="Позиция",
+               passage="Фрагмент (совпавшие слова выделены)", searched="Проверено", short_note="Краткий отчёт. Полный отчёт можно "
+               "скачать на странице результата, пока он доступен (15 минут).", no_matches="В проверенном охвате совпадений не найдено."),
     "uz": dict(overview="Umumiy ko‘rinish", counted="Moslik (hisobga olingan)", excluded="Moslik, chiqarib tashlangan (iqtiboslar, adabiyotlar)",
                original="Tekshirilgan doirada moslik topilmadi", bar_note="Uch qism birga hujjat so‘zlarining 100% ini tashkil etadi. "
                "«Moslik topilmadi» faqat tekshirilgan doiraga tegishli; bu originallik sertifikati emas.",
@@ -484,7 +494,12 @@ VIEW_T = {
                "ko‘rsatadi (yuqoridagi ro‘yxat va 4-bo‘limdagi raqam). Bu matn faqat sizning PDF faylingizda: PlagIQ uni hisobot "
                "mavjud bo‘lgan 15 daqiqa xotirada saqlaydi va hech qachon diskka yozmaydi.",
                legend_q="iqtibos", legend_b="adabiyotlar ro‘yxati", legend_x="moslik hisobga olinmagan (sozlamalaringiz bo‘yicha)",
-               none="Hujjatda mos parchalar yo‘q.", more="qolgan manbalar shu rangda"),
+               none="Hujjatda mos parchalar yo‘q.", more="qolgan manbalar shu rangda",
+               where="Mosliklar qayerda", where_note="{m} ta mos parchadan eng uzun {n} tasi, hujjatdagi tartibda, bir necha so‘z "
+               "kontekst bilan. Joylashuv — parcha hujjat boshidan qancha uzoqda boshlanishi. To‘liq hisobotda barcha mosliklar, "
+               "barcha dalillar va mosliklar belgilangan butun hujjat bor.", position="Joylashuv",
+               passage="Parcha (mos so‘zlar belgilangan)", searched="Tekshirilgan doira", short_note="Qisqa hisobot. To‘liq "
+               "hisobotni natija sahifasidan yuklab oling (15 daqiqa davomida mavjud).", no_matches="Tekshirilgan doirada mos parchalar topilmadi."),
 }
 
 
@@ -493,7 +508,7 @@ def _ranked_sources(result):
     return sorted(result.get("sources") or [], key=lambda s: -(s.get("matched_tokens") or 0))
 
 
-def overview_section(result, lang, st, esc, t):
+def overview_section(result, lang, st, esc, t, max_sources=None):
     """A three-part bar (counted / excluded / no match) and the sources by their share of the document."""
     v = VIEW_T.get(lang, VIEW_T["en"])
     percent = result.get("percent")
@@ -525,7 +540,7 @@ def overview_section(result, lang, st, esc, t):
     if matched and words:
         head = [Paragraph(f"<b>{esc(h)}</b>", st["cell"]) for h in (v["no"], v["source"], v["coverage"], v["share"])]
         body = []
-        for n, source in enumerate(matched[:PDF_SOURCES], 1):
+        for n, source in enumerate(matched[:max_sources or PDF_SOURCES], 1):
             colour = PALETTE[min(n - 1, len(PALETTE) - 1)]
             title = esc(t["pasted"] if source.get("title") == "Pasted reference" else (source.get("title") or "—"))
             link = f'<br/><font size="7" color="#4C6368">{esc(source["url"])}</font>' if source.get("url") else ""
@@ -539,6 +554,48 @@ def overview_section(result, lang, st, esc, t):
                                    ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 5)]))
         story += [Paragraph(esc(v["src_title"]), st["source"]), table, Paragraph(esc(v["share_note"]), st["small"])]
     return story
+
+
+WORD_SPAN = __import__("re").compile(r"\S+")
+
+
+def excerpts_section(result, lang, st, esc, limit=10, context=8):
+    """The longest counted matches, in document order, each with a few words of context, its source
+    number and colour, and its position in the document. Fits on about one page."""
+    v = VIEW_T.get(lang, VIEW_T["en"])
+    text, marks = result.get("_text"), result.get("_marks") or []
+    if not text or result.get("percent") is None:
+        return []
+    counted = [(int(a), int(b), r) for a, b, cls, r in marks
+               if r is not None and " x" not in str(cls) and str(cls).split(" ")[0] in ("m", "qu") and 0 <= int(a) < int(b) <= len(text)]
+    story = [Paragraph(esc(v["where"]), st["h"])]
+    if not counted:
+        return story + [Paragraph(esc(v["no_matches"]), st["body"])]
+    chosen = sorted(sorted(counted, key=lambda m: -(m[1] - m[0]))[:limit])
+    story.append(Paragraph(esc(v["where_note"].format(n=len(chosen), m=len(counted))), st["small"]))
+    words = [(m.start(), m.end()) for m in WORD_SPAN.finditer(text)]
+    starts = [w[0] for w in words]
+    import bisect
+    rows = [[Paragraph(f"<b>{esc(h)}</b>", st["cell"]) for h in ("№", v["passage"], v["position"])]]
+    for a, b, rank in chosen:
+        i = bisect.bisect_right(starts, a) - 1
+        j = bisect.bisect_left(starts, b)
+        left = words[max(0, i - context)][0] if words else a
+        right = words[min(len(words) - 1, j + context - 1)][1] if words else b
+        match = text[a:b]
+        if len(match) > 260:                                   # long matches: beginning and end only (full report has all)
+            match = match[:120].rsplit(" ", 1)[0] + " … " + match[-120:].split(" ", 1)[-1]
+        colour = PALETTE[min(int(rank), len(PALETTE) - 1)]
+        body = ((("… " if left > 0 else "") + f'<font color="#4C6368">{esc(" ".join(text[left:a].split()))}</font> ')
+                + f'<font backColor="{colour}">{esc(" ".join(match.split()))}</font>'
+                + f' <font color="#4C6368">{esc(" ".join(text[b:right].split()))}</font>' + (" …" if right < len(text) else ""))
+        rows.append([Paragraph(f'<font backColor="{BADGE}" color="#FFFFFF">\u00a0{int(rank) + 1}\u00a0</font>', st["cell"]),
+                     Paragraph(body, st["cell"]), Paragraph(f"{100.0 * a / max(1, len(text)):.0f}%", st["cell"])])
+    table = Table(rows, colWidths=[12 * mm, 138 * mm, 20 * mm], hAlign="LEFT", repeatRows=1)
+    table.setStyle(TableStyle([("BACKGROUND", (0, 0), (-1, 0), TINT), ("LINEBELOW", (0, 0), (-1, -1), 0.4, LINE),
+                               ("BOX", (0, 0), (-1, -1), 0.4, LINE), ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                               ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 5)]))
+    return story + [table]
 
 
 def highlighted_section(result, lang, st, esc):
@@ -589,6 +646,27 @@ def highlighted_section(result, lang, st, esc):
             out.append(esc(text[cursor:end]))
         story.append(Paragraph("".join(out), style))
     return story
+
+
+def build_short_pdf(result, identifier, lang="en", verify_url=None):
+    """Short report (about 2-3 pages): the certificate, then the overview, the top sources and the longest
+    matched passages with their source, colour and position. The full report has everything else."""
+    t, v = T.get(lang, T["en"]), VIEW_T.get(lang, VIEW_T["en"])
+    st = _styles()
+    esc = lambda value: html.escape(str(value))
+    mode = result.get("mode", "reference")
+    story = [CertificatePage(result, identifier, lang, verify_url, _qr, (REGULAR, BOLD)), PageBreak()]
+    story += overview_section(result, lang, st, esc, t, max_sources=10)
+    story += excerpts_section(result, lang, st, esc)
+    if mode == "ai":
+        story += ai_section(result.get("ai"), lang, st, lambda rows: Paragraph(" · ".join(f"{k}: {x}" for k, x in rows), st["cell"]))
+    story += [Spacer(1, 8), Paragraph(f"<b>{esc(v['searched'])}:</b> {esc(_scope(t, mode, result))}", st["small"]),
+              Paragraph(esc(t["disclaimer"]), st["small"]), Paragraph(esc(v["short_note"]), st["small"])]
+    out = io.BytesIO()
+    doc = SimpleDocTemplate(out, pagesize=A4, leftMargin=18 * mm, rightMargin=18 * mm, topMargin=16 * mm,
+                            bottomMargin=20 * mm, title="PlagIQ short report", author="PlagIQ", subject=t["subtitle"])
+    doc.build(story, canvasmaker=_numbered_canvas(t, identifier))
+    return out.getvalue()
 
 
 def build_pdf(result, identifier, lang="en", minutes_left=15, verify_url=None):

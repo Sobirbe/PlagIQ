@@ -86,7 +86,7 @@ def test_web_options_and_report():
     assert excluded['percent'] < plain['percent'] and excluded['citation']['excluded'] == {'bibliography': 10, 'quotations': 10, 'short': 0}
     assert 'class="qc x"' in excluded['highlight_html'] and 'class="bib x"' in excluded['highlight_html']
     assert 'segments' not in excluded['citation']
-    pdf = client.get(f"/api/report/{excluded['report_id']}.pdf?lang=ru").content
+    pdf = client.get(f"/api/report/{excluded['report_id']}.pdf?full=1&lang=ru").content
     with fitz.open(stream=pdf, filetype='pdf') as doc:
         text = ' '.join(''.join(page.get_text() for page in doc).split())
     assert 'Исключения, выбранные пользователем' in text and 'цитаты (10 слов)' in text and 'References' in text
