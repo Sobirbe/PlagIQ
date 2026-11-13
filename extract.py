@@ -30,6 +30,12 @@ def dehyphenate(text):
     return _LINE_HYPHEN.sub(lambda m: "" if text[m.end()].islower() else m.group(), text)
 
 
+def expand_ligatures(text):
+    """'Inﬂation' -> 'Inflation': PDF text often keeps typographic ligatures as single characters."""
+    from textfold import LIGATURES
+    return text.translate(str.maketrans(LIGATURES)) if any(c in text for c in LIGATURES) else text
+
+
 W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 MC_FALLBACK = "{http://schemas.openxmlformats.org/markup-compatibility/2006}Fallback"
 
@@ -190,7 +196,7 @@ def extract_text(name, content, max_pages=MAX_PDF_PAGES):
         with fitz.open(stream=content, filetype="pdf") as pdf:
             if pdf.page_count > max_pages:
                 raise ExtractError(400, "pdf_pages", f"PDF exceeds {max_pages} pages")
-            return dehyphenate("\n".join(page.get_text() for page in pdf))
+            return expand_ligatures(dehyphenate("\n".join(page.get_text() for page in pdf)))
     except ExtractError:
         raise
     except Exception:

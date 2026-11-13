@@ -114,6 +114,41 @@ def _store_windows(db, num, text, language):
                    ((f, num, i) for f, i in windows(lexical(text, language))))
 
 
+LIGATURE_CHARS = "\ufb00\ufb01\ufb02\ufb03\ufb04\ufb05\ufb06"
+
+
+def ligature_upgrade(db, batch=50):
+    """Re-fingerprint up to `batch` stored texts that contain typographic ligatures (indexed before
+    ligatures were expanded). Returns how many still need it afterwards. Only those texts are touched,
+    so the engine never has to rebuild the whole index at start-up."""
+    db.execute('CREATE TABLE IF NOT EXISTS corpus_meta (key TEXT PRIMARY KEY, value TEXT)')
+    if db.execute("SELECT 1 FROM corpus_meta WHERE key='ligatures_expanded'").fetchone():
+        return 0
+    condition = ' OR '.join(f"instr(text, '{c}') > 0" for c in LIGATURE_CHARS)
+    done = {int(v) for (v,) in db.execute("SELECT value FROM corpus_meta WHERE key LIKE 'ligature_done:%'")}
+    pending = [(num, raw, text) for num, raw, text in db.execute(f'SELECT num, metadata, text FROM sources WHERE {condition}')
+               if num not in done]
+    chosen = pending[:batch]
+    if chosen:
+        nums = [num for num, _, _ in chosen]
+        with db:
+            db.execute(f"DELETE FROM windows WHERE source IN ({','.join('?' * len(nums))})", nums)
+            for num, raw, text in chosen:
+                _store_windows(db, num, text, json.loads(raw)['language'])
+                db.execute("INSERT OR REPLACE INTO corpus_meta VALUES (?, ?)", (f'ligature_done:{num}', str(num)))
+        try:
+            db.execute('PRAGMA wal_checkpoint(TRUNCATE)')
+        except sqlite3.Error:
+            pass
+    remaining = len(pending) - len(chosen)
+    if not remaining:
+        with db:
+            db.execute("DELETE FROM corpus_meta WHERE key LIKE 'ligature_done:%'")
+            db.execute("INSERT OR REPLACE INTO corpus_meta VALUES ('ligatures_expanded', ?)",
+                       (datetime.now(timezone.utc).isoformat(timespec='seconds'),))
+    return remaining
+
+
 def remove(db, identifier):
     """Delete one source and its fingerprints. Returns True if it existed."""
     row = db.execute('SELECT num FROM sources WHERE id=?', (identifier,)).fetchone()
