@@ -46,5 +46,17 @@
   "models_chosen": {
    "rus+eng": 15
   }
+ },
+ {
+  "script": "en",
+  "condition": "clean",
+  "pages": 15,
+  "word_accuracy": 0.9995,
+  "worst_page_accuracy": 0.992,
+  "copying_found": 0.9995,
+  "seconds_per_page": 3.86,
+  "models_chosen": {
+   "eng": 15
+  }
  }
 ]
