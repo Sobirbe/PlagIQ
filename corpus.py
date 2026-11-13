@@ -559,6 +559,147 @@ def restore_deposits(db, path):
     return restored
 
 
+def provider(metadata):
+    """Which importer or route a source came through (for /admin): wikipedia, cyberleninka, openalex,
+    core, oai_journal, author_deposit, institution_deposit or manual."""
+    if metadata.get('rights_basis') in DEPOSITS:
+        return metadata['rights_basis']
+    if category(metadata) == 'wikipedia':
+        return 'wikipedia'
+    if category(metadata) == 'cyberleninka':
+        return 'cyberleninka'
+    reference = (metadata.get('permission_reference') or '').lower()
+    if 'openalex' in reference:
+        return 'openalex'
+    if 'core' in reference.split():
+        return 'core'
+    if 'oai' in reference or category(metadata) == 'journals':
+        return 'oai_journal'
+    return 'manual'
+
+
+SHORT_TEXT = 300          # sources with fewer words are searchable, but are not counted as full texts
+
+
+def stats(db, now=None):
+    """Owner statistics: counts by language, collection, provider and rights basis, indexing freshness
+    and searchable full-text coverage. Metadata only; no texts are read."""
+    today = (now or datetime.now(timezone.utc)).date()
+    out = {'total': 0, 'by_language': {}, 'by_category': {}, 'by_provider': {}, 'by_rights': {},
+           'category_language': {}, 'freshness': {}, 'coverage': {}}
+    for (raw,) in db.execute('SELECT metadata FROM sources'):
+        m = json.loads(raw)
+        lang, cat, prov = m.get('language', '?'), category(m), provider(m)
+        words = int(m.get('words') or 0)
+        out['total'] += 1
+        for key, value in (('by_language', lang), ('by_category', cat), ('by_provider', prov),
+                           ('by_rights', m.get('rights_basis', '?'))):
+            out[key][value] = out[key].get(value, 0) + 1
+        out['category_language'].setdefault(cat, {}).setdefault(lang, 0)
+        out['category_language'][cat][lang] += 1
+        fresh = out['freshness'].setdefault(cat, {'newest': None, 'oldest': None, 'last_7_days': 0, 'last_30_days': 0})
+        day = str(m.get('imported_at') or '')[:10]
+        if day:
+            fresh['newest'] = max(fresh['newest'] or day, day)
+            fresh['oldest'] = min(fresh['oldest'] or day, day)
+            try:
+                age = (today - datetime.fromisoformat(day).date()).days
+            except ValueError:
+                age = None
+            if age is not None and age <= 7:
+                fresh['last_7_days'] += 1
+            if age is not None and age <= 30:
+                fresh['last_30_days'] += 1
+        cov = out['coverage'].setdefault(lang, {'sources': 0, 'full_texts': 0, 'short_texts': 0, 'words': 0})
+        cov['sources'] += 1
+        cov['words'] += words
+        cov['full_texts' if words >= SHORT_TEXT else 'short_texts'] += 1
+    out['windows'] = db.execute('SELECT COUNT(*) FROM windows').fetchone()[0]
+    return out
+
+
+def find_source(db, doi='', title=''):
+    """Indexed sources matching a DOI (in the source URL) or a title (case-insensitive, whole or part).
+    Returns [(num, metadata)], at most 5. Never returns text."""
+    doi = re.sub(r'^(https?://(dx\.)?doi\.org/|doi:)', '', (doi or '').strip(), flags=re.I).lower()
+    title = ' '.join((title or '').lower().split())
+    found = []
+    for num, raw in db.execute('SELECT num, metadata FROM sources'):
+        m = json.loads(raw)
+        url = (m.get('url') or '').lower()
+        name = ' '.join((m.get('title') or '').lower().split())
+        if (doi and doi in url) or (title and len(title) >= 8 and (title == name or title in name)):
+            found.append((num, m))
+            if len(found) >= 5:
+                break
+    return found
+
+
+def diagnose(db, num, passage=''):
+    """Is this indexed source really searchable? Checks its fingerprints and runs a search for a
+    passage: the one given, or about 60 words sampled internally from the middle of the source.
+    Returns facts only (never the source text or the sampled passage)."""
+    row = db.execute('SELECT id, metadata, text FROM sources WHERE num=?', (num,)).fetchone()
+    if not row:
+        return None
+    identifier, raw, text = row
+    m = json.loads(raw)
+    fingerprints = db.execute('SELECT COUNT(*) FROM windows WHERE source=?', (num,)).fetchone()[0]
+    sampled = not (passage or '').strip()
+    if sampled:
+        words = text.split()
+        middle = max(0, len(words) // 2 - 30)
+        passage = ' '.join(words[middle:middle + 60])
+    result = search(db, passage, m['language'], max_passages=1)
+    ranks = [i for i, s in enumerate(result['sources']) if s.get('sha256') == identifier]
+    hit = result['sources'][ranks[0]] if ranks else None
+    return {'title': m.get('title', ''), 'year': m.get('year'), 'language': m['language'], 'url': m.get('url', ''),
+            'category': category(m), 'provider': provider(m), 'rights_basis': m.get('rights_basis'),
+            'deposit': m.get('rights_basis') in DEPOSITS, 'words': m.get('words'), 'imported_at': m.get('imported_at'),
+            'fingerprints': fingerprints, 'searchable': fingerprints > 0,
+            'passage': {'source': 'sampled from the indexed text (60 words, middle)' if sampled else 'given by the owner',
+                        'words': len(passage.split()), 'found': bool(ranks), 'rank': ranks[0] + 1 if ranks else None,
+                        'matched_words': hit['matched_words'] if hit else 0,
+                        'other_sources_matched': len(result['sources']) - len(ranks),
+                        'boilerplate_windows': result['boilerplate_windows']}}
+
+
+PRUNABLE = ('wikipedia',)        # only general-reference collections; never journals, theses or deposits
+
+
+def prune_collection(db, collection, keep_per_language, dry_run=True, chunk=100):
+    """Remove texts of a general-reference collection (only Wikipedia), keeping the longest
+    `keep_per_language` per language. Never touches journals, theses, CyberLeninka or deposits.
+    Deletes in chunks with a WAL checkpoint after each, so a large removal cannot fill the disk.
+    Returns {"remove": {lang: n}, "keep": {lang: n}, "removed": [{title, url, language, words}]}."""
+    if collection not in PRUNABLE:
+        raise ValueError(f'Only these collections can be pruned: {", ".join(PRUNABLE)}')
+    keep_per_language = max(0, int(keep_per_language))
+    groups = {}
+    for num, identifier, raw in db.execute('SELECT num, id, metadata FROM sources'):
+        m = json.loads(raw)
+        if category(m) == collection and m.get('rights_basis') not in DEPOSITS:
+            groups.setdefault(m.get('language', '?'), []).append((int(m.get('words') or 0), num, identifier, m))
+    plan, removed = {'remove': {}, 'keep': {}}, []
+    doomed = []
+    for lang, items in groups.items():
+        items.sort(key=lambda x: (-x[0], x[1]))          # longest first: most text per article kept
+        plan['keep'][lang] = min(len(items), keep_per_language)
+        plan['remove'][lang] = len(items) - plan['keep'][lang]
+        for words, num, identifier, m in items[keep_per_language:]:
+            doomed.append(num)
+            removed.append({'title': m.get('title', ''), 'url': m.get('url', ''), 'language': lang, 'words': words})
+    if not dry_run:
+        for start in range(0, len(doomed), chunk):
+            part = doomed[start:start + chunk]
+            marks = ','.join('?' * len(part))
+            with db:
+                db.execute(f'DELETE FROM windows WHERE source IN ({marks})', part)
+                db.execute(f'DELETE FROM sources WHERE num IN ({marks})', part)
+            db.execute('PRAGMA wal_checkpoint(TRUNCATE)')
+    return {**plan, 'removed': removed}
+
+
 def inventory(db):
     rows = [json.loads(raw) for (raw,) in db.execute('SELECT metadata FROM sources')]
     return sorted(rows, key=lambda m: (m['language'], m.get('title', '')))

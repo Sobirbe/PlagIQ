@@ -206,6 +206,10 @@ def stage_work(work, args, fetcher, budget, stage, key, content, text=None):
     if wid in stage.state["done"]:
         row.update(status="skipped", reason="already staged", file=stage.state["done"][wid])
         return
+    prefer = getattr(args, "prefer", None)
+    if prefer == "uz" and entry["language"] == "ru" and "ы" in (entry["title"] or "").lower():
+        row.update(status="skipped", reason="title is Russian (letter ы); not downloaded in the Uzbek relabelling pass")
+        return
     verdict = decide(licence)
     if args.unpaywall_email and work.get("doi") and verdict == "accept":
         other = unpaywall_licence(work["doi"], args.unpaywall_email, fetcher)

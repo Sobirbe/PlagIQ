@@ -64,7 +64,7 @@ try:
             page.goto(BASE + '/login#tgAuthResult=' + tg_result(42 + width))
             page.locator('[data-lang=en]').click()
             page.wait_for_selector('#account summary:not(.signin-open)')
-            page.wait_for_function('() => document.querySelector("#account summary").textContent.includes("UZS")')
+            page.wait_for_function('() => ((document.querySelector("#account summary") || {}).textContent || "").includes("UZS")')
             assert '0 UZS' in page.locator('#account summary').inner_text()
             assert 'TEST MODE' in page.locator('#pilot-bar').inner_text()
             page.locator('#calc-words').fill('3000')
@@ -138,7 +138,7 @@ try:
             page.wait_for_selector('#account summary.signin-open')
             assert 'unspent balance of 5,000 UZS is lost' in messages[0], messages
             page.goto(BASE + '/login#tgAuthResult=' + tg_result(42 + width))
-            page.wait_for_function('() => document.querySelector("#account summary").textContent.includes("UZS")')
+            page.wait_for_function('() => ((document.querySelector("#account summary") || {}).textContent || "").includes("UZS")')
             assert '· 0 UZS' in page.locator('#account summary').inner_text()
             assert not errors, errors
             context.close()

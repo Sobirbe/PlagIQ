@@ -6,6 +6,12 @@ import pytest
 import corpus
 import wikipedia_import
 
+
+@pytest.fixture(autouse=True)
+def _no_share_ceiling(monkeypatch):
+    monkeypatch.setenv("WIKIPEDIA_MAX_SHARE", "100")      # these tests start from an empty library
+
+
 TEXT = ("Bu matn kutubxona chegaralarini sinash uchun yozilgan bo‘lib, har bir manba alohida va yetarlicha uzun. " * 12)
 
 
