@@ -1,0 +1,50 @@
+[
+ {
+  "script": "uz",
+  "condition": "clean",
+  "pages": 15,
+  "word_accuracy": 0.9982,
+  "worst_page_accuracy": 0.9856,
+  "copying_found": 0.9982,
+  "seconds_per_page": 6.5,
+  "models_chosen": {
+   "uzb+eng": 15
+  }
+ },
+ {
+  "script": "uz",
+  "condition": "poor",
+  "pages": 15,
+  "word_accuracy": 0.9953,
+  "worst_page_accuracy": 0.9764,
+  "copying_found": 0.992,
+  "seconds_per_page": 5.44,
+  "models_chosen": {
+   "uzb+eng": 15
+  }
+ },
+ {
+  "script": "ru",
+  "condition": "clean",
+  "pages": 15,
+  "word_accuracy": 0.9867,
+  "worst_page_accuracy": 0.9595,
+  "copying_found": 0.9843,
+  "seconds_per_page": 3.41,
+  "models_chosen": {
+   "rus+eng": 15
+  }
+ },
+ {
+  "script": "ru",
+  "condition": "poor",
+  "pages": 15,
+  "word_accuracy": 0.9819,
+  "worst_page_accuracy": 0.9538,
+  "copying_found": 0.9789,
+  "seconds_per_page": 3.02,
+  "models_chosen": {
+   "rus+eng": 15
+  }
+ }
+]
