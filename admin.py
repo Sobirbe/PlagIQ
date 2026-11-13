@@ -172,12 +172,13 @@ def details(inv):
             if error and any(w in error.lower() for w in DISK_WORDS) and not inv.get("disk_low_now"):
                 error += " (at that time; there is enough free space now)"
             reasons = "; ".join(f"{k} ×{n}" for k, n in (v.get("failure_reasons") or {}).items())
-            problem = (error[:220] + (f" [error at {str(v.get('error_at'))[:19]}]" if error and v.get("error_at") else "")) \
+            problem = (error[:220] + (f" [error at {timefmt.show(v.get('error_at'), with_label=False)}]" if error and v.get("error_at") else "")) \
                 if error else str(v.get("note") or "")[:200]
-            rows.append((name, str(v.get("finished") or "—")[:19], str(v.get("last_success") or "—")[:19],
+            rows.append((name, timefmt.show(v.get("finished"), with_label=False) or "—",
+                         timefmt.show(v.get("last_success"), with_label=False) or "—",
                          v.get("imported") if v.get("imported") is not None else "—", problem or "—", reasons[:300] or "—"))
         out += ["<h3>Import history</h3>",
-                _table(["Import", "Last attempt", "Last success", "Imported", "Problem or note", "Main failure reasons (staged works)"], rows)]
+                _table(["Import", "Last attempt (Tashkent time)", "Last success", "Imported", "Problem or note", "Main failure reasons (staged works)"], rows)]
     if inv.get("disk_low_now"):
         out.append(f'<p class="warn">Now: {esc(inv["disk_low_now"])}</p>')
     return "".join(out)
