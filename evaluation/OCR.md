@@ -27,7 +27,7 @@
 | Uzbek (Cyrillic) | rough | 15 | 94.8% | 90.8% | 90.7% | 2.9 |
 
 ## What this means
-- On clean and office-quality scans, a fully copied page is still found at **98–100%** in all four scripts. The models were chosen correctly for every page.
+- On clean and office-quality scans, a fully copied page is still found at **97.9–100%** in all four scripts. The models were chosen correctly for every page.
 - On rough phone photos detection drops, most in Uzbek Latin (**86%**): misread ʻ/ʼ letters and noise break seven-word sequences. OCR errors can only **hide** matches, never invent them, so a bad scan under-counts copying but never over-counts it.
 - The times were measured in the development sandbox and may differ on Railway. That is why one upload is OCR'd at a time and the page and time limits are adjustable (DEPLOYMENT.md, Part 3q).
 
