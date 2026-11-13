@@ -30,6 +30,7 @@ import pricing
 import payments
 import telegram_bot
 import verify
+import timefmt
 import extract
 from discovery import discover
 import html
@@ -249,7 +250,7 @@ def require_tokens(text, language, code, message):
 VERIFY_TEXT = {
     "en": dict(title="PlagIQ report verification", ok="Valid: PlagIQ issued a report with these figures.",
                bad="Not valid: this link was changed or was not issued by this PlagIQ server.",
-               off="Verification is not set up on this server.", rid="Report ID", date="Checked (UTC)",
+               off="Verification is not set up on this server.", rid="Report ID", date="Checked",
                hash="Document SHA-256 begins with", mode="Comparison", result="Matched portion within scope",
                words="Words in the document", sources="Sources compared", lang="Document language",
                modes={"i": "AI detector only", "r": "Your own reference", "a": "OpenAlex (open-access full texts and abstracts)", "c": "Private authorized corpus"},
@@ -258,7 +259,7 @@ VERIFY_TEXT = {
                     "figures of a PlagIQ evidence report; it is not a certificate of originality and keeps no copy of the document."),
     "ru": dict(title="Проверка отчёта PlagIQ", ok="Действителен: PlagIQ выдал отчёт с этими данными.",
                bad="Недействителен: ссылка изменена или выдана не этим сервером PlagIQ.",
-               off="Проверка на этом сервере не настроена.", rid="Номер отчёта", date="Проверено (UTC)",
+               off="Проверка на этом сервере не настроена.", rid="Номер отчёта", date="Проверено",
                hash="SHA-256 документа начинается с", mode="Сравнение", result="Доля совпадений в охвате",
                words="Слов в документе", sources="Сравнено источников", lang="Язык документа",
                modes={"i": "Только ИИ-детектор", "r": "Ваш источник", "a": "OpenAlex (открытые полные тексты и аннотации)", "c": "Внутренний разрешённый корпус"},
@@ -267,7 +268,7 @@ VERIFY_TEXT = {
                     "это не сертификат оригинальности, копия документа не хранится."),
     "uz": dict(title="PlagIQ hisobotini tekshirish", ok="Haqiqiy: PlagIQ shu ma’lumotlar bilan hisobot bergan.",
                bad="Haqiqiy emas: havola o‘zgartirilgan yoki bu PlagIQ serveri tomonidan berilmagan.",
-               off="Bu serverda tekshirish sozlanmagan.", rid="Hisobot raqami", date="Tekshirilgan (UTC)",
+               off="Bu serverda tekshirish sozlanmagan.", rid="Hisobot raqami", date="Tekshirilgan",
                hash="Hujjat SHA-256 boshlanishi", mode="Solishtirish", result="Doira ichidagi moslik ulushi",
                words="Hujjatdagi so‘zlar", sources="Solishtirilgan manbalar", lang="Hujjat tili",
                modes={"i": "Faqat AI detektor", "r": "O‘z manbangiz", "a": "OpenAlex (ochiq to‘liq matnlar va annotatsiyalar)", "c": "Ruxsat berilgan ichki korpus"},
@@ -285,8 +286,7 @@ def verify_page(request: Request, ui: str = ""):
     status = t["off"] if not verify.secret() else (t["ok"] if valid else t["bad"])
     rows = ""
     if valid:
-        d = f["d"]
-        when = f"{d[0:4]}-{d[4:6]}-{d[6:8]} {d[9:11]}:{d[11:13]}"
+        when = timefmt.show(f["d"], lang)          # the signed time is UTC; shown in Tashkent time
         result = t["ne"] if f["p"] == "NE" else f["p"] + "%"
         rows = "".join(f"<tr><th>{html.escape(k)}</th><td>{html.escape(v)}</td></tr>" for k, v in (
             (t["rid"], f["r"]), (t["date"], when), (t["hash"], f["h"]), (t["mode"], t["modes"][f["m"]]),
@@ -661,7 +661,7 @@ async def payments_receipt(order_id: str, request: Request):
 
 def payments_receipt_html(row, user):
     esc = html.escape
-    when = datetime.fromtimestamp(row["paid"] / 1000, timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    when = timefmt.show(row["paid"], "uz")
     seller = os.environ.get("SELLER_NAME", "PlagIQ")
     tin = os.environ.get("SELLER_TIN", "")
     test = row["mode"] == "test"

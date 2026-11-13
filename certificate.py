@@ -189,7 +189,8 @@ class CertificatePage(Flowable):
         y = self._para(esc(t["intro"]), pad + 10 * mm, y - 18, inner - 20 * mm, 9.5, color=MUTED, align=1) - 14
 
         # document block: measure, draw the panel, then the text on top
-        date = str(r.get("date", ""))[:16].replace("T", " ") + " UTC"
+        import timefmt
+        date = timefmt.show(r.get("date", ""), self.lang)          # Tashkent time; the QR link signs UTC
         cols = [(t["date"], date), (t["words"], f"{int(r.get('total_tokens') or 0):,}".replace(",", " ")),
                 (t["language"], str(r.get("language", "")).upper()),
                 (t["fingerprint"], " ".join(str(r.get("sha256", ""))[i:i + 4] for i in range(0, 16, 4)) + " …")]

@@ -13,6 +13,7 @@ import institutions
 import payments
 import telegram_bot
 import verify
+import timefmt
 import websearch
 from engine_client import configured as engine_configured
 
@@ -126,8 +127,8 @@ def page(library, probe=""):
                        "Room to raise CORPUS_MAX_SOURCES step by step.") + "</p>")
         imports = library.get("imports") or {}
         if imports:
-            lib += "<h3>Automatic imports</h3><table><tr><th>Import</th><th>Last run</th><th>Imported</th><th>Problem or note</th></tr>"
-            lib += "".join(f"<tr><td>{esc(k)}</td><td>{esc(str(v.get('finished') or '—'))[:19]}</td>"
+            lib += "<h3>Automatic imports</h3><table><tr><th>Import</th><th>Last run (Tashkent time)</th><th>Imported</th><th>Problem or note</th></tr>"
+            lib += "".join(f"<tr><td>{esc(k)}</td><td>{esc(timefmt.show(v.get('finished'), with_label=False) or '—')}</td>"
                            f"<td>{esc(str(v.get('imported') if v.get('imported') is not None else '—'))}</td>"
                            f"<td>{esc(str(v.get('error') or ''))[:160]}"
                            + (f"<span class=\"note\">{esc(str(v['note']))[:160]}</span>" if v.get("note") else "")
