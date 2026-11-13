@@ -40,11 +40,20 @@ NOT_TITLE = re.compile(
     r"|udc|udk|удк|ббк|doi|vol\.|volume|no\.|№|issn|received|accepted|e-?mail)\b", re.I)
 
 
+# Series labels, publisher and copyright lines printed above or below a title page's real title
+# ("Working Paper/Document de travail", "Bank of Canada Working Paper 2007-35", "ISSN 1701-9397").
+SERIES_LINE = re.compile(
+    r"working paper|document de travail|discussion paper|staff report|technical report|occasional paper|"
+    r"policy (?:research )?paper|research paper series|working papers? series|preprint|препринт|issn|isbn|"
+    r"www\.|https?://|©|copyright|all rights reserved|^by\b|^\s*(?:muallif|автор)\b|ilmiy[- ]?(?:amaliy )?jurnal|"
+    r"научный журнал|научно[- ]практический журнал|conference proceedings|материалы конференции", re.I)
+
+
 def _looks_like_title(line):
     words = line.split()
     letters = sum(c.isalpha() for c in line)
     return (3 <= len(words) <= 30 and 15 <= len(line) <= 250 and letters >= 0.7 * len(line.replace(" ", ""))
-            and not NOT_TITLE.match(line) and "@" not in line)
+            and not NOT_TITLE.match(line) and not SERIES_LINE.search(line) and "@" not in line)
 
 
 def _first_line_query(text):

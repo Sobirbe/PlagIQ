@@ -24,6 +24,9 @@ CYR = {
 # Invisible format characters that commonly appear inside words in PDF/DOCX
 # extraction (soft hyphen, zero-width space/joiners, word joiner, BOM).
 IGNORABLE = frozenset("\u00ad\u200b\u200c\u200d\u2060\ufeff")
+# Typographic ligatures that PDF text extraction often returns as one character ("Inﬂation"):
+# expanded, so they match the same words typed normally.
+LIGATURES = {"\ufb00": "ff", "\ufb01": "fi", "\ufb02": "fl", "\ufb03": "ffi", "\ufb04": "ffl", "\ufb05": "st", "\ufb06": "st"}
 CYR["\u020f"] = O_CANON  # o with inverted breve (NFC of o + U+0311)
 
 
@@ -92,7 +95,7 @@ def normalized_chars(text: str, keep_marks=frozenset(), prefer=None, whole=False
         while j < n and unicodedata.combining(text[j]):
             j += 1
         for ch in unicodedata.normalize("NFC", text[i:j]):
-            for lower in ch.lower():
+            for lower in LIGATURES.get(ch, ch).lower():
                 if lower in IGNORABLE or (unicodedata.combining(lower) and lower not in keep_marks):
                     continue
                 out.append((lower, i, j))
