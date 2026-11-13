@@ -65,11 +65,62 @@ By comparison, the passage-first approach (a passage score of 0.75, then the sam
   - **Scale:** 158 + 281 negatives can only show that the false-alarm rate is low, roughly under 1–2%, not that it is zero; a library 100 times larger gives more chances for coincidences.
   - **8-bit storage:** whether it keeps the same quality was not measured.
 
+## Round 2: academic texts, machine translation with edits, all directions (November 2026)
+Scripts: `evaluation/crosslang_translate.py` (step 1) and `evaluation/crosslang_academic.py` (step 2). Raw figures: `evaluation/CROSSLANG_ACADEMIC.json`.
+
+**Data:**
+- 1,487 Uzbek, 1,106 Russian and 2,020 English academic abstracts from OpenAlex, across 28 subjects. The English ones are all by authors at Uzbek institutions. Every abstract's language was confirmed by PlagIQ's detector.
+- 200 abstracts per direction were machine-translated sentence by sentence with NLLB-200 (600M, CC BY-NC: used for measurement only, never in the product). This is how students typically copy across languages.
+- Each abstract is used in one direction only.
+
+**Per direction:**
+- **Library:** the originals of 100 translated abstracts, plus 500 other real abstracts in the same language (600 in all).
+- **Must be found:** the 100 translations; the same translations edited (about 15% of words dropped, two sentences swapped, two merged); and half-translated texts (half translation, half an unrelated real abstract).
+- **Must not be flagged:** translations of the other 100 abstracts, whose source is not in the library; and 400 real abstracts written in the manuscript's language.
+- Uzbek manuscripts were also tested in Cyrillic script.
+
+**Rule:** at least 2 sentences each matching a sentence of the same library abstract with similarity ≥ 0.80. Model: LaBSE.
+
+| Manuscript ← source | Plain machine translation | Edited translation | Half translated | False alarms: real abstracts (400) | Flagged: translations of texts not in the library (100) |
+|---|---|---|---|---|---|
+| Uzbek Latin ← Russian | **100%** | **98%** | 80% | **0%** | 1 (boilerplate, see below) |
+| Uzbek Cyrillic ← Russian | 99% | 84% | 78% | **0%** | 0 |
+| Uzbek Latin ← English | **100%** | 90% | 72% | 0.5% (2, at the cut-off) | 0 |
+| Uzbek Cyrillic ← English | **100%** | 84% | 71% | 0.5% (2, at the cut-off) | 0 |
+| Russian ← Uzbek | **100%** | **99%** | 74% | **0%** | 2 (real reuse, see below) |
+| Russian ← English | **100%** | **97%** | 77% | **0%** | 3* (2 real reuse) |
+
+\* At 0.80, 3 of 100 were flagged; the listing at the same setting showed 2, both genuine reuse. The third sits near the cut-off.
+
+**The "flagged" translations of texts not in the library turned out to be genuine reuse.** Every case was read by hand:
+- **Uzbek→Russian:** a thesis on project-based learning for linguistics students. The same thesis is in the library under a second OpenAlex record, with the same title and sentences at similarity 0.94–0.98. A tax-risk article: another paper's abstract repeats its sentences (0.91–0.96).
+- **English→Russian:** two pairs of papers with different titles, and in one case different authors, whose abstracts share identical sentences ("Teaching physics at school helps to increase students' knowledge about existence…"; "The scientific article talks about culture as a continuous conscious creative activity…").
+- **Russian→Uzbek:** two library catalogue records of conference proceedings from the same university, sharing their bibliographic template ("[Электронный ресурс] : сборник … Учреждение образования 'Гродненский государственный университет имени Янки Купалы' …"). This is boilerplate: in the product, sentences that match many library texts are ignored, as the exact matcher already does.
+
+So, in about 1,700 real abstracts that should not be flagged, the only flags were real duplicates, real reuse, boilerplate, or 2 English→Uzbek cases right at the cut-off. Those 2 were flagged in the scoring run but not when re-checked one at a time, because tiny numerical differences decide a score of about 0.80.
+
+**Cut-off:**
+- **0.75** finds more edited text but flags more: up to 7% of the translations of texts not in the library in Uzbek→Russian.
+- **0.85** loses many edited translations: 46% found in English→Uzbek.
+- **0.80 stays the recommended setting.**
+
+**Uzbek Cyrillic** is found as well as Latin for plain translations (99–100%), but edited translations drop to 84%. The model sees Uzbek Cyrillic less often in its training.
+
+**Shortlist step:** searching sentences only within the 20 library texts closest to the manuscript as a whole loses nothing on plain and edited translations, and 0–3 points on half-translated texts. With 5 texts it loses up to 5 points. Use 20 or more, and re-measure on the full library: 600 texts here, against about 2,300 live and more later.
+
+**Still not shown:**
+- translations from other systems (Google, Yandex) and human paraphrase after translation;
+- whole chapters rather than abstracts;
+- a library of 2,000 to 10,000 texts;
+- whether 8-bit storage keeps the same quality.
+
+The data includes real duplicates, so library de-duplication will matter in production.
+
 ## Recommendation
 1. **Model:** LaBSE on the engine; neither smaller model is good enough for Uzbek.
 2. **Design:** sentence-level search with the 2-sentence, 0.80 rule.
 3. **Presentation:** show the result **separately** from the exact-match percentage, as "possible translated reuse — needs review". Show each matched sentence pair side by side, and never add it to the plagiarism percentage.
-4. **Before switching it on for users, measure:**
+4. **Before switching it on for users** (round 2 above covered academic text, machine translation with edits, the other directions, Uzbek Cyrillic and the shortlist), **measure:**
    - academic manuscripts: permission-cleared theses or articles with their own published translations, or library texts machine-translated for the test;
    - the other language directions;
    - the shortlist step;
