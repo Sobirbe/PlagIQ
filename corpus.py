@@ -466,6 +466,8 @@ def category(metadata):
         return 'wikipedia'
     if host == 'cyberleninka.ru':
         return 'cyberleninka'
+    if 'zenodo' in host or '10.5281/zenodo' in (metadata.get('url') or '').lower():
+        return 'zenodo'
     if host.endswith('.uz') or 'oai' in (metadata.get('permission_reference') or '').lower():
         return 'journals'
     return 'other'
