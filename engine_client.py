@@ -329,3 +329,63 @@ async def library():
                 "auto_import": [l for l in data.get("auto_import") or [] if l in LANGUAGES]}
     except (httpx.HTTPError, EngineError, ValueError, TypeError, AttributeError, KeyError):
         return None
+
+
+# ------------------------------------------------------------- owner diagnostics
+
+def _owner_client(timeout=20.0):
+    return httpx.AsyncClient(base_url=engine_base_url(), timeout=httpx.Timeout(timeout, connect=10.0), trust_env=False,
+                             follow_redirects=False, headers={"Authorization": "Bearer " + os.environ["ENGINE_API_KEY"]})
+
+
+async def inventory():
+    """Detailed library statistics for /admin (owner only), or None when the engine does not answer."""
+    if not configured():
+        return None
+    try:
+        async with _owner_client() as client:
+            response = await client.get("/v1/inventory")
+        if response.status_code != 200:
+            return None
+        data = response.json()
+        return data if isinstance(data, dict) else None
+    except (httpx.HTTPError, EngineError, ValueError):
+        return None
+
+
+async def diagnostic(doi="", title="", passage=""):
+    """Owner check of one known source (see engine /v1/diagnostic). Raises EngineError with a reason."""
+    if not configured():
+        raise EngineError("Private corpus engine is not configured.", "engine_not_configured")
+    try:
+        async with _owner_client(timeout=float(os.environ.get("ENGINE_TIMEOUT", "120"))) as client:
+            response = await client.post("/v1/diagnostic", json={"doi": doi[:300], "title": title[:500], "passage": passage[:5000]})
+    except httpx.HTTPError as exc:
+        raise EngineError("The engine did not answer (" + type(exc).__name__ + ").", "engine_unavailable")
+    if response.status_code == 422:
+        raise EngineError("Give a DOI or at least 8 characters of the title.", "invalid_request")
+    if response.status_code == 429:
+        raise EngineError("The engine is busy; try again in a minute.", "engine_busy")
+    if response.status_code != 200:
+        raise EngineError(f"The engine answered {response.status_code}.", "engine_unavailable")
+    data = response.json()
+    if not isinstance(data, dict) or not isinstance(data.get("results"), list):
+        raise EngineError("The engine gave an unexpected answer.", "engine_unavailable")
+    return data
+
+
+async def prune(keep_per_language, confirm=False):
+    """Owner-only Wikipedia pruning through the engine (preview unless confirm). Raises EngineError."""
+    if not configured():
+        raise EngineError("Private corpus engine is not configured.", "engine_not_configured")
+    try:
+        async with _owner_client(timeout=600.0) as client:
+            response = await client.post("/v1/prune", json={"collection": "wikipedia", "keep_per_language": int(keep_per_language),
+                                                            "confirm": bool(confirm)})
+    except httpx.HTTPError as exc:
+        raise EngineError("The engine did not answer (" + type(exc).__name__ + ").", "engine_unavailable")
+    if response.status_code == 429:
+        raise EngineError("The engine is busy; try again in a minute.", "engine_busy")
+    if response.status_code != 200:
+        raise EngineError(f"The engine answered {response.status_code}.", "engine_unavailable")
+    return response.json()

@@ -18,6 +18,7 @@ import json
 import re
 import shutil
 from fastapi.responses import StreamingResponse
+import corpus
 from corpus import DEPOSITS, LANGUAGES, category, connect, corpus_version, deposits, ingest, inventory, remove_deposit, search
 from security import SecurityMiddleware
 import import_job
@@ -56,6 +57,16 @@ def import_loop():
                 log.warning("import %s failed: %s: %s", language, type(exc).__name__, str(exc)[:300])
                 import_job.write_status(import_job.staging_root(), language,
                                         {"language": language, "error": type(exc).__name__ + ": " + str(exc)[:200]})
+        relabel, rl_batch, rl_cost = import_job.uz_from_ru_settings()
+        if relabel and not import_stop.is_set():
+            try:
+                status = import_job.run_uz_from_ru(rl_batch, rl_cost)
+                log.warning("import uz-from-ru: %s imported (%s relabelled to uz), %s failed, error=%s", status["imported"],
+                            status.get("relabelled"), status["failed"], status["error"])
+            except Exception as exc:
+                log.warning("import uz-from-ru failed: %s: %s", type(exc).__name__, str(exc)[:300])
+                import_job.write_status(import_job.staging_root(), "uz-from-ru",
+                                        {"language": "uz", "error": type(exc).__name__ + ": " + str(exc)[:200]})
         wiki_langs, wiki_batch, min_words = wikipedia_import.settings()
         for language in wiki_langs:
             if import_stop.is_set():
@@ -259,7 +270,7 @@ def library():
     by_source = {}
     for m in rows:
         by_source[category(m)] = by_source.get(category(m), 0) + 1
-    allowed = {f'wikipedia-{lang}' for lang in LANGUAGES} | set(LANGUAGES) | {'cyberleninka', 'uz-journals', 'disk'}
+    allowed = {f'wikipedia-{lang}' for lang in LANGUAGES} | set(LANGUAGES) | {'cyberleninka', 'uz-journals', 'disk', 'uz-from-ru'}
     status = {name: {k: v for k, v in info.items() if k in (
                   'finished', 'imported', 'updated', 'failed', 'staged_total', 'failed_total', 'listing_complete',
                   'dump_complete', 'estimated_cost_usd', 'error', 'note', 'language_corrected', 'staged', 'skipped',
@@ -276,6 +287,89 @@ def library():
     return {'language_counts': counts, 'by_source': by_source, 'total': len(rows), 'corpus_version': version, 'disk': disk,
             'auto_import': import_job.settings()[0], 'auto_import_wikipedia': wikipedia_import.settings()[0],
             'imports': status}
+
+
+STATUS_FIELDS = ('started', 'finished', 'last_success', 'error_at', 'imported', 'updated', 'failed', 'staged_total',
+                 'failed_total', 'listing_complete', 'dump_complete', 'estimated_cost_usd', 'error', 'note',
+                 'language_corrected', 'relabelled', 'staged', 'skipped', 'journals', 'downloaded', 'surveyed',
+                 'approved', 'failure_reasons')
+
+
+@app.get('/v1/inventory', dependencies=[Depends(authorize)])
+def inventory_stats():
+    """Owner statistics for /admin: counts by language, collection, provider and rights basis, freshness,
+    searchable full-text coverage, limits, import history with reasons, and current disk state.
+    No texts, no permission records."""
+    with closing(connect()) as db:
+        data = corpus.stats(db)
+    data['limits'] = {'corpus_max_sources': corpus.max_sources(), 'archive_max_sources': corpus.max_deposits(),
+                      'wikipedia_max_articles': wikipedia_import.max_articles(), 'wikipedia_max_share': wikipedia_import.max_share()}
+    data['imports'] = {str(name)[:40]: {k: v for k, v in info.items() if k in STATUS_FIELDS}
+                       for name, info in import_job.read_status().items() if isinstance(info, dict)}
+    data['disk_low_now'] = staging.low_disk()
+    data['auto_import'] = import_job.settings()[0]
+    data['auto_import_wikipedia'] = wikipedia_import.settings()[0]
+    return data
+
+
+class Diagnostic(BaseModel):
+    doi: str = Field(default='', max_length=300)
+    title: str = Field(default='', max_length=500)
+    passage: str = Field(default='', max_length=5000)
+
+
+@app.post('/v1/diagnostic', dependencies=[Depends(authorize)])
+def diagnostic(item: Diagnostic):
+    """Owner check of one known source: is it indexed (by DOI or title), are its fingerprints present,
+    and is a passage from it found by a search? Returns facts only, never source text."""
+    if not item.doi.strip() and len(item.title.strip()) < 8:
+        raise HTTPException(422, 'Give a DOI or at least 8 characters of the title')
+    if not lock.acquire(timeout=queue_seconds()):
+        raise HTTPException(429, 'Engine busy')
+    try:
+        with closing(connect()) as db:
+            matches = corpus.find_source(db, item.doi, item.title)
+            results = [corpus.diagnose(db, num, item.passage) for num, _ in matches[:3]]
+    finally:
+        lock.release()
+    return {'matches': len(matches), 'results': results}
+
+
+class Prune(BaseModel):
+    collection: str = Field(default='wikipedia', max_length=40)
+    keep_per_language: int = Field(ge=0, le=100000)
+    confirm: bool = False
+
+
+@app.post('/v1/prune', dependencies=[Depends(authorize)])
+def prune(item: Prune):
+    """Owner-only removal of general-reference texts (Wikipedia), keeping the longest N per language.
+    Without confirm it only reports what would be removed. With confirm, the list of removed articles
+    (title, address, language, words) is written to the staging folder first, then they are deleted."""
+    if not lock.acquire(timeout=queue_seconds()):
+        raise HTTPException(429, 'Engine busy')
+    try:
+        with closing(connect()) as db:
+            try:
+                plan = corpus.prune_collection(db, item.collection, item.keep_per_language, dry_run=True)
+            except ValueError as exc:
+                raise HTTPException(422, str(exc))
+            record = None
+            if item.confirm and plan['removed']:
+                stamp = time.strftime('%Y%m%d-%H%M%S', time.gmtime())
+                root = import_job.staging_root()
+                root.mkdir(parents=True, exist_ok=True)
+                record = root / f'pruned-{item.collection}-{stamp}.json'
+                record.write_text(json.dumps(plan['removed'], ensure_ascii=False), 'utf-8')
+                plan = corpus.prune_collection(db, item.collection, item.keep_per_language, dry_run=False)
+                log.warning('pruned %s: removed %s, kept %s; list in %s', item.collection, plan['remove'], plan['keep'], record)
+            total = db.execute('SELECT COUNT(*) FROM sources').fetchone()[0]
+            left = corpus.count_category(db, item.collection)
+    finally:
+        lock.release()
+    return {'remove': plan['remove'], 'keep': plan['keep'], 'confirmed': bool(item.confirm and record),
+            'record': record.name if record else None, 'total_after': total if item.confirm else total - sum(plan['remove'].values()),
+            'collection_after': left if item.confirm else sum(plan['keep'].values())}
 
 
 @app.get('/v1/checks/{identifier}', dependencies=[Depends(authorize)])
