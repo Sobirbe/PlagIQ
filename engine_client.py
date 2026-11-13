@@ -324,7 +324,7 @@ async def library():
                                           if isinstance(v.get(f), (int, str, type(None)))}
                             for k, v in (data.get("imports") or {}).items() if isinstance(v, dict)},
                 "by_source": {k: _int(v, 0, 10**9) for k, v in (data.get("by_source") or {}).items()
-                              if k in ("wikipedia", "cyberleninka", "journals", "archive", "university", "other")},
+                              if k in ("wikipedia", "cyberleninka", "zenodo", "journals", "archive", "university", "other")},
                 "last_import": max(finished) if finished else None,
                 "auto_import": [l for l in data.get("auto_import") or [] if l in LANGUAGES]}
     except (httpx.HTTPError, EngineError, ValueError, TypeError, AttributeError, KeyError):

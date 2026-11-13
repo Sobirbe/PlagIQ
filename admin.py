@@ -104,7 +104,7 @@ def _size(n):
     return f"{n / 1024 ** 3:.2f} GB" if n >= 1024 ** 3 else f"{n / 1024 ** 2:.0f} MB"
 
 
-NAMES = {"journals": "Uzbek and other journals", "cyberleninka": "CyberLeninka", "wikipedia": "Wikipedia",
+NAMES = {"journals": "Uzbek and other journals", "cyberleninka": "CyberLeninka", "zenodo": "Zenodo", "wikipedia": "Wikipedia",
          "university": "University archives", "archive": "Authors' archive", "other": "Other (OpenAlex etc.)"}
 PROVIDERS = {"openalex": "OpenAlex import (open licence)", "core": "CORE import", "oai_journal": "Journal OAI feeds",
              "cyberleninka": "CyberLeninka", "wikipedia": "Wikipedia dumps", "author_deposit": "Author deposits (consent)",
@@ -257,7 +257,7 @@ def page(library, probe="", inventory=None, diagnostic="", pruning=None):
                    for a, ok, d, h in checklist(library, probe))
     lib = "<p>The engine is not connected, so there is no library yet.</p>"
     if library and library.get("available"):
-        names = {"journals": "Uzbek and other journals", "cyberleninka": "CyberLeninka", "wikipedia": "Wikipedia",
+        names = {"journals": "Uzbek and other journals", "cyberleninka": "CyberLeninka", "zenodo": "Zenodo", "wikipedia": "Wikipedia",
                  "university": "University archives", "archive": "Authors' archive", "other": "Other (OpenAlex etc.)"}
         by = library.get("by_source") or {}
         lib = "<table>" + "".join(f"<tr><th>{esc(names.get(k, k))}</th><td>{v:,}</td></tr>" for k, v in by.items())

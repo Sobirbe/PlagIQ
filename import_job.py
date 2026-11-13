@@ -20,6 +20,10 @@ Configured on the engine with environment variables:
                             downloaded text is detected, and only texts that really are Uzbek are imported, as
                             Uzbek (Russian ones too if "ru" is in AUTO_IMPORT). Status key "uz-from-ru".
   AUTO_IMPORT_UZ_FROM_RU_BATCH=100, AUTO_IMPORT_UZ_FROM_RU_MAX_COST=0.05 (USD per run)
+  AUTO_IMPORT_ZENODO=uz,ru  open-licence works with a copy on Zenodo (found through OpenAlex; PDFs from
+                            Zenodo at its 10-second crawl delay). ZENODO_BATCH=100 per language per run,
+                            ZENODO_MAX_COST=0.05. Russian: authors at Uzbek institutions only, unless
+                            ZENODO_RU_ANY_COUNTRY=1. Status keys "zenodo-uz", "zenodo-ru".
 Manual run: python import_job.py uz --batch 50   (or: python import_job.py uz-from-ru --batch 20)
 """
 import argparse
@@ -41,13 +45,13 @@ def staging_root():
 
 
 def run(language, batch=500, max_cost=0.20, db_path=None, root=None, fetcher=None, api=oa_import.OPENALEX,
-        label=None, country=None, accept=None, status_key=None):
+        label=None, country=None, accept=None, status_key=None, location_source=None):
     """One import run. `label`/`country` list works by another OpenAlex language label (and authors'
     country); `accept` limits which detected text languages are imported (others fail with a reason)."""
     root = Path(root or staging_root())
     folder = root / (f"openalex-{status_key}" if status_key else f"openalex-{language}")
     args = argparse.Namespace(language=label or language, country=country, since=None, source_id=None, query=None, download=True,
-                              prefer=language if label else None,
+                              prefer=language if label else None, location_source_id=location_source,
                               pdf_from="publisher", unpaywall_email=os.environ.get("UNPAYWALL_EMAIL") or None,
                               max_records=batch * 20, max_new=batch, resume=True,
                               openalex_fallback=os.environ.get("AUTO_IMPORT_OPENALEX_PDF") == "1")
@@ -118,6 +122,25 @@ def run_uz_from_ru(batch=100, max_cost=0.05, db_path=None, root=None, fetcher=No
                status_key="uz-from-ru")
 
 
+ZENODO = "S4306400562"          # OpenAlex source: Zenodo (CERN)
+
+
+def run_zenodo(language, batch=100, max_cost=0.05, db_path=None, root=None, fetcher=None, api=oa_import.OPENALEX):
+    """Open-licence works that have a copy on Zenodo, found through OpenAlex (Zenodo's robots.txt
+    disallows automated use of its search API). PDFs come from Zenodo's file links, which robots.txt
+    allows, at its 10-second crawl delay. Russian works are limited to authors at Uzbek institutions
+    unless ZENODO_RU_ANY_COUNTRY=1."""
+    country = None if language != "ru" or os.environ.get("ZENODO_RU_ANY_COUNTRY") == "1" else "UZ"
+    return run(language, batch, max_cost, db_path, root, fetcher, api, country=country,
+               status_key=f"zenodo-{language}", location_source=ZENODO)
+
+
+def zenodo_settings():
+    """(languages, batch, max cost) from AUTO_IMPORT_ZENODO=uz,ru, ZENODO_BATCH=100, ZENODO_MAX_COST=0.05."""
+    langs = [l.strip() for l in os.environ.get("AUTO_IMPORT_ZENODO", "").split(",") if l.strip() in ("uz", "ru", "en")]
+    return langs, _bounded("ZENODO_BATCH", 100, 1, 2000, int), _bounded("ZENODO_MAX_COST", 0.05, 0.0, 5.0, float)
+
+
 def uz_from_ru_settings():
     on = "uz" in settings()[0] and os.environ.get("AUTO_IMPORT_UZ_FROM_RU", "1") != "0"
     return (on, _bounded("AUTO_IMPORT_UZ_FROM_RU_BATCH", 100, 1, 2000, int),
@@ -162,9 +185,11 @@ def settings():
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Collect and import open-licence OpenAlex works now.")
-    parser.add_argument("language", choices=["uz", "ru", "en", "uz-from-ru"])
+    parser.add_argument("language", choices=["uz", "ru", "en", "uz-from-ru", "zenodo-uz", "zenodo-ru"])
     parser.add_argument("--batch", type=int, default=50)
     parser.add_argument("--max-cost-usd", type=float, default=0.20)
     a = parser.parse_args()
-    result = run_uz_from_ru(a.batch, a.max_cost_usd) if a.language == "uz-from-ru" else run(a.language, a.batch, a.max_cost_usd)
+    result = (run_uz_from_ru(a.batch, a.max_cost_usd) if a.language == "uz-from-ru" else
+              run_zenodo(a.language.split("-")[1], a.batch, a.max_cost_usd) if a.language.startswith("zenodo-") else
+              run(a.language, a.batch, a.max_cost_usd))
     print(json.dumps(result, ensure_ascii=False, indent=1))

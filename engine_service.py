@@ -57,6 +57,18 @@ def import_loop():
                 log.warning("import %s failed: %s: %s", language, type(exc).__name__, str(exc)[:300])
                 import_job.write_status(import_job.staging_root(), language,
                                         {"language": language, "error": type(exc).__name__ + ": " + str(exc)[:200]})
+        zen_langs, zen_batch, zen_cost = import_job.zenodo_settings()
+        for language in zen_langs:
+            if import_stop.is_set():
+                return
+            try:
+                status = import_job.run_zenodo(language, zen_batch, zen_cost)
+                log.warning("import zenodo-%s: %s imported, %s failed, error=%s", language, status["imported"],
+                            status["failed"], status["error"])
+            except Exception as exc:
+                log.warning("import zenodo-%s failed: %s: %s", language, type(exc).__name__, str(exc)[:300])
+                import_job.write_status(import_job.staging_root(), f"zenodo-{language}",
+                                        {"language": language, "error": type(exc).__name__ + ": " + str(exc)[:200]})
         relabel, rl_batch, rl_cost = import_job.uz_from_ru_settings()
         if relabel and not import_stop.is_set():
             try:
@@ -293,7 +305,8 @@ def library():
     by_source = {}
     for m in rows:
         by_source[category(m)] = by_source.get(category(m), 0) + 1
-    allowed = {f'wikipedia-{lang}' for lang in LANGUAGES} | set(LANGUAGES) | {'cyberleninka', 'uz-journals', 'disk', 'uz-from-ru'}
+    allowed = ({f'wikipedia-{lang}' for lang in LANGUAGES} | {f'zenodo-{lang}' for lang in LANGUAGES} | set(LANGUAGES)
+               | {'cyberleninka', 'uz-journals', 'disk', 'uz-from-ru'})
     status = {name: {k: v for k, v in info.items() if k in (
                   'finished', 'imported', 'updated', 'failed', 'staged_total', 'failed_total', 'listing_complete',
                   'dump_complete', 'estimated_cost_usd', 'error', 'note', 'language_corrected', 'staged', 'skipped',
