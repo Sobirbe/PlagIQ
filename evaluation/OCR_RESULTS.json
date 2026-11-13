@@ -70,5 +70,17 @@
   "models_chosen": {
    "eng": 15
   }
+ },
+ {
+  "script": "uz_cyrillic",
+  "condition": "clean",
+  "pages": 15,
+  "word_accuracy": 0.9943,
+  "worst_page_accuracy": 0.964,
+  "copying_found": 0.9884,
+  "seconds_per_page": 3.38,
+  "models_chosen": {
+   "uzb_cyrl+rus": 15
+  }
  }
 ]
