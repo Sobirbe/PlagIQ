@@ -876,13 +876,25 @@ async def _run_check(request, user, anonymous, submission, reference, reference_
         unused = unused_ai_price(result, words, ai_check)
         if unused:
             await run_in_threadpool(payments.refund, user, charge_id, unused, "AI detector did not run")
-        result["charged_uzs"] = price - unused
+        compared_nothing = unused_check_price(result, mode, price, words, ai_check)
+        if compared_nothing:
+            await run_in_threadpool(payments.refund, user, charge_id, compared_nothing, "nothing could be compared")
+        result["charged_uzs"] = price - unused - compared_nothing
     response = finish(request, result)
     if user:
         await run_in_threadpool(auth.log_check, user, result, response.headers.get("x-report-id", ""))
     if charge_id:
         await run_in_threadpool(payments.attach_report, charge_id, response.headers.get("x-report-id", ""))
     return response
+
+
+def unused_check_price(result, mode, price, words, ai_check):
+    """The plagiarism part of a price when no percentage could be given (search failed, or no comparable source):
+    the user is not charged for a check that compared nothing. An incomplete check that did compare sources
+    ("at least X%") is charged."""
+    if mode == "ai" or result.get("percent") is not None:
+        return 0
+    return max(0, price - (pricing.ai_price(words) if ai_check else 0))
 
 
 def unused_ai_price(result, words, ai_check):

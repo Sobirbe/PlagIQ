@@ -282,6 +282,27 @@ def test_failed_check_is_refunded(pay):
     assert kinds == ["refund", "charge", "topup"]
 
 
+def test_check_that_compared_nothing_is_refunded(pay, monkeypatch):
+    """Search service down: no percentage, so the check is given back. An incomplete check that compared
+    something ("at least X%") is still charged."""
+    sign_in(pay)
+    top_up(pay, 40000)
+    monkeypatch.setattr(web, "discover", lambda text, *a: {"status": "unavailable", "sources": [], "queries": 3, "message": ""})
+    data = pay.post("/api/check", data={"language": "en", "mode": "academic", "consent": "true"},
+                    files={"submission": ("a.txt", (EN * 7).encode(), "text/plain")}).json()
+    assert data["status"] == "failed_search" and data["percent"] is None and data["charged_uzs"] == 0
+    assert balance(pay) == 40000
+    ledger = pay.get("/api/payments").json()["account"]["ledger"]
+    assert [e["kind"] for e in ledger][:2] == ["refund", "charge"]
+    record = {"title": "W", "url": "https://doi.org/10.1/w", "year": 2024, "coverage": "abstract", "abstract": EN}
+    monkeypatch.setattr(web, "discover", lambda text, *a: {"status": "partial", "failed_queries": 1, "sources": [record],
+                                                           "queries": 3, "message": ""})
+    data = pay.post("/api/check", data={"language": "en", "mode": "academic", "consent": "true"},
+                    files={"submission": ("a.txt", (EN * 7).encode(), "text/plain")}).json()
+    assert data["status"] == "incomplete_coverage" and data["charged_uzs"] == 15000
+    assert balance(pay) == 25000
+
+
 def test_payments_off_keeps_checks_free(pay, monkeypatch):
     monkeypatch.setenv("PAYMENTS_ENABLED", "0")
     sign_in(pay)
