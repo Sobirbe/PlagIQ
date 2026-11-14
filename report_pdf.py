@@ -8,6 +8,7 @@ life of the report (15 minutes) and only for its owner's browser session; it is 
 import html
 import io
 
+import checkstatus
 import timefmt
 from pathlib import Path
 
@@ -365,7 +366,7 @@ def _plagiarism_sections(result, mode, t, st, table, esc, headline, basis, lang)
     pasted = lambda name: t["pasted"] if name == "Pasted reference" else name
     c = result.get("citation")
     counted = c["matched_words_counted"] if c else (result.get("matched_tokens") or 0)
-    result_rows = [(t["units_tokens"], t["tokens_v"].format(a=counted, b=result.get("total_tokens") or 0)),
+    result_rows = checkstatus.rows(result, lang) + [(t["units_tokens"], t["tokens_v"].format(a=counted, b=result.get("total_tokens") or 0)),
                    (t["units_chars"], t["chars_v"].format(a=result.get("matched_chars") or 0, b=result.get("total_chars") or 0))]
     if c:
         o, ex = c["exclusions"], c["excluded"]
@@ -747,7 +748,7 @@ def build_pdf(result, identifier, lang="en", minutes_left=15, verify_url=None):
         headline = t["not_evaluated"]
         basis = t["reasons"].get(result.get("not_evaluated_reason"), "")
     else:
-        headline = f"{percent}%"
+        headline = checkstatus.headline(result, lang) if mode != "ai" else f"{percent}%"
         basis = t["basis_tokens"]
     if mode == "ai":
         story += integrity_section(result.get("integrity"), lang, st, table)
