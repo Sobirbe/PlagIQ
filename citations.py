@@ -86,19 +86,23 @@ def _location(ws, we, quotes, bib):
     return "other"
 
 
-def assess(text, language, intervals, exclude_quotes=False, exclude_bibliography=False, min_words=7, q=None):
+def assess(text, language, intervals, exclude_quotes=False, exclude_bibliography=False, min_words=7, q=None,
+           template_spans=None, template_name=None):
     """Classify matched words and apply only the exclusions the user selected.
 
     `intervals` are validated character spans of matched text. Each matched word
     gets one location (quotation with/without a nearby reference, bibliography,
-    other) and at most one exclusion reason, checked in the order bibliography,
-    quotation, short match. The denominator (all manuscript words) never changes.
+    other) and at most one exclusion reason, checked in the order institution template text
+    (`template_spans`: wording the student's university requires), bibliography, quotation, short match.
+    The denominator (all manuscript words) never changes.
     """
     q = q if q is not None else lexical(text, language)
     quotes = [(s, e, is_cited(text, e)) for s, e in quotation_spans(text)]
     bib = bibliography_span(text)
     locations = dict.fromkeys(("quotation_cited", "quotation_uncited", "bibliography", "other"), 0)
-    excluded = dict.fromkeys(("bibliography", "quotations", "short"), 0)
+    excluded = dict.fromkeys(("template", "bibliography", "quotations", "short"), 0)
+    template = merge([list(x) for x in template_spans or []])
+    in_template = lambda ws, we: any(s <= ws and we <= e for s, e in template)
     segments, k = [], 0
     for start, end in merge(intervals):
         while k < len(q) and q[k][1] < start:
@@ -110,7 +114,8 @@ def assess(text, language, intervals, exclude_quotes=False, exclude_bibliography
         for _, ws, we in run:
             where = _location(ws, we, quotes, bib)
             locations[where] += 1
-            reason = ("bibliography" if exclude_bibliography and where == "bibliography" else
+            reason = ("template" if template and in_template(ws, we) else
+                      "bibliography" if exclude_bibliography and where == "bibliography" else
                       "quotations" if exclude_quotes and where.startswith("quotation") else
                       "short" if len(run) < min_words else None)
             if reason:
@@ -120,6 +125,8 @@ def assess(text, language, intervals, exclude_quotes=False, exclude_bibliography
                 segments[-1][1] = we
             else:
                 segments.append([ws, we, label])
+    if not template:
+        excluded.pop("template")
     matched = sum(locations.values())
     counted = matched - sum(excluded.values())
     total = len(q)
@@ -129,7 +136,7 @@ def assess(text, language, intervals, exclude_quotes=False, exclude_bibliography
         "percent_all": pct(matched), "percent_counted": pct(counted),
         "locations": locations, "excluded": excluded,
         "exclusions": {"quotations": bool(exclude_quotes), "bibliography": bool(exclude_bibliography),
-                       "min_words": int(min_words)},
+                       "min_words": int(min_words), "template": template_name if template else None},
         "quotations_found": len(quotes), "quotations_cited": sum(c for _, _, c in quotes),
         "bibliography": ({"start": bib[0], "end": bib[1], "heading": bib[2][:80]} if bib else None),
         "segments": [(s, e, where, reason) for s, e, (where, reason) in segments],

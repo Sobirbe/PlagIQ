@@ -355,6 +355,19 @@ python institutions.py --institution TDIU --agreement "No. 12/2026" --csv works.
 ```
 The first command only validates. The import is all-or-nothing. The agreement is stored with every work. Raise `CORPUS_MAX_SOURCES` first if needed (Part 2).
 
+## Part 3t — University template text (title pages, approval sheets, declarations)
+
+Universities in `INSTITUTIONS` (Part 3l) can add the wording their students **must** use: title page, approval sheet, independence declaration (at most 20 templates of 20,000 words each).
+
+**How a university admin adds it:** sign in, open the **University** panel, then **Approved template text**, and upload a file or paste the text.
+
+**How it is used:**
+- **Students** choose **"My university"** under the check options. Matched words that also appear in that university's templates are **excluded as template text**, like an excluded quotation: still highlighted, not counted, and named in the result, the PDF and the certificate ("template text of TDIU (29 words)").
+- **Recalculation:** excluding a source later reapplies the same rule.
+- **Visibility:** students see only template titles, never the text. Templates are never added to the library.
+
+**Where they are stored:** `plagiq-templates.sqlite3` on the website's `/data` volume, until an admin removes them.
+
 ## Part 3e — Full-text comparison during academic checks (on by default)
 
 In **Find academic publications** mode, PlagIQ now downloads the free full texts (PDFs) of the most relevant papers it finds and compares the manuscript against the **whole articles**, not only their abstracts. The texts are used for that one check and then discarded; they are not stored. Your lawyer has confirmed this use.
