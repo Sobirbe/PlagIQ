@@ -44,6 +44,7 @@ import csv
 import sqlite3
 import logging
 import reports_store
+import templates
 import metrics
 
 # The whole request is capped by SecurityMiddleware, so keep uploaded parts in
@@ -553,6 +554,49 @@ async def institution_deposit(request: Request, institution: str = Form(..., max
             "words": pricing.count_words(text)}
 
 
+@app.get("/api/templates")
+def template_institutions():
+    """Universities with approved template text, for the check form (names and counts only)."""
+    return {"institutions": templates.institutions_with_templates(list(institutions.configured()))}
+
+
+@app.get("/api/institution/templates")
+def institution_templates(request: Request, institution: str):
+    user = auth.read(request.cookies.get(auth.COOKIE))
+    if not institutions.allowed(user, institution):
+        raise ApiError(403, "institution_forbidden", "This account may not manage this institution's templates.")
+    return {"items": templates.listing(institution), "max": templates.MAX_TEMPLATES}
+
+
+@app.post("/api/institution/templates")
+async def institution_template_add(request: Request, institution: str = Form(..., max_length=80),
+                                   file: UploadFile | None = File(None), text: str = Form("", max_length=400_000),
+                                   title: str = Form("", max_length=templates.MAX_TITLE)):
+    """A university admin adds wording its students must use (title page, approval sheet, declaration)."""
+    user = auth.read(request.cookies.get(auth.COOKIE))
+    if not institutions.allowed(user, institution):
+        raise ApiError(403, "institution_forbidden", "This account may not manage this institution's templates.")
+    content = await read_file(file) if file and file.filename else text
+    if not content.strip():
+        raise ApiError(400, "template_missing", "Upload a file or paste the template text.")
+    name = " ".join(title.split()) or (clean_filename(file.filename, "Template").rsplit(".", 1)[0] if file and file.filename else "Template")
+    try:
+        identifier = await run_in_threadpool(templates.add, institution, name, content, user["id"])
+    except templates.TemplateError as exc:
+        raise ApiError(400, exc.code, str(exc))
+    return {"id": identifier, "title": name, "words": len(content.split())}
+
+
+@app.delete("/api/institution/templates/{template_id}")
+def institution_template_remove(template_id: int, request: Request, institution: str):
+    user = auth.read(request.cookies.get(auth.COOKIE))
+    if not institutions.allowed(user, institution):
+        raise ApiError(403, "institution_forbidden", "This account may not manage this institution's templates.")
+    if not templates.remove(institution, template_id):
+        raise ApiError(404, "report_unavailable", "Not found")
+    return {"deleted": True}
+
+
 @app.get("/api/institution/archive")
 async def institution_archive(request: Request, institution: str):
     user = auth.read(request.cookies.get(auth.COOKIE))
@@ -822,7 +866,7 @@ async def check(request:Request, submission:UploadFile=File(...),
                 exclude_quotes:bool=Form(False),exclude_bibliography:bool=Form(False),min_words:int=Form(7),
                 web_search:bool=Form(False),ai_check:bool=Form(False),ai_consent:bool=Form(False),
                 archive:bool=Form(False),archive_consent:bool=Form(False),archive_title:str=Form("",max_length=300),
-                archive_author:str=Form("",max_length=300)):
+                archive_author:str=Form("",max_length=300),institution:str=Form("",max_length=80)):
     global active_scans
     purge_reports()
     user = auth.read(request.cookies.get(auth.COOKIE))
@@ -836,6 +880,11 @@ async def check(request:Request, submission:UploadFile=File(...),
     if min_words not in citations.MIN_WORD_OPTIONS:
         raise ApiError(400, "invalid_option", "Unsupported minimum match length")
     options = dict(exclude_quotes=exclude_quotes, exclude_bibliography=exclude_bibliography, min_words=min_words)
+    institution = " ".join(institution.split())
+    if institution:                                  # the student's university: its approved template text is excluded
+        if institution not in institutions.configured():
+            raise ApiError(400, "institution_unknown", "This university is not set up in PlagIQ.")
+        options["template"] = institution
     ai_check = ai_check or mode == "ai"
     if ai_check and not aidetect.configured():
         raise ApiError(503, "ai_not_configured", "The AI detector is not set up on this server.")
@@ -1130,8 +1179,14 @@ async def analyse(submission, reference, reference_text, language, mode, options
         result["language_note"] = {"selected": chosen, "detected": detected}
     intervals = result.pop("intervals", [])
     exact_intervals = result.pop("exact_intervals", intervals)
+    options = dict(options or {})
+    template = options.pop("template", None)
+    if template and result.get("percent") is not None:
+        # Wording the student's university requires (title page, approval sheet ...): excluded as template text.
+        options["template_spans"] = await run_in_threadpool(templates.spans, original, template, language)
+        options["template_name"] = template
     # Kept with the report (never sent to the browser) so the owner can exclude sources and recalculate later.
-    result["_intervals"], result["_exact"], result["_options"] = intervals, exact_intervals, dict(options or {})
+    result["_intervals"], result["_exact"], result["_options"] = intervals, exact_intervals, options
     if result.get("percent") is not None:
         # Matched words found only as edited copying (words replaced, inserted or deleted), reported separately.
         lex = corpus.lexical(original, language)

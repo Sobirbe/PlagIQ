@@ -71,7 +71,7 @@ T = {
     pasted="Pasted reference",
     before="Matched before exclusions", applied="Exclusions chosen by the user",
     ex_none="No exclusions — every verified match is counted", ex_q="quotations ({n} words)", ex_b="bibliography ({n} words)",
-    ex_s="matches under {m} words ({n} words)", where="Where the matched words are",
+    ex_s="matches under {m} words ({n} words)", ex_t="template text of {u} ({n} words)", where="Where the matched words are",
     locs=dict(other="other text", quotation_cited="in quotations with a nearby reference",
              quotation_uncited="in quotations without a nearby reference", bibliography="in the bibliography"),
     detected="Detected structure", bib_yes="bibliography from heading “{h}”", bib_no="no bibliography heading",
@@ -129,7 +129,7 @@ T = {
     pasted="Вставленный текст источника",
     before="Совпадения до исключений", applied="Исключения, выбранные пользователем",
     ex_none="Нет — учитываются все проверенные совпадения", ex_q="цитаты ({n} слов)", ex_b="список литературы ({n} слов)",
-    ex_s="совпадения короче {m} слов ({n} слов)", where="Где находятся совпавшие слова",
+    ex_s="совпадения короче {m} слов ({n} слов)", ex_t="шаблонный текст {u} ({n} слов)", where="Где находятся совпавшие слова",
     locs=dict(other="остальной текст", quotation_cited="в цитатах со ссылкой рядом",
              quotation_uncited="в цитатах без ссылки рядом", bibliography="в списке литературы"),
     detected="Обнаруженная структура", bib_yes="список литературы по заголовку «{h}»", bib_no="заголовок списка литературы не найден",
@@ -187,7 +187,7 @@ T = {
     pasted="Kiritilgan manba matni",
     before="Istisnolargacha moslik", applied="Foydalanuvchi tanlagan istisnolar",
     ex_none="Yo‘q — barcha tasdiqlangan mosliklar hisoblanadi", ex_q="iqtiboslar ({n} so‘z)", ex_b="adabiyotlar ro‘yxati ({n} so‘z)",
-    ex_s="{m} so‘zdan qisqa mosliklar ({n} so‘z)", where="Mos so‘zlar qayerda",
+    ex_s="{m} so‘zdan qisqa mosliklar ({n} so‘z)", ex_t="{u} shablon matni ({n} so‘z)", where="Mos so‘zlar qayerda",
     locs=dict(other="boshqa matn", quotation_cited="yaqinida havolasi bor iqtiboslarda",
              quotation_uncited="yaqinida havolasi yo‘q iqtiboslarda", bibliography="adabiyotlar ro‘yxatida"),
     detected="Aniqlangan tuzilma", bib_yes="“{h}” sarlavhasi bo‘yicha adabiyotlar ro‘yxati", bib_no="adabiyotlar sarlavhasi topilmadi",
@@ -405,7 +405,8 @@ def _plagiarism_sections(result, mode, t, st, table, esc, headline, basis, lang)
         o, ex = c["exclusions"], c["excluded"]
         chosen = ([t["ex_q"].format(n=ex["quotations"])] if o["quotations"] else []) + \
                  ([t["ex_b"].format(n=ex["bibliography"])] if o["bibliography"] else []) + \
-                 ([t["ex_s"].format(m=o["min_words"], n=ex["short"])] if o["min_words"] > 7 else [])
+                 ([t["ex_s"].format(m=o["min_words"], n=ex["short"])] if o["min_words"] > 7 else []) + \
+                 ([t["ex_t"].format(u=o["template"], n=ex.get("template", 0))] if o.get("template") else [])
         result_rows += [
             (t["before"], f"{c['percent_all']}% · " + t["tokens_v"].format(a=c["matched_words_all"], b=c["total_words"])),
             (t["applied"], "; ".join(chosen) or t["ex_none"]),
