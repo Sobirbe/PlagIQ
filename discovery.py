@@ -49,15 +49,51 @@ SERIES_LINE = re.compile(
     r"научный журнал|научно[- ]практический журнал|conference proceedings|материалы конференции", re.I)
 
 
+# Title-page headers above the real title: the institution, ministry, department, approval stamp.
+# Only an upper-case line counts as an institution header, since real titles can mention a university.
+INSTITUTION = re.compile(r"\b(?:university of|universiteti|университет|institute of|instituti|институт|academy of|akademiyasi|"
+                         r"академия|ministry of|vazirligi|министерство|department of|kafedrasi|кафедра|faculty of|fakulteti|факультет)\b", re.I)
+TITLE_PAGE_LINE = re.compile(r"на правах рукописи|на соискание|qo.lyozma huquqida|tasdiqlayman|утверждаю|^approved\b|"
+                             r"camscanner|scanned with|adobe scan|microsoft lens", re.I)
+SHORT_WORDS = {"a", "i", "an", "as", "at", "by", "in", "is", "it", "of", "on", "or", "to", "va", "da", "u", "bu",
+               "в", "и", "к", "о", "с", "у", "во", "из", "на", "не", "по", "от", "до", "за", "со"}
+
+
+def _junk_share(line):
+    """Share of tokens that are not words: stray letters and symbols left by OCR of stamps and signatures."""
+    tokens = line.split()
+    bad = sum(1 for t in tokens if (len(t.strip(".,:;()\"'«»“”")) <= 2 and t.lower().strip(".,:;") not in SHORT_WORDS)
+              or not any(c.isalpha() for c in t))
+    return bad / max(1, len(tokens))
+
+
 def _looks_like_title(line):
     words = line.split()
     letters = sum(c.isalpha() for c in line)
     return (3 <= len(words) <= 30 and 15 <= len(line) <= 250 and letters >= 0.7 * len(line.replace(" ", ""))
-            and not NOT_TITLE.match(line) and not SERIES_LINE.search(line) and "@" not in line)
+            and not NOT_TITLE.match(line) and not SERIES_LINE.search(line) and "@" not in line
+            and not TITLE_PAGE_LINE.search(line) and not (INSTITUTION.search(line) and line.upper() == line)
+            and _junk_share(line) < 0.25)
 
 
-def _first_line_query(text):
-    """The title is usually among the first lines; many real titles have only 3-5 words."""
+def stored_title(title, text):
+    """The title kept in a PDF's properties, if it is a real title confirmed by the text: every word of it appears
+    in the first pages, so a stale title from a template or another document is not used."""
+    title = re.sub(r"\s+", " ", title or "").strip()
+    words = re.findall(r"[^\W\d_]+", title.lower())
+    if (len(words) < 2 or len(title) > 250 or re.search(r"\.(?:docx?|pdf|txt|rtf|odt)\b|microsoft|untitled|anonymous|"
+                                                        r"^document\d*$|^слайд|^slide", title, re.I)):
+        return None
+    head = set(re.findall(r"[^\W\d_]+", text[:6000].lower()))
+    return title if all(w in head for w in words) else None
+
+
+def _first_line_query(text, title=None):
+    """The title kept in the PDF's properties when the text confirms it; otherwise the title-like first line
+    (many real titles have only 3-5 words)."""
+    confirmed = stored_title(title, text)
+    if confirmed:
+        return " ".join(confirmed.split()[:QUERY_WORDS])[:220]
     lines = [re.sub(r"\s+", " ", line).strip() for line in re.split(r"[\n\t]", text)]   # table cells separately
     lines = [line for line in lines if line]
     titles = [line for line in lines[:15] if _looks_like_title(line)]
@@ -73,14 +109,14 @@ def _distinctive(sentence):
     return len(set(words))
 
 
-def suggest_queries(text, max_queries=MAX_QUERIES):
+def suggest_queries(text, max_queries=MAX_QUERIES, title=None):
     """Up to max_queries excerpts of at most 14 words: the title-like first line,
     then the most distinctive sentence from each of the beginning, middle and end
     of the body (bibliography excluded). Never the whole manuscript."""
     from citations import bibliography_span
     bib = bibliography_span(text)
     body = text[:bib[0]] if bib else text
-    queries = [_first_line_query(body)]
+    queries = [_first_line_query(body, title)]
     # Whole sentences are assigned to a third by where they start, so an excerpt
     # never begins or ends in the middle of a word.
     sentences = [(m.start(), re.sub(r"\s+", " ", m.group()).strip()) for m in SENTENCE.finditer(body)]
@@ -98,14 +134,14 @@ def suggest_queries(text, max_queries=MAX_QUERIES):
     return unique[:max_queries]
 
 
-def spread_excerpts(text, n):
+def spread_excerpts(text, n, title=None):
     """Up to n excerpts of at most 14 words for web search: the title-like first line,
     then the most distinctive sentence of each of n-1 equal parts of the body
     (bibliography excluded), so copying anywhere in the document can be found."""
     from citations import bibliography_span
     bib = bibliography_span(text)
     body = text[:bib[0]] if bib else text
-    excerpts = [_first_line_query(body)]
+    excerpts = [_first_line_query(body, title)]
     sentences = [(m.start(), re.sub(r"\s+", " ", m.group()).strip()) for m in SENTENCE.finditer(body)]
     sentences = [(start, c) for start, c in sentences if 8 <= len(c.split()) <= 80 and _distinctive(c) >= 4]
     parts = max(1, n - 1)
@@ -263,7 +299,7 @@ def _best_excerpt(body, start, end, taken):
     return None
 
 
-def chapter_queries(text, n):
+def chapter_queries(text, n, title=None):
     """Up to n excerpts: the title, then one from each chapter (headings found in the text). Long chapters
     get extra excerpts when there are fewer chapters than searches; with more chapters than searches the
     longest ones are used. Falls back to equal parts when the text has no headings. Never the whole text."""
@@ -272,7 +308,7 @@ def chapter_queries(text, n):
     body = text[:bib[0]] if bib else text
     parts = chapters(body)
     if len(parts) < 2:
-        return spread_excerpts(text, n), 0
+        return spread_excerpts(text, n, title), 0
     found = len(parts)
     while len(parts) < n - 1:                                 # split the longest part in two
         i = max(range(len(parts)), key=lambda k: parts[k][1] - parts[k][0])
@@ -284,7 +320,7 @@ def chapter_queries(text, n):
     if len(parts) > n - 1:
         keep = sorted(sorted(range(len(parts)), key=lambda k: parts[k][0] - parts[k][1])[:n - 1])
         parts = [parts[k] for k in keep]
-    queries = [_first_line_query(body)]
+    queries = [_first_line_query(body, title)]
     taken = [set(queries[0].lower().split())]
     for a, b in parts:
         excerpt = _best_excerpt(body, a, b, taken)
@@ -305,13 +341,13 @@ def query_count(text):
     return min(cap, MAX_QUERIES + max(0, words - 1) // 3000)
 
 
-def discover(text, max_results=8, language=None):
+def discover(text, max_results=8, language=None, title=None):
     count = query_count(text)
     found_chapters = 0
     if count <= MAX_QUERIES:
-        queries = suggest_queries(text)
+        queries = suggest_queries(text, title=title)
     else:
-        queries, found_chapters = chapter_queries(text, count)
+        queries, found_chapters = chapter_queries(text, count, title)
     if not queries:
         return {"status": "no_query", "sources": [], "queries": 0, "message": "No search phrase could be extracted"}
     with ThreadPoolExecutor(max_workers=len(queries)) as pool:

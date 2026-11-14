@@ -67,7 +67,7 @@ def test_text_pdf_is_not_ocred(fast):
     doc = pymupdf.open()
     doc.new_page().insert_textbox(pymupdf.Rect(60, 60, 535, 790), EN, fontfile=FONT, fontname="serif", fontsize=12)
     info = {}
-    assert "Fergana valley" in extract.extract_text("t.pdf", doc.tobytes(), ocr=True, info=info) and info == {}
+    assert "Fergana valley" in extract.extract_text("t.pdf", doc.tobytes(), ocr=True, info=info) and "ocr_pages" not in info
 
 
 def test_page_limit_and_off_switch(fast, monkeypatch):
