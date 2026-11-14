@@ -162,6 +162,15 @@ def summarize(report: dict, max_sources=25) -> dict:
                 passages.append({k: passage[k] for k in ('query_start','query_end','source_start','source_end')}
                                 | {'source_excerpt': str(passage.get('source_excerpt', ''))[:501], 'type': kind}
                                 | ({'similarity': round(float(similarity), 2)} if kind == 'edited' else {}))
+            spans = src.get("intervals")                     # every matched span (older engines: absent)
+            if spans is not None:
+                if not isinstance(spans, list) or len(spans) > 2000:
+                    raise ValueError()
+                for pair in spans:
+                    if (not isinstance(pair, (list, tuple)) or len(pair) != 2 or any(type(x) is not int for x in pair)
+                            or not 0 <= pair[0] < pair[1] <= document_length):
+                        raise ValueError()
+                spans = merge([list(p) for p in spans])
             matched_words = src.get("matched_words", 0)
             if type(matched_words) is not int or not 0 <= matched_words <= document_length:
                 raise ValueError()
@@ -178,6 +187,7 @@ def summarize(report: dict, max_sources=25) -> dict:
                 "collection": str(src.get("collection") or "")[:120] if src.get("rights_basis") == "institution_deposit" else "",
                 "matched_chars": matched_chars,
                 "matched_tokens": matched_words,
+                **({"spans": spans} if spans is not None else {}),
                 "edited_tokens": _int(src.get("edited_words", 0), 0, matched_words),
                 "authors": str(src.get("authors") or "")[:300],
                 "year": year if type(year) is int and 1000 <= year <= 2200 else None,

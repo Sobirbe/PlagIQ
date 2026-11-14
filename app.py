@@ -39,6 +39,8 @@ import engine_client
 from report_pdf import build_pdf, build_short_pdf
 from security import SecurityMiddleware, MAX_REQUEST
 import checkstatus
+import io
+import csv
 import sqlite3
 import logging
 import reports_store
@@ -295,7 +297,7 @@ VERIFY_TEXT = {
                hash="Document SHA-256 begins with", mode="Comparison", result="Matched portion within scope",
                words="Words in the document", sources="Sources compared", lang="Document language",
                modes={"i": "AI detector only", "r": "Your own reference", "a": "OpenAlex (open-access full texts and abstracts)", "c": "Private authorized corpus"},
-               ne="Not evaluated", ai="AI detector estimate (Pangram): AI + AI-assisted",
+               ne="Not evaluated", ai="AI detector estimate (Pangram): AI + AI-assisted", ex="Sources excluded by the report owner",
                note="Compare the first 16 characters of the SHA-256 printed in the report with the value above. This page confirms the "
                     "figures of a PlagIQ evidence report; it is not a certificate of originality and keeps no copy of the document."),
     "ru": dict(title="Проверка отчёта PlagIQ", ok="Действителен: PlagIQ выдал отчёт с этими данными.",
@@ -304,7 +306,7 @@ VERIFY_TEXT = {
                hash="SHA-256 документа начинается с", mode="Сравнение", result="Доля совпадений в охвате",
                words="Слов в документе", sources="Сравнено источников", lang="Язык документа",
                modes={"i": "Только ИИ-детектор", "r": "Ваш источник", "a": "OpenAlex (открытые полные тексты и аннотации)", "c": "Внутренний разрешённый корпус"},
-               ne="Не оценено", ai="Оценка ИИ-детектора (Pangram): ИИ + с помощью ИИ",
+               ne="Не оценено", ai="Оценка ИИ-детектора (Pangram): ИИ + с помощью ИИ", ex="Источников исключено владельцем отчёта",
                note="Сравните первые 16 символов SHA-256 из отчёта со значением выше. Страница подтверждает данные отчёта PlagIQ; "
                     "это не сертификат оригинальности, копия документа не хранится."),
     "uz": dict(title="PlagIQ hisobotini tekshirish", ok="Haqiqiy: PlagIQ shu ma’lumotlar bilan hisobot bergan.",
@@ -313,7 +315,7 @@ VERIFY_TEXT = {
                hash="Hujjat SHA-256 boshlanishi", mode="Solishtirish", result="Doira ichidagi moslik ulushi",
                words="Hujjatdagi so‘zlar", sources="Solishtirilgan manbalar", lang="Hujjat tili",
                modes={"i": "Faqat AI detektor", "r": "O‘z manbangiz", "a": "OpenAlex (ochiq to‘liq matnlar va annotatsiyalar)", "c": "Ruxsat berilgan ichki korpus"},
-               ne="Baholanmagan", ai="AI detektor bahosi (Pangram): AI + AI yordamida",
+               ne="Baholanmagan", ai="AI detektor bahosi (Pangram): AI + AI yordamida", ex="Hisobot egasi chiqarib tashlagan manbalar",
                note="Hisobotdagi SHA-256 ning birinchi 16 belgisini yuqoridagi qiymat bilan solishtiring. Bu sahifa PlagIQ dalillar "
                     "hisobotidagi ma’lumotlarni tasdiqlaydi; originallik sertifikati emas va hujjat nusxasini saqlamaydi."),
 }
@@ -333,7 +335,7 @@ def verify_page(request: Request, ui: str = ""):
         rows = "".join(f"<tr><th>{html.escape(k)}</th><td>{html.escape(v)}</td></tr>" for k, v in (
             (t["rid"], f["r"]), (t["date"], when), (t["hash"], f["h"]), (t["mode"], t["modes"][f["m"]]),
             (t["result"], result), (t["words"], f["w"]), (t["sources"], f["n"]), (t["lang"], f["l"].upper()))
-            + (((t["ai"], f["x"] + "%"),) if "x" in f else ()))
+            + (((t["ai"], f["x"] + "%"),) if "x" in f else ()) + (((t["ex"], f["e"]),) if "e" in f else ()))
     links = " · ".join(f'<a href="?{html.escape(str(request.query_params))}&amp;ui={l}">{l.upper()}</a>' for l in VERIFY_TEXT)
     colour = "#0b6a64" if valid else "#9b2c16"
     page = (f'<!doctype html><html lang="{lang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
@@ -1128,6 +1130,8 @@ async def analyse(submission, reference, reference_text, language, mode, options
         result["language_note"] = {"selected": chosen, "detected": detected}
     intervals = result.pop("intervals", [])
     exact_intervals = result.pop("exact_intervals", intervals)
+    # Kept with the report (never sent to the browser) so the owner can exclude sources and recalculate later.
+    result["_intervals"], result["_exact"], result["_options"] = intervals, exact_intervals, dict(options or {})
     if result.get("percent") is not None:
         # Matched words found only as edited copying (words replaced, inserted or deleted), reported separately.
         lex = corpus.lexical(original, language)
@@ -1289,6 +1293,113 @@ def delete_report(identifier: str, request: Request):
     results.pop(identifier, None)
     reports_store.delete(identifier)
     return {"deleted": True}
+
+
+def _subtract(a, b):
+    """Character intervals of a that are not in b (both merged lists)."""
+    out, k = [], 0
+    for start, end in a:
+        pos = start
+        while k < len(b) and b[k][1] <= pos:
+            k += 1
+        j = k
+        while j < len(b) and b[j][0] < end:
+            if b[j][0] > pos:
+                out.append([pos, b[j][0]])
+            pos = max(pos, b[j][1])
+            j += 1
+        if pos < end:
+            out.append([pos, end])
+    return out
+
+
+def _intersect(a, b):
+    return _subtract(a, _subtract(a, b))
+
+
+def exclude_sources(result, chosen):
+    """Recalculate a stored report without the sources at the given indices (the owner's choice; an empty list
+    restores the original). Words matched only by excluded sources stop counting; words that another source also
+    matched still count; words matched by sources beyond the listed ones always count. The quotation, bibliography
+    and short-match options of the check are applied again. The original figures stay in "before_source_exclusion"."""
+    text, all_spans = result.get("_text"), result.get("_intervals")
+    sources = result.get("sources") or []
+    if text is None or all_spans is None:
+        raise ApiError(409, "exclusion_unavailable", "This report cannot be recalculated.")
+    chosen = sorted({i for i in chosen if type(i) is int and 0 <= i < len(sources)})
+    if any(not sources[i].get("spans") or not sources[i].get("matched_tokens") for i in chosen):
+        raise ApiError(400, "source_not_excludable", "This source has no complete match positions and cannot be excluded.")
+    original = result.get("before_source_exclusion") or {k: result.get(k) for k in (
+        "percent", "percent_all", "matched_tokens", "matched_tokens_counted", "matched_chars", "edited_tokens", "citation",
+        "status", "coverage_issues")}
+    excluded = corpus.merge([list(x) for i in chosen for x in sources[i]["spans"]])
+    kept = corpus.merge([list(x) for i, src in enumerate(sources) if i not in chosen for x in src.get("spans") or []])
+    remaining = _subtract(corpus.merge([list(x) for x in all_spans]), _subtract(excluded, kept))
+    language = result.get("language", "en")
+    lex = corpus.lexical(text, language)
+    review = citations.assess(text, language, remaining, **(result.get("_options") or {}))
+    shown = [{**src, "spans": [], "passages": []} if i in chosen else src for i, src in enumerate(sources)]
+    marks = marks_for(text, review.pop("segments"), shown)
+    exact = _intersect(remaining, corpus.merge([list(x) for x in result.get("_exact") or all_spans]))
+    out = dict(result)
+    out.update(matched_tokens=corpus.words_in_intervals(lex, remaining), matched_chars=sum(e - s for s, e in remaining),
+               citation=review, percent_all=review["percent_all"], percent=review["percent_counted"],
+               matched_tokens_counted=review["matched_words_counted"],
+               edited_tokens=max(0, corpus.words_in_intervals(lex, remaining) - corpus.words_in_intervals(lex, exact)),
+               _marks=[list(m) for m in marks],
+               sources=[{**src, "excluded": i in chosen} for i, src in enumerate(sources)])
+    if chosen:
+        out["before_source_exclusion"] = original
+        out["excluded_sources"] = [{"index": i, "title": sources[i].get("title", ""), "words": sources[i].get("matched_tokens", 0)}
+                                   for i in chosen]
+    else:                                              # restore the check exactly as it was
+        for key in ("percent", "percent_all", "matched_tokens", "matched_tokens_counted", "matched_chars", "edited_tokens",
+                    "citation", "status", "coverage_issues"):
+            out[key] = original.get(key)
+        out.pop("before_source_exclusion", None)
+        out.pop("excluded_sources", None)
+        return out
+    checkstatus.assess(out)
+    return out
+
+
+@app.post("/api/report/{identifier}/exclude")
+async def exclude_report_sources(identifier: str, request: Request):
+    """The report's owner excludes sources (for example their own earlier work or an approved template) and gets
+    the recalculated report; {"sources": []} restores the original. PDFs and the QR code follow the choice."""
+    entry = owned(identifier, request)
+    try:
+        body = await request.json()
+    except ValueError:
+        body = None
+    if not isinstance(body, dict) or not isinstance(body.get("sources"), list) or len(body["sources"]) > 200:
+        raise ApiError(400, "invalid_request", "Send the list of source numbers to exclude.")
+    updated = await run_in_threadpool(exclude_sources, entry["result"], body["sources"])
+    if identifier in results:
+        results[identifier]["result"] = updated
+    await run_in_threadpool(reports_store.finish, identifier, updated)
+    return report_json(identifier, request)
+
+
+@app.get("/api/report/{identifier}/sources.csv")
+def report_sources_csv(identifier: str, request: Request):
+    """The source list as a spreadsheet (UTF-8 with BOM, so Excel shows Cyrillic and Uzbek letters)."""
+    result = owned(identifier, request)["result"]
+    words = result.get("total_tokens") or 0
+    out = io.StringIO()
+    writer = csv.writer(out)
+    writer.writerow(["Rank", "Title", "Link or DOI", "Year", "Coverage", "Matched words", "Share of document %",
+                     "Edited-copy words", "Passages", "Excluded by you"])
+    order = sorted(range(len(result.get("sources") or [])), key=lambda i: -(result["sources"][i].get("matched_tokens") or 0))
+    safe = lambda v: ("'" + v) if isinstance(v, str) and v[:1] in ("=", "+", "-", "@", "\t", "\r") else v   # no spreadsheet formulas
+    for rank, i in enumerate(order, 1):
+        src = result["sources"][i]
+        writer.writerow([rank, safe(src.get("title") or ""), safe(src.get("url") or ""), src.get("year") or "",
+                         src.get("coverage") or "", src.get("matched_tokens") or 0,
+                         f"{100 * (src.get('matched_tokens') or 0) / words:.2f}" if words else "",
+                         src.get("edited_tokens") or 0, src.get("passage_count") or 0, "yes" if src.get("excluded") else ""])
+    return Response("\ufeff" + out.getvalue(), media_type="text/csv; charset=utf-8",
+                    headers={"Content-Disposition": 'attachment; filename="PlagIQ-sources.csv"', "Cache-Control": "no-store"})
 
 
 @app.get("/api/reports")

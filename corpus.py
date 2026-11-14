@@ -522,7 +522,7 @@ def search(db, text, language, max_passages=5, exclude=(), ignore=()):
             public.update(url='', owner=metadata.get('owner', ''), collection=metadata.get('collection', ''))
         sources.append({**public, 'source_filename': metadata['title'], 'source_url': metadata['url'],
                         'matched_chars': evidence['matched_chars'], 'matched_words': evidence['matched_words'],
-                        'edited_words': evidence['edited_words'],
+                        'edited_words': evidence['edited_words'], 'intervals': evidence['intervals'][:2000],
                         'passage_count': evidence['passage_count'], 'passages': evidence['passages']})
     counts = {lang: 0 for lang in LANGUAGES}
     for (raw,) in db.execute('SELECT metadata FROM sources'):

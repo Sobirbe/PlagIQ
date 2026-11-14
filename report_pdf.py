@@ -360,6 +360,15 @@ def integrity_section(data, lang, st, table):
     return [Paragraph(html.escape(t["title"]), st["h"]), table(rows), Paragraph(html.escape(t["note"]), st["small"])]
 
 
+EXCLUDED_T = {
+    "en": dict(row="Sources excluded by the report owner", value="{titles}. Before exclusion: {p}% ({w} words).",
+               tag=" (excluded by the report owner)"),
+    "ru": dict(row="Источники, исключённые владельцем отчёта", value="{titles}. До исключения: {p}% ({w} слов).",
+               tag=" (исключён владельцем отчёта)"),
+    "uz": dict(row="Hisobot egasi chiqarib tashlagan manbalar", value="{titles}. Chiqarib tashlashdan oldin: {p}% ({w} so‘z).",
+               tag=" (hisobot egasi chiqarib tashlagan)"),
+}
+
 EDITED_T = {
     "en": dict(row="Of which edited copying", value="{e} words (words replaced, inserted or deleted; verified by word alignment)",
                tag=" · edited copy, {s}% identical words"),
@@ -385,6 +394,11 @@ def _plagiarism_sections(result, mode, t, st, table, esc, headline, basis, lang)
     counted = c["matched_words_counted"] if c else (result.get("matched_tokens") or 0)
     edited_rows = [(EDITED_T.get(lang, EDITED_T["en"])["row"], EDITED_T.get(lang, EDITED_T["en"])["value"].format(
         e=result["edited_tokens"]))] if result.get("edited_tokens") else []
+    excluded = result.get("excluded_sources") or []
+    if excluded:
+        x, before = EXCLUDED_T.get(lang, EXCLUDED_T["en"]), result.get("before_source_exclusion") or {}
+        edited_rows = edited_rows + [(x["row"], x["value"].format(titles="; ".join(e["title"][:120] for e in excluded),
+                                                                   p=before.get("percent"), w=before.get("matched_tokens")))]
     result_rows = checkstatus.rows(result, lang) + [(t["units_tokens"], t["tokens_v"].format(a=counted, b=result.get("total_tokens") or 0))] + edited_rows + [
                    (t["units_chars"], t["chars_v"].format(a=result.get("matched_chars") or 0, b=result.get("total_chars") or 0))]
     if c:
@@ -428,7 +442,8 @@ def _plagiarism_sections(result, mode, t, st, table, esc, headline, basis, lang)
     if any(s.get("passages") for s in sources):
         story.append(Paragraph(esc(t["loc_note"]), st["small"]))
     for number, source in enumerate(sources[:PDF_SOURCES], 1):
-        block = [Paragraph(f"{number}. " + esc(pasted(source.get("title") or "—")), st["source"])]
+        block = [Paragraph(f"{number}. " + esc(pasted(source.get("title") or "—")
+                                               + (EXCLUDED_T.get(lang, EXCLUDED_T["en"])["tag"] if source.get("excluded") else "")), st["source"])]
         meta = []
         if source.get("authors"):
             meta.append(f"{t['authors']}: {source['authors']}")
@@ -566,7 +581,8 @@ def overview_section(result, lang, st, esc, t, max_sources=None):
         body = []
         for n, source in enumerate(matched[:max_sources or PDF_SOURCES], 1):
             colour = PALETTE[min(n - 1, len(PALETTE) - 1)]
-            title = esc(t["pasted"] if source.get("title") == "Pasted reference" else (source.get("title") or "—"))
+            title = esc((t["pasted"] if source.get("title") == "Pasted reference" else (source.get("title") or "—"))
+                        + (EXCLUDED_T.get(lang, EXCLUDED_T["en"])["tag"] if source.get("excluded") else ""))
             link = f'<br/><font size="7" color="#4C6368">{esc(source["url"])}</font>' if source.get("url") else ""
             coverage = t["cov_web"] if source.get("coverage") == "web" else t["cov"].get(source.get("coverage"), t["cov_full"])
             body.append([Paragraph(f'<font backColor="{colour}">\u00a0{n}\u00a0</font>', st["cell"]),

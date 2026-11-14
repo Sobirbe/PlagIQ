@@ -22,6 +22,17 @@ Every mode (own reference, OpenAlex abstracts, private corpus) uses the same cod
 
 Sequences (exact or edited) that occur in 3 or more different works (journal headers, licence lines, site banners) are treated as boilerplate and not counted; copies of one work count once (`evaluation/SAME_WORK.md`). The result is evidence with character positions in both texts. Accuracy on real texts: `evaluation/REAL_RESULTS.md` and `evaluation/EDITED.md`. Paraphrase and translation are not detected, and neither is heavier editing such as one word in three replaced.
 
+## Excluding sources and the source list
+
+The owner of a report can **exclude a source** from the result page, for example their own earlier paper or a template their university approved. The percentage is recalculated:
+- words matched only by excluded sources stop counting;
+- words another source also matched still count;
+- the quotation, bibliography and short-match options chosen for the check are applied again.
+
+The figure before exclusion stays visible, and **"Include all again"** restores the original exactly. The choice is saved with the report: the PDFs list the excluded sources, the certificate's "Exclusions" row names them, and the signed QR link carries the number excluded. **Source list (CSV)** downloads every source with its share, edited-copy words and exclusion, opening correctly in Excel (UTF-8 with BOM; cells that would start a formula are escaped).
+
+Sources from the PlagIQ library can be excluded once the engine is redeployed, because the engine must send each source's full match positions.
+
 ## Check status (never a silent 0%)
 
 Every finished check has a `status`:
