@@ -14,10 +14,11 @@ Settings (website service):
   FULLTEXT_OPENALEX_PDF=1   use OpenAlex's PDF copy first (most reliable; ~$0.01 each)
 """
 import os
+import re
 import time
 import urllib.error
 from concurrent.futures import ThreadPoolExecutor, wait
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlsplit
 
 import extract
 from harvest import MAX_PAGE, MAX_PDF, Fetcher, HarvestError, _PageMeta
@@ -62,12 +63,52 @@ def _from_url(url, fetcher):
         return _pdf_text(body)
     if "html" not in (ctype or "").lower() and not body.lstrip()[:15].lower().startswith((b"<!doctype", b"<html")):
         raise HarvestError("not a PDF")
-    meta = _PageMeta()
+    meta = _LinkMeta()
     meta.feed(body[:MAX_PAGE].decode("utf-8", "replace"))
-    if not meta.pdf:
+    page = getattr(fetcher, "last_url", None) or url
+    pdf_url = urljoin(page, meta.pdf) if meta.pdf else _pdf_link(meta.links, page, url)
+    if not pdf_url:
         raise HarvestError("page names no PDF")
-    pdf_url = urljoin(getattr(fetcher, "last_url", None) or url, meta.pdf)
     return _pdf_text(fetcher.get(pdf_url, MAX_PDF, cross_host=True)[0])
+
+
+class _LinkMeta(_PageMeta):
+    """citation_pdf_url, and also the page's ordinary links to PDF files (for pages without that tag)."""
+
+    def __init__(self):
+        super().__init__()
+        self.links = []
+
+    def handle_starttag(self, tag, attrs):
+        super().handle_starttag(tag, attrs)
+        href = dict(attrs).get("href") or ""
+        if tag == "a" and (urlsplit(href).path.lower().endswith(".pdf") or "/bitstream/" in href) and len(self.links) < 200:
+            self.links.append(href)
+
+
+def _digits(text, years_short=False):
+    groups = re.findall(r"\d{2,}", text)
+    return {g[-2:] if years_short and len(g) == 4 and g[:2] in ("19", "20") else g for g in groups}
+
+
+def _pdf_link(links, page, asked):
+    """A PDF link on the article page that clearly belongs to this work: the only PDF link on the same website, or
+    the one whose file name carries the numbers of the link that was asked for (a DOI such as swp-2007-35 and a file
+    wp07-35.pdf). Anything less certain is not used."""
+    host = (urlsplit(page).hostname or "").removeprefix("www.")
+    same = []
+    for href in links:
+        full = urljoin(page, href)
+        if (urlsplit(full).hostname or "").removeprefix("www.") == host and full not in same:
+            same.append(full)
+    if len(same) == 1:
+        return same[0]
+    last = lambda u: ([part for part in urlsplit(u).path.split("/") if part] or [""])[-1]
+    wanted = _digits(last(asked), years_short=True)
+    if not wanted:
+        return None
+    fitting = [u for u in same if wanted <= _digits(last(u), years_short=True)]
+    return fitting[0] if len(fitting) == 1 else None
 
 
 def reason(exc):
