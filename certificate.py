@@ -25,7 +25,7 @@ C = {
         scope="Scope", scopes=dict(academic="Open academic publications found through OpenAlex{w}",
                                    reference="Comparison with one reference document supplied by the user",
                                    corpus="PlagIQ private corpus of authorized texts"),
-        scope_web=" and the web ({p})", scope_library=", and the PlagIQ library", src_library=" · PlagIQ library: {n}",
+        scope_web=" and the web ({p})", scope_library=", and the PlagIQ library", src_library=" · PlagIQ library: {lib}",
         verify="Verify this certificate", verify_v="Scan the QR code, or open the link, to confirm that PlagIQ issued it with these figures.",
         verify_off="Online verification is not enabled on this server.",
         issued="Issued electronically by PlagIQ", details="Full evidence (every matched passage and source) on the following pages.",
@@ -46,7 +46,7 @@ C = {
                                    reference="Сравнение с одним документом, предоставленным пользователем",
                                    corpus="Внутренний корпус PlagIQ с разрешёнными текстами"),
         scope_web=" и интернет ({p})",
-        scope_library=", а также библиотека PlagIQ", src_library=" · библиотека PlagIQ: {n}",
+        scope_library=", а также библиотека PlagIQ", src_library=" · библиотека PlagIQ: {lib}",
         verify="Проверить сертификат", verify_v="Отсканируйте QR-код или откройте ссылку, чтобы убедиться, что PlagIQ выдал его с этими данными.",
         verify_off="Онлайн-проверка на этом сервере не настроена.",
         issued="Выдан в электронном виде PlagIQ", details="Полные доказательства (все совпадения и источники) — на следующих страницах.",
@@ -67,7 +67,7 @@ C = {
                                    reference="Foydalanuvchi bergan bitta hujjat bilan solishtirish",
                                    corpus="PlagIQ ichki korpusidagi ruxsat berilgan matnlar"),
         scope_web=" va internet ({p})",
-        scope_library=" hamda PlagIQ kutubxonasi", src_library=" · PlagIQ kutubxonasi: {n}",
+        scope_library=" hamda PlagIQ kutubxonasi", src_library=" · PlagIQ kutubxonasi: {lib}",
         verify="Sertifikatni tekshirish", verify_v="PlagIQ uni aynan shu ma’lumotlar bilan berganini tasdiqlash uchun QR kodni skanerlang yoki havolani oching.",
         verify_off="Bu serverda onlayn tekshirish sozlanmagan.",
         issued="PlagIQ tomonidan elektron shaklda berilgan", details="To‘liq dalillar (barcha mos parchalar va manbalar) keyingi sahifalarda.",
@@ -85,6 +85,30 @@ def _short(name, limit=70):
     return name if len(name) <= limit else name[:limit - 22] + "…" + name[-21:]
 
 
+LIBRARY_T = {
+    "en": dict(base="{n} texts in {l}", parts=": {a} academic publications, {w} Wikipedia articles (not academic), {d} deposited works",
+               langs={"uz": "Uzbek", "ru": "Russian", "en": "English"}),
+    "ru": dict(base="текстов на языке «{l}»: {n}", parts=" — научных публикаций {a}, статей Википедии {w} (не научные), депонированных работ {d}",
+               langs={"uz": "узбекский", "ru": "русский", "en": "английский"}),
+    "uz": dict(base="{l} tilida {n} ta matn", parts=": {a} ta ilmiy nashr, {w} ta Vikipediya maqolasi (ilmiy emas), {d} ta topshirilgan ish",
+               langs={"uz": "o‘zbek", "ru": "rus", "en": "ingliz"}),
+}
+
+
+def library_phrase(library, lang):
+    """How much of the PlagIQ library a check compared: the texts in the document's language, split into academic
+    publications, Wikipedia (not academic) and deposited works. Older engines give only a total."""
+    t = LIBRARY_T.get(lang, LIBRARY_T["en"])
+    groups = library.get("collections")
+    n = library.get("language_size", library.get("size", 0))
+    if not library.get("language"):
+        return f"{library.get('size', 0):,}".replace(",", " ")
+    text = t["base"].format(n=f"{n:,}".replace(",", " "), l=t["langs"].get(library["language"], library["language"]))
+    if isinstance(groups, dict):
+        text += t["parts"].format(a=groups.get("academic", 0), w=groups.get("wikipedia", 0), d=groups.get("deposits", 0))
+    return text
+
+
 def facts(result, lang):
     """Certificate rows from the cached report summary (no manuscript text)."""
     t = C.get(lang, C["en"])
@@ -97,7 +121,7 @@ def facts(result, lang):
         sources = t["src_academic"].format(f=(result.get("fulltext") or {}).get("compared", 0), a=abstracts,
                                            w=t["src_web"].format(n=web.get("compared", 0)) if web.get("enabled") else "")
         if library.get("searched"):
-            sources += t["src_library"].format(n=library.get("size", 0))
+            sources += t["src_library"].format(lib=library_phrase(library, lang))
     elif mode == "ai":
         sources = t["src_ai"]
     elif mode == "corpus":
@@ -280,3 +304,4 @@ class CertificatePage(Flowable):
 
 import uzcyr  # noqa: E402  (Uzbek Cyrillic texts, generated from the Uzbek Latin ones)
 uzcyr.add_to(C)
+uzcyr.add_to(LIBRARY_T)

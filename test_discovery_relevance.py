@@ -106,8 +106,19 @@ def test_pdf_and_certificate_state_the_library(monkeypatch):
     client = TestClient(web.app)
     data = client.post("/api/check", data={"mode": "academic", "language": "en", "consent": "true"},
                        files={"submission": ("a.txt", EN.encode())}).json()
-    for lang, row, cert in (("en", "PlagIQ library 2 287 indexed sources searched", "and the PlagIQ library"),
-                            ("uz", "PlagIQ kutubxonasi 2 287 ta indekslangan manba qidirildi", "hamda PlagIQ kutubxonasi"),
-                            ("ru", "Библиотека PlagIQ проверено индексированных источников: 2 287", "библиотека PlagIQ")):
+    for lang, row, cert in (("en", "PlagIQ library 2 287 searched; 0 with matches", "and the PlagIQ library"),     # older engine: total only
+                            ("uz", "PlagIQ kutubxonasi qidirildi: 2 287; 0 tasida moslik bor", "hamda PlagIQ kutubxonasi"),
+                            ("ru", "Библиотека PlagIQ проверено: 2 287; с совпадениями: 0", "библиотека PlagIQ")):
         text = " ".join(pdf_text(client, data["report_id"], lang)[0].split())
         assert row in text and cert in text, (lang, text[:3000])
+
+    async def library_by_collection(result, original, language, owner):
+        return {"searched": True, "size": 2287, "language": "en", "language_size": 412, "matched_sources": 1,
+                "collections": {"academic": 380, "wikipedia": 32, "deposits": 0}}
+    monkeypatch.setattr(web, "search_library", library_by_collection)
+    data = client.post("/api/check", data={"mode": "academic", "language": "en", "consent": "true"},
+                       files={"submission": ("a.txt", EN.encode())}).json()
+    text = " ".join(pdf_text(client, data["report_id"], "en")[0].split())
+    assert ("412 texts in English: 380 academic publications, 32 Wikipedia articles (not academic), 0 deposited works "
+            "searched; 1 with matches") in text
+    assert "PlagIQ library: 412 texts in English: 380 academic publications" in text          # certificate

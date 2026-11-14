@@ -294,12 +294,26 @@ def charge(user, amount_uzs, note):
 
 
 def refund(user, charge_id, amount_uzs, note):
-    """Give back all or part of a charge (once per charge and amount)."""
+    """Give back all or part of a charge. Never more than was charged: refunds for one charge are capped at its
+    amount, so a repeated or overlapping refund (a retry, a restart) cannot create credit. Returns the amount given."""
     if not charge_id or amount_uzs <= 0:
-        return
+        return 0
     with _lock, closing(_connect()) as db:
-        db.execute("INSERT INTO ledger (user, time, amount_uzs, kind, ref, note, mode) VALUES (?, ?, ?, 'refund', ?, ?, ?)",
-                   (user["id"], _ms(), amount_uzs, str(charge_id), note[:120], mode()))
+        db.execute("BEGIN IMMEDIATE")
+        try:
+            row = db.execute("SELECT -amount_uzs FROM ledger WHERE id=? AND user=? AND kind='charge'",
+                             (int(charge_id), user["id"])).fetchone()
+            given = db.execute("SELECT COALESCE(SUM(amount_uzs), 0) FROM ledger WHERE kind='refund' AND ref=? AND user=?",
+                               (str(charge_id), user["id"])).fetchone()[0]
+            amount = min(int(amount_uzs), (row[0] if row else 0) - given)
+            if amount > 0:
+                db.execute("INSERT INTO ledger (user, time, amount_uzs, kind, ref, note, mode) VALUES (?, ?, ?, 'refund', ?, ?, ?)",
+                           (user["id"], _ms(), amount, str(charge_id), note[:120], mode()))
+            db.execute("COMMIT")
+            return max(0, amount)
+        except BaseException:
+            db.execute("ROLLBACK")
+            raise
 
 
 def has_records(user):

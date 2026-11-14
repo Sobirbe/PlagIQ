@@ -44,6 +44,8 @@ import csv
 import sqlite3
 import logging
 import progress
+import operator_info
+import sample_report
 import reports_store
 import uzcyr
 import templates
@@ -364,7 +366,7 @@ def verify_page(request: Request, ui: str = ""):
 def health():
     return {"status":"ok","version":VERSION,"corpus_engine_configured":corpus_configured(),
             "web_search":websearch.settings()[0],"web_providers":websearch.providers(),"web_max_excerpts":websearch.max_queries(),
-            "ocr":extract.ocr_available(),"login":auth.public_config(),"ai_detector":aidetect.settings(),"archive":corpus_configured() and auth.enabled(),
+            "ocr":extract.ocr_available(),"fulltext":fulltext.settings()[0],"login":auth.public_config(),"ai_detector":aidetect.settings(),"archive":corpus_configured() and auth.enabled(),
             "payments":{"enabled":payments.enabled(),"mode":payments.mode() if payments.enabled() else ""}}
 
 
@@ -374,7 +376,19 @@ def _secure(request):
 
 @app.get("/privacy", response_class=HTMLResponse)
 def privacy_page():
-    return HTMLResponse(Path(__file__).with_name("privacy.html").read_text("utf-8"))
+    return HTMLResponse(operator_info.privacy_html())
+
+
+@app.get("/api/sample-report")
+def sample_report_json():
+    """The labelled sample report (sample_report.py): fictional document and sources, real matching."""
+    return JSONResponse(sample_report.build(), headers={"Cache-Control": "no-store"})
+
+
+@app.get("/api/support")
+def support_details():
+    """Support and operator details the owner has set (operator_info.py); empty fields are not set yet."""
+    return operator_info.support()
 
 
 @app.get("/login", response_class=HTMLResponse)
@@ -1047,7 +1061,9 @@ async def search_library(result, original, language, owner):
     if result.get("percent") is not None or summary["language_counts"].get(language, 0):
         result["percent"] = _percent(matched, len(q))
         result.pop("not_evaluated_reason", None)
-    return {"searched": True, "size": summary["corpus_size"],
+    return {"searched": True, "size": summary["corpus_size"], "language": language,
+            "language_size": summary["language_counts"].get(language, 0),
+            "collections": (summary.get("collection_counts") or {}).get(language),
             "matched_sources": sum(1 for s in summary["sources"] if s["matched_tokens"])}
 
 

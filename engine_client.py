@@ -99,6 +99,17 @@ def _int(value, low, high):
     return value
 
 
+GROUPS = ("academic", "wikipedia", "deposits")
+
+
+def _collections(raw):
+    """{language: {academic, wikipedia, deposits}} from the engine, validated; {} from older engines."""
+    if not isinstance(raw, dict):
+        return {}
+    return {lang: {g: _int((raw.get(lang) or {}).get(g, 0), 0, 10**9) for g in GROUPS}
+            for lang in LANGUAGES if isinstance(raw.get(lang), dict)}
+
+
 def summarize(report: dict, max_sources=25) -> dict:
     """Recompute overlap from validated spans; never trust engine totals.
 
@@ -207,6 +218,7 @@ def summarize(report: dict, max_sources=25) -> dict:
                 "corpus_size": sum(counts.values()),
                 "intervals": intervals, "exact_intervals": exact, "sources": sources,
                 "language_counts": counts,
+                "collection_counts": _collections(report.get("collection_counts")),
                 "matched_source_count": len(raw_sources),
                 "sources_truncated": len(raw_sources) > max_sources}
     except (ValueError, TypeError, KeyError, AttributeError) as exc:
@@ -350,6 +362,7 @@ async def library():
                             for k, v in (data.get("imports") or {}).items() if isinstance(v, dict)},
                 "by_source": {k: _int(v, 0, 10**9) for k, v in (data.get("by_source") or {}).items()
                               if k in ("wikipedia", "cyberleninka", "zenodo", "journals", "archive", "university", "other")},
+                "collection_counts": _collections(data.get("collection_counts")),
                 "last_import": max(finished) if finished else None,
                 "auto_import": [l for l in data.get("auto_import") or [] if l in LANGUAGES]}
     except (httpx.HTTPError, EngineError, ValueError, TypeError, AttributeError, KeyError):
