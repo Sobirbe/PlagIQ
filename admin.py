@@ -258,7 +258,8 @@ PROBLEMS = {"no_text": "No readable text in the file (even after OCR)", "extract
             "unsupported_type": "Unsupported file type", "doc_protected": "Password-protected Word file",
             "engine_unavailable": "Library engine unreachable", "engine_timeout": "Library engine timed out",
             "engine_busy": "Library engine busy", "internal_error": "PlagIQ error (see Railway logs)",
-            "interrupted": "Cut off by a restart"}
+            "interrupted": "Cut off by a restart",
+            "file_too_complex": "File needed more memory or time to read than allowed (sandbox limit)"}
 
 
 def _issue(code):
