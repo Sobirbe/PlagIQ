@@ -21,6 +21,17 @@ Every mode (own reference, OpenAlex abstracts, private corpus) uses the same cod
 
 Seven-word sequences that occur in 3 or more different texts (journal headers, licence lines, site banners) are treated as boilerplate and not counted. The result is exact-copy evidence with character positions in both texts. Accuracy on real texts: `evaluation/REAL_RESULTS.md`. It does not detect paraphrase, translation or edited copying (measured below).
 
+## Check status (never a silent 0%)
+
+Every finished check has a `status`:
+- `completed_matches` and `completed_no_matches`: every planned source was searched.
+- `incomplete_coverage`: some search queries failed, full-text downloads were cut off by the time limit or a site could not be reached, the PlagIQ library or the web search failed, or nothing comparable was found. The percentage is shown as **"at least X%"**, and `coverage_issues` lists what was missing.
+- `failed_search`: nothing could be compared, so no percentage is given.
+
+Error responses carry `failed_extraction`, `failed_search`, `failed_internal` or `rejected`. Unexpected errors are logged without the document text, and any charge for the check is returned.
+
+The status appears on the result page, in the PDF report and on the certificate. An incomplete check is also flagged in the signed QR link. See `checkstatus.py`.
+
 ## Citation-aware results (optional exclusions)
 
 Every matched word is located by fixed, tested rules (`citations.py`): inside quotation marks («», “”, „“, "") with or without a reference marker within 80 characters ([3], [3, b. 45], (Karimov, 2019), (Иванов, 2018, с. 5)), inside the bibliography (last references heading in UZ Latin/Cyrillic, RU or EN after the first 30% of the text, ending at an appendix heading), or elsewhere. Nothing is excluded by default. Users may exclude quotations, the bibliography and/or matches shorter than 10–30 words; the page and PDF then show the percentage before and after and how many words each exclusion removed. The denominator never changes. The rules do not judge whether a citation is correct or adequate. Results: [evaluation/CITATIONS.md](evaluation/CITATIONS.md).

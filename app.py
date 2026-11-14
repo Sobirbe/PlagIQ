@@ -38,6 +38,8 @@ from engine_client import EngineError, configured as corpus_configured, library 
 import engine_client
 from report_pdf import build_pdf, build_short_pdf
 from security import SecurityMiddleware, MAX_REQUEST
+import checkstatus
+import logging
 
 # The whole request is capped by SecurityMiddleware, so keep uploaded parts in
 # memory instead of letting Starlette spill files over 1 MB to a temp file on disk.
@@ -88,7 +90,19 @@ class ApiError(HTTPException):
 @app.exception_handler(StarletteHTTPException)
 async def http_error(request, exc):
     code = getattr(exc, "code", None) or {404: "not_found", 405: "method_not_allowed"}.get(exc.status_code, "request_failed")
-    return JSONResponse({"detail": exc.detail, "code": code}, exc.status_code, headers=getattr(exc, "headers", None))
+    status = checkstatus.error_status(code, exc.status_code)
+    if status in ("failed_search", "failed_internal"):
+        logging.getLogger("plagiq.check").warning("%s %s: %s", request.url.path, status, code)
+    return JSONResponse({"detail": exc.detail, "code": code, "status": status}, exc.status_code,
+                        headers=getattr(exc, "headers", None))
+
+
+@app.exception_handler(Exception)
+async def internal_error(request, exc):
+    # Logged with the stack trace for the operator; the manuscript text is never part of the message.
+    logging.getLogger("plagiq.check").error("%s failed_internal: %s", request.url.path, type(exc).__name__, exc_info=exc)
+    return JSONResponse({"detail": "PlagIQ could not finish this check because of an internal error. Any charge for it was returned; "
+                                   "try again.", "code": "internal_error", "status": "failed_internal"}, 500)
 
 
 @app.exception_handler(RequestValidationError)
@@ -290,7 +304,8 @@ def verify_page(request: Request, ui: str = ""):
     rows = ""
     if valid:
         when = timefmt.show(f["d"], lang)          # the signed time is UTC; shown in Tashkent time
-        result = t["ne"] if f["p"] == "NE" else f["p"] + "%"
+        result = t["ne"] if f["p"] == "NE" else (checkstatus.texts(lang)["at_least"].format(p=f["p"]) + " — " +
+                                                  checkstatus.texts(lang)["incomplete_coverage"] if f.get("c") == "i" else f["p"] + "%")
         rows = "".join(f"<tr><th>{html.escape(k)}</th><td>{html.escape(v)}</td></tr>" for k, v in (
             (t["rid"], f["r"]), (t["date"], when), (t["hash"], f["h"]), (t["mode"], t["modes"][f["m"]]),
             (t["result"], result), (t["words"], f["w"]), (t["sources"], f["n"]), (t["lang"], f["l"].upper()))
@@ -1002,7 +1017,8 @@ async def analyse(submission, reference, reference_text, language, mode, options
         result["matched_source_count"] = sum(1 for e in result["sources"] if e["matched_tokens"])
         result.update({"mode":"academic","reference":"None","source_count":len(discovery["sources"]),
                        "database_status":discovery["status"],"database_message":discovery["message"],
-                       "queries":discovery["queries"],"search_phrases":discovery.get("query_texts", []),
+                       "queries":discovery["queries"],"failed_queries":discovery.get("failed_queries", 0),
+                       "search_phrases":discovery.get("query_texts", []),
                        "chapters":discovery.get("chapters", 0),"duplicates_merged":discovery.get("duplicates_merged", 0),
                        "self_comparison":False,
                        "scope":"OpenAlex discovery; exact matching against open-access full texts fetched for this check "
@@ -1076,7 +1092,7 @@ async def analyse(submission, reference, reference_text, language, mode, options
                    "date":datetime.now(timezone.utc).isoformat(timespec="seconds"),
                    "quotations_excluded":False, "bibliography_excluded":False,
                    "sha256":hashlib.sha256(original.encode()).hexdigest()})
-    return result
+    return checkstatus.assess(result)
 
 
 MARK_CLASS = {"quotation_cited": "qc", "quotation_uncited": "qu", "bibliography": "bib", "other": "m"}
