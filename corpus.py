@@ -245,6 +245,38 @@ def match_source(q, s, source_text, hits, max_passages=5):
             'matched_chars': sum(e - s for s, e in intervals), 'passage_count': len(passages), 'passages': shown}
 
 
+# Copies of one work (journal version, preprint, repository copy, web mirror; an abstract and its full text)
+# must count once when deciding what is boilerplate: otherwise a passage copied from a widely mirrored paper
+# is in "3 different texts" and is dropped, and verbatim copying scores 0%.
+SAME_WORK_MIN = 20          # shared seven-word windows (about 26 words) ...
+SAME_WORK_SHARE = 0.5       # ... that are at least half of the shorter text
+SAME_WORK_CHECK_MAX = 12    # a sequence in more texts than this is boilerplate without further checks
+
+
+def same_work(a, b):
+    """True when two fingerprint sets are copies of one work (one largely contains the other)."""
+    shared = len(a & b) if len(a) <= len(b) else len(b & a)
+    return shared >= SAME_WORK_MIN and shared >= SAME_WORK_SHARE * min(len(a), len(b))
+
+
+def distinct_works(members, sets):
+    """Number of different works among `members` (keys of `sets`), grouping copies of the same work."""
+    groups = []
+    for m in members:
+        for group in groups:
+            if any(same_work(sets[m], sets[g]) for g in group):
+                group.append(m)
+                break
+        else:
+            groups.append([m])
+    return len(groups)
+
+
+@lru_cache(maxsize=256)
+def _source_fingerprints(identifier, language, text):
+    return frozenset(f for f, _ in windows(_source_lexical(identifier, language, text)))
+
+
 def compare_texts(text, sources, language):
     """In-memory comparison against user-supplied texts (reference, abstracts).
 
@@ -260,11 +292,22 @@ def compare_texts(text, sources, language):
     limit = boilerplate_sources()
     common = set()
     if limit and len(sources) >= limit:
-        counts = {}
-        for ws in source_windows:
+        holders = {}
+        for k, ws in enumerate(source_windows):
             for f in {f for f, _ in ws if f in by_fp}:
-                counts[f] = counts.get(f, 0) + 1
-        common = {f for f, n in counts.items() if n >= limit}
+                holders.setdefault(f, []).append(k)
+        sets = {}
+        for f, members in holders.items():
+            if len(members) < limit:
+                continue
+            if len(members) > SAME_WORK_CHECK_MAX:
+                common.add(f)
+                continue
+            for k in members:
+                if k not in sets:
+                    sets[k] = frozenset(g for g, _ in source_windows[k])
+            if distinct_works(members, sets) >= limit:
+                common.add(f)
     results, covered, union = [], set(), []
     for source_text, s, ws in zip(sources, lexed, source_windows):
         hits = [(i, j) for f, j in ws if f not in common for i in by_fp.get(f, ())]
@@ -308,11 +351,22 @@ def search(db, text, language, max_passages=5, exclude=(), ignore=()):
     q = lexical(text, language)
     hits, seen, common = {}, {}, set()
     limit = boilerplate_sources()
+    sets = {}
+
+    def work_sets(nums):
+        for num in nums:
+            if num not in sets:
+                identifier, raw, source_text = db.execute('SELECT id, metadata, text FROM sources WHERE num=?', (num,)).fetchone()
+                sets[num] = _source_fingerprints(identifier, json.loads(raw)['language'], source_text)
+        return sets
+
     for f, i in windows(q):
         if f not in seen:
             seen[f] = db.execute('SELECT source, token_index FROM windows WHERE fingerprint=?', (f,)).fetchall()
-            if limit and len({num for num, _ in seen[f]}) >= limit:
-                common.add(f)
+            holders = sorted({num for num, _ in seen[f]})
+            if limit and len(holders) >= limit and (len(holders) > SAME_WORK_CHECK_MAX or
+                                                    distinct_works(holders, work_sets(holders)) >= limit):
+                common.add(f)                           # in `limit` different works, not copies of one
         if f in common:
             continue                                    # boilerplate shared by many texts
         for num, j in seen[f]:
@@ -457,7 +511,7 @@ def _insert(db, metadata, text):
 
 
 def boilerplate_sources():
-    """A seven-word sequence found in this many different texts is treated as boilerplate (journal
+    """A seven-word sequence found in this many different works is treated as boilerplate (journal
     headers, licence lines, website banners, Wikipedia navigation boxes) and not counted as a match.
     Measured on real texts in evaluation/REAL_RESULTS.md. 0 turns the filter off."""
     try:
