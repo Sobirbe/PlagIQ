@@ -47,7 +47,8 @@ def make_fetcher():
 def _pdf_text(data):
     if not data.startswith(b"%PDF"):
         raise HarvestError("not a PDF")
-    text = extract.extract_text("work.pdf", data, max_pages=MAX_PAGES)
+    import sandbox
+    text = sandbox.extract_text("work.pdf", data, max_pages=MAX_PAGES)   # downloaded files: read in a limited process
     if len(text.split()) < MIN_WORDS:
         raise HarvestError("PDF has too little text (scanned?)")
     return text

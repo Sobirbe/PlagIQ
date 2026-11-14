@@ -20,7 +20,7 @@ log = logging.getLogger("plagiq.check")
 
 EXTRACTION_CODES = {"empty_file", "unsupported_type", "txt_encoding", "doc_protected", "doc_not_word", "extract_failed",
                     "docx_expanded", "pdf_pages", "no_text", "ocr_too_many_pages", "ocr_timeout", "ocr_busy",
-                    "file_too_large", "text_too_long", "too_short", "reference_too_short", "reference_too_long"}
+                    "file_too_large", "file_too_complex", "text_too_long", "too_short", "reference_too_short", "reference_too_long"}
 SEARCH_CODES = {"engine_unavailable", "engine_busy", "engine_timeout", "engine_not_configured", "engine_error",
                 "provider_unavailable"}
 TRANSIENT_DOWNLOAD = {"timed out", "website not reachable"}

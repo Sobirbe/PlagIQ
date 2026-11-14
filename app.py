@@ -45,6 +45,7 @@ import sqlite3
 import logging
 import progress
 import reports_store
+import sandbox
 import uzcyr
 import templates
 import metrics
@@ -203,7 +204,7 @@ def compare_sources(text, sources, language):
 def extract_text(name, content, info=None):
     """Extract text from bounded bytes (scanned PDF pages by OCR). Runs in a worker thread, not the event loop."""
     try:
-        return extract.extract_text(name, content, ocr=True, info=info)
+        return sandbox.extract_text(name, content, ocr=True, info=info)      # separate, limited process
     except extract.ExtractError as exc:
         raise ApiError(exc.status, exc.code, str(exc))
 

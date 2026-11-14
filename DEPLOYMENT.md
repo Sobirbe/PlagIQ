@@ -493,6 +493,18 @@ PlagIQ also finds copied passages in which words were replaced, inserted or dele
 - **After a restart:** checks that were running are marked "interrupted", and any charge is refunded.
 - **Setting:** `REPORT_HOURS` (1–72, default 24). The privacy page says 24 hours, so change both together.
 
+## Part 3u — Files are read in a separate, limited process
+
+Uploaded files, and PDFs downloaded during academic checks, are opened by a short-lived helper process (`sandbox.py`, `extract_worker.py`) instead of inside the website. If a file exhausts memory, hangs or crashes the PDF/Word/OCR libraries, only the helper dies; the user sees "This file needs more memory or time to read than PlagIQ allows".
+
+**Settings (optional):**
+- `EXTRACT_MEMORY_MB` (768): memory cap per helper. OCR at 300 dpi measured 441 MB; a 500-page PDF 128 MB.
+- `EXTRACT_SECONDS` (60): time limit per file without OCR. OCR files use `OCR_MAX_SECONDS` plus the queue time.
+- `EXTRACT_CONCURRENCY` (2): helpers running at once. OCR stays one job at a time across them.
+- `EXTRACT_SANDBOX=0`: read files in the website process again.
+
+**What it does not get:** helpers receive no secrets (payment, API or engine keys). Each file costs about 0.3 s of extra start-up time.
+
 ## Part 5a — Owner dashboard (/admin)
 
 Website service → **Variables**: add `OWNER_TELEGRAM_IDS` = your Telegram user ID (get it from @userinfobot; separate several IDs with commas). Sign in with Telegram, then open `https://<your site>/admin`. Anyone else gets "Not found".
