@@ -80,6 +80,7 @@ def test_engine_collection_counts_are_validated():
 
 
 def test_error_messages_tell_mistakes_from_failures():
+    pytest.importorskip("playwright", reason="browser tests run in the CI 'browser' job")
     from pathlib import Path
     from playwright.sync_api import sync_playwright
     with sync_playwright() as p:

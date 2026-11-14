@@ -46,6 +46,7 @@ def strings(value):
 
 @pytest.fixture(scope="module")
 def page_tables():
+    pytest.importorskip("playwright", reason="browser tests run in the CI 'browser' job")
     from playwright.sync_api import sync_playwright
     with sync_playwright() as p:
         browser = p.chromium.launch()

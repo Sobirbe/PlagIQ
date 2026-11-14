@@ -493,6 +493,28 @@ PlagIQ also finds copied passages in which words were replaced, inserted or dele
 - **After a restart:** checks that were running are marked "interrupted", and any charge is refunded.
 - **Setting:** `REPORT_HOURS` (1–72, default 24). The privacy page says 24 hours, so change both together.
 
+## Part 3v — Email confirmation and password recovery (off until you add a mail server)
+
+Email accounts can confirm their address and recover a forgotten password by email. **Nothing is sent until you set a mail server** on the website service:
+- `SMTP_HOST`, `SMTP_PORT` (587), `SMTP_USER`, `SMTP_PASSWORD` (secret), `SMTP_FROM` (for example `PlagIQ <no-reply@your-domain>`);
+- `SMTP_SECURITY`: `starttls` (default), `ssl` or `none`.
+
+Use a transactional mail service or your domain's mailbox. A personal Gmail account is not suitable for sending to users.
+
+**Once it is set:**
+- **Confirmation:** new email accounts get a confirmation link (48 hours). The account menu shows "Confirm your email" with a resend button.
+- **Forgot password?** in the sign-in menu sends a single-use link (1 hour). The answer is the same whether or not the address has an account.
+- **Limits:** 3 emails per address per hour, 20 per network address.
+- **After a reset:** every earlier sign-in of that account ends.
+- `EMAIL_VERIFY_REQUIRED=1` makes sign-in wait for a confirmed address. The default is off, as decided earlier: accounts work at once and confirmation is offered.
+
+**Without a mail server:** "Forgot password?" says recovery by email is not available yet and points to support (Part 3w). Telegram sign-in is unchanged.
+
+## Part 3w — Privacy notice, support contact and sample report
+
+- **Privacy notice and support line:** filled from your settings. `docs/LEGAL-CHECKLIST.md` lists `OPERATOR_NAME`, `OPERATOR_ADDRESS`, `SUPPORT_EMAIL`, `SUPPORT_TELEGRAM`, `SUPPORT_HOURS`, `PRIVACY_UPDATED` and `PRIVACY_DATA_LOCATION_UZ/_RU/_EN`, plus `PRIVACY_REVIEWED=1` after counsel's review. Until they are set, the page shows "to be completed by the operator". `/admin` lists what is missing.
+- **Sample report:** the home page's "See a sample report" is a labelled example computed by the real matcher on fictional texts. It needs no settings.
+
 ## Part 5a — Owner dashboard (/admin)
 
 Website service → **Variables**: add `OWNER_TELEGRAM_IDS` = your Telegram user ID (get it from @userinfobot; separate several IDs with commas). Sign in with Telegram, then open `https://<your site>/admin`. Anyone else gets "Not found".
