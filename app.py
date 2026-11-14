@@ -123,7 +123,8 @@ def tokens(value, language):
     return corpus.tokens(value, language)
 
 
-METHOD = "Exact seven-word matching after normalization (verified word by word)"
+METHOD = ("Exact seven-word matching after normalization (verified word by word), and edited copies "
+          "(words replaced, inserted or deleted; verified by word alignment)")
 
 
 def _percent(matched, total):
@@ -132,7 +133,7 @@ def _percent(matched, total):
 
 def _source_entry(evidence, **fields):
     evidence = evidence or {}
-    return {**fields, "matched_tokens": evidence.get("matched_words", 0),
+    return {**fields, "matched_tokens": evidence.get("matched_words", 0), "edited_tokens": evidence.get("edited_words", 0),
             "matched_chars": evidence.get("matched_chars", 0),
             "passage_count": evidence.get("passage_count", 0), "passages": evidence.get("passages", []),
             "spans": [list(i) for i in evidence.get("intervals", [])][:2000]}
@@ -150,6 +151,7 @@ def compare(text, source, language):
     result, intervals = _measure(q, covered, intervals)
     result.update({"language": language, "method": METHOD, "ai_detection": "Not performed",
                    "total_chars": len(text), "intervals": intervals,
+                   "exact_intervals": (evidence or {}).get("exact_intervals", []),
                    "passages": (evidence or {}).get("passages", []), "evidence": evidence})
     return result
 
@@ -167,6 +169,7 @@ def compare_sources(text, sources, language):
                for s, e in zip(sources, evidence)]
     result.update({"language": language, "method": METHOD + " against open-access full texts and abstracts",
                    "total_chars": len(text), "intervals": intervals, "sources": entries,
+                   "exact_intervals": corpus.merge([list(i) for e in evidence if e for i in e["exact_intervals"]]),
                    "ai_detection": "Not performed"})
     return result
 
@@ -919,6 +922,8 @@ async def search_library(result, original, language, owner):
         mark_own(source, owner)
     result["sources"] = summary["sources"] + result["sources"]
     intervals = corpus.merge([list(i) for i in result.get("intervals", [])] + [list(i) for i in summary["intervals"]])
+    result["exact_intervals"] = corpus.merge([list(i) for i in result.get("exact_intervals", [])]
+                                             + [list(i) for i in summary.get("exact_intervals", summary["intervals"])])
     q = corpus.lexical(original, language)
     matched = corpus.words_in_intervals(q, intervals)
     result.update(intervals=intervals, matched_tokens=matched, matched_chars=sum(e - s for s, e in intervals))
@@ -1068,10 +1073,16 @@ async def analyse(submission, reference, reference_text, language, mode, options
             "language_counts":summary["language_counts"],
             "sources_truncated":summary["sources_truncated"],
             "intervals":summary["intervals"] if evaluated else [],
+            "exact_intervals":summary.get("exact_intervals", summary["intervals"]) if evaluated else [],
         }
     if detected and detected != chosen:
         result["language_note"] = {"selected": chosen, "detected": detected}
     intervals = result.pop("intervals", [])
+    exact_intervals = result.pop("exact_intervals", intervals)
+    if result.get("percent") is not None:
+        # Matched words found only as edited copying (words replaced, inserted or deleted), reported separately.
+        lex = corpus.lexical(original, language)
+        result["edited_tokens"] = max(0, corpus.words_in_intervals(lex, intervals) - corpus.words_in_intervals(lex, exact_intervals))
     result["highlight_html"] = ""
     if result.get("percent") is not None:
         review = await run_in_threadpool(citations.assess, original, language, intervals, **(options or {}))

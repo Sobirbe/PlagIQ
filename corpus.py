@@ -4,6 +4,7 @@ One matching algorithm is used for every PlagIQ mode (own reference, OpenAlex
 abstracts, private corpus). Never downloads source URLs or indexes queries.
 """
 import argparse
+import difflib
 import hashlib
 import json
 import os
@@ -78,12 +79,16 @@ def tokens(text, language):
 SOURCES_SQL = ('CREATE TABLE IF NOT EXISTS sources (num INTEGER PRIMARY KEY, id TEXT UNIQUE NOT NULL, '
                'metadata TEXT NOT NULL, text TEXT NOT NULL)')
 
+SEEDS_SQL = ('CREATE TABLE IF NOT EXISTS seeds (gram INTEGER NOT NULL, source INTEGER NOT NULL, '
+             'PRIMARY KEY (gram, source)) WITHOUT ROWID')
+
 
 def connect(path=None):
     db = sqlite3.connect(path or os.environ.get('CORPUS_DB', 'corpus.sqlite3'), timeout=60)
     # WAL lets searches read while a background import writes.
     db.execute('PRAGMA journal_mode=WAL')
     db.execute(SOURCES_SQL)
+    db.execute(SEEDS_SQL)
     if db.execute('PRAGMA user_version').fetchone()[0] < NORMALIZATION_VERSION:
         reindex(db)
     return db
@@ -97,6 +102,7 @@ def reindex(db):
     """
     with db:
         db.execute('DROP TABLE IF EXISTS windows')
+        db.execute('DELETE FROM seeds')
         if 'num' not in [row[1] for row in db.execute('PRAGMA table_info(sources)')]:  # v0.4 layout
             db.execute('ALTER TABLE sources RENAME TO sources_v04')
             db.execute(SOURCES_SQL)
@@ -110,8 +116,39 @@ def reindex(db):
 
 
 def _store_windows(db, num, text, language):
-    db.executemany('INSERT OR IGNORE INTO windows VALUES (?,?,?)',
-                   ((f, num, i) for f, i in windows(lexical(text, language))))
+    words = lexical(text, language)
+    db.executemany('INSERT OR IGNORE INTO windows VALUES (?,?,?)', ((f, num, i) for f, i in windows(words)))
+    _store_seeds(db, num, words)
+
+
+def _store_seeds(db, num, words):
+    """1 in SEED_SAMPLE three-word phrases (chosen by hash, so the manuscript samples the same ones): used only to
+    find library texts that may contain an edited copy; every candidate is then verified against its full text."""
+    db.executemany('INSERT OR IGNORE INTO seeds VALUES (?,?)',
+                   ((f, num) for f in {f for f, _ in grams(words) if f % SEED_SAMPLE == 0}))
+
+
+def seeds_upgrade(db, batch=50):
+    """Add edited-copy seeds for texts indexed before seeds existed, `batch` texts per call, in source order.
+    Returns how many texts still need them. Texts imported meanwhile get seeds at import."""
+    db.execute('CREATE TABLE IF NOT EXISTS corpus_meta (key TEXT PRIMARY KEY, value TEXT)')
+    if db.execute("SELECT 1 FROM corpus_meta WHERE key='seeds_indexed'").fetchone():
+        return 0
+    row = db.execute("SELECT value FROM corpus_meta WHERE key='seeds_upto'").fetchone()
+    upto = int(row[0]) if row else 0
+    chosen = db.execute('SELECT num, metadata, text FROM sources WHERE num > ? ORDER BY num LIMIT ?', (upto, batch)).fetchall()
+    with db:
+        for num, raw, text in chosen:
+            _store_seeds(db, num, lexical(text, json.loads(raw)['language']))
+        if chosen:
+            db.execute("INSERT OR REPLACE INTO corpus_meta VALUES ('seeds_upto', ?)", (str(chosen[-1][0]),))
+    remaining = db.execute('SELECT COUNT(*) FROM sources WHERE num > ?', (chosen[-1][0] if chosen else upto,)).fetchone()[0]
+    if not remaining:
+        with db:
+            db.execute("DELETE FROM corpus_meta WHERE key='seeds_upto'")
+            db.execute("INSERT OR REPLACE INTO corpus_meta VALUES ('seeds_indexed', ?)",
+                       (datetime.now(timezone.utc).isoformat(timespec='seconds'),))
+    return remaining
 
 
 LIGATURE_CHARS = "\ufb00\ufb01\ufb02\ufb03\ufb04\ufb05\ufb06"
@@ -155,6 +192,7 @@ def remove(db, identifier):
     if not row:
         return False
     db.execute('DELETE FROM windows WHERE source=?', (row[0],))
+    db.execute('DELETE FROM seeds WHERE source=?', (row[0],))
     db.execute('DELETE FROM sources WHERE num=?', (row[0],))
     return True
 
@@ -226,23 +264,98 @@ def _excerpt(text, start, end):
     return excerpt[:EXCERPT_LIMIT] + ('…' if len(excerpt) > EXCERPT_LIMIT else '')
 
 
-def match_source(q, s, source_text, hits, max_passages=5):
-    """Evidence for one source: verified passages and covered manuscript words."""
-    runs = _chains(q, s, hits)
-    if not runs:
+def match_source(q, s, source_text, hits, max_passages=5, blocked=frozenset(), edited=True):
+    """Evidence for one source: verified passages and covered manuscript words.
+    Exact passages (seven or more identical words) and, unless edited=False, edited passages (copied text with
+    words replaced, inserted or deleted, verified by alignment; see edited_runs). Each passage has a 'type'."""
+    runs = _chains(q, s, hits) if hits else []
+    passages = [{'type': 'exact', 'query_start': q[i0][1], 'query_end': q[i0+n-1][2], 'source_start': s[j0][1],
+                 'source_end': s[j0+n-1][2], 'words': n, '_q': (i0, i0 + n)} for i0, j0, n in runs]
+    exact_covered = {k for p in passages for k in range(*p['_q'])}
+    if edited:
+        for a, b, j0, j1, similarity in edited_runs(q, s, blocked):
+            if sum(1 for k in range(a, b) if k in exact_covered) >= 0.9 * (b - a):
+                continue                                # already an exact passage
+            passages.append({'type': 'edited', 'query_start': q[a][1], 'query_end': q[b-1][2], 'source_start': s[j0][1],
+                             'source_end': s[j1-1][2], 'words': b - a, 'similarity': similarity, '_q': (a, b)})
+    if not passages:
         return None
-    covered = set()
-    passages = []
-    for i0, j0, n in runs:
-        covered.update(range(i0, i0 + n))
-        passages.append({'query_start': q[i0][1], 'query_end': q[i0+n-1][2],
-                         'source_start': s[j0][1], 'source_end': s[j0+n-1][2], 'words': n})
+    covered = {k for p in passages for k in range(*p.pop('_q'))}
+    edited_words = len(covered - exact_covered)
     intervals = merge([[p['query_start'], p['query_end']] for p in passages])
+    exact_intervals = merge([[p['query_start'], p['query_end']] for p in passages if p['type'] == 'exact'])
     shown = sorted(sorted(passages, key=lambda p: -p['words'])[:max_passages], key=lambda p: p['query_start'])
     for passage in shown:
         passage['source_excerpt'] = _excerpt(source_text, passage['source_start'], passage['source_end'])
-    return {'covered': covered, 'intervals': intervals, 'matched_words': len(covered),
+    return {'covered': covered, 'intervals': intervals, 'exact_intervals': exact_intervals,
+            'matched_words': len(covered), 'edited_words': edited_words,
             'matched_chars': sum(e - s for s, e in intervals), 'passage_count': len(passages), 'passages': shown}
+
+
+# ------------------------------------------------- edited copying (near-duplicate passages)
+# Copied text with words replaced, inserted or deleted keeps short runs of identical words. Three-word phrases
+# shared by the manuscript and one source are anchors; anchors that follow one another along roughly the same
+# alignment are joined, and the region is verified by aligning the two passages word by word. A region counts
+# only when it is long, mostly identical and not journal template text. Measured on real texts in
+# evaluation/EDITED.md (choice of these values: evaluation/EDITED.md, "settings compared").
+GRAM = 3
+EDITED_MIN_ANCHORS = 4        # anchors in one region
+EDITED_GAP = 8                # most words between consecutive anchors
+EDITED_SHIFT = 3              # most inserted/deleted words between consecutive anchors
+EDITED_MIN_WORDS = 20         # region length in manuscript words
+EDITED_MIN_SAME = 14          # identical words in the aligned region ...
+EDITED_MIN_SHARE = 0.6        # ... and at least this share of the region
+EDITED_MAX_BLOCKED = 0.2      # most of a region may not be boilerplate (journal headers, licence lines)
+SEED_SAMPLE = 4               # library index keeps 1 in 4 three-word phrases (by hash), for finding candidates
+SEED_MAX_SOURCES = 20         # a sampled phrase in more library texts than this is too common to find candidates
+
+
+def grams(words):
+    """(fingerprint, first-token index) of every three-word phrase."""
+    strings = [w[0] for w in words]
+    return [(fingerprint(strings[i:i+GRAM]), i) for i in range(max(0, len(words)-GRAM+1))]
+
+
+def edited_runs(q, s, blocked=frozenset()):
+    """Verified edited-copy regions of manuscript q in source s: (q_start, q_end, s_start, s_end, similarity),
+    token indices end-exclusive. `blocked`: manuscript tokens inside boilerplate (never counted)."""
+    if len(q) < EDITED_MIN_WORDS or len(s) < GRAM:
+        return []
+    qw, sw = [w[0] for w in q], [w[0] for w in s]
+    positions = {}
+    for j in range(len(sw) - GRAM + 1):
+        positions.setdefault(tuple(sw[j:j+GRAM]), []).append(j)
+    hits = sorted((i, j) for i in range(len(qw) - GRAM + 1) for j in positions.get(tuple(qw[i:i+GRAM]), ())[:20])
+    if len(hits) < EDITED_MIN_ANCHORS:
+        return []
+    chains = []
+    for i, j in hits:
+        for chain in reversed(chains[-12:]):
+            li, lj = chain[-1]
+            if 0 < i - li <= EDITED_GAP and abs((j - i) - (lj - li)) <= EDITED_SHIFT:
+                chain.append((i, j))
+                break
+        else:
+            chains.append([(i, j)])
+    found = []
+    for chain in chains:
+        if len(chain) < EDITED_MIN_ANCHORS:
+            continue
+        i0, i1, j0, j1 = chain[0][0], chain[-1][0] + GRAM, chain[0][1], chain[-1][1] + GRAM
+        if i1 - i0 < EDITED_MIN_WORDS:
+            continue
+        blocks = [b for b in difflib.SequenceMatcher(None, qw[i0:i1], sw[j0:j1], autojunk=False).get_matching_blocks() if b.size]
+        same = sum(b.size for b in blocks)
+        if not blocks or same < EDITED_MIN_SAME or same < EDITED_MIN_SHARE * (i1 - i0):
+            continue
+        a, b = i0 + blocks[0].a, i0 + blocks[-1].a + blocks[-1].size
+        sa, sb = j0 + blocks[0].b, j0 + blocks[-1].b + blocks[-1].size
+        if b - a < EDITED_MIN_WORDS or sum(1 for k in range(a, b) if k in blocked) > EDITED_MAX_BLOCKED * (b - a):
+            continue
+        if not _has_words(qw[a:b]):
+            continue
+        found.append((a, b, sa, sb, round(same / (b - a), 2)))
+    return found
 
 
 # Copies of one work (journal version, preprint, repository copy, web mirror; an abstract and its full text)
@@ -308,10 +421,13 @@ def compare_texts(text, sources, language):
                     sets[k] = frozenset(g for g, _ in source_windows[k])
             if distinct_works(members, sets) >= limit:
                 common.add(f)
+    blocked = {k for f in common for i in by_fp[f] for k in range(i, i + WINDOW)}
+    blocked |= _shared_edits(q, [(k, s) for k, s in enumerate(lexed) if s], blocked, limit,
+                             lambda k: frozenset(g for g, _ in source_windows[k]))
     results, covered, union = [], set(), []
     for source_text, s, ws in zip(sources, lexed, source_windows):
         hits = [(i, j) for f, j in ws if f not in common for i in by_fp.get(f, ())]
-        evidence = match_source(q, s, source_text, hits) if hits else None
+        evidence = match_source(q, s, source_text, hits, blocked=blocked) if s else None
         if evidence:
             covered |= evidence['covered']
             union.extend(evidence['intervals'])
@@ -373,18 +489,31 @@ def search(db, text, language, max_passages=5, exclude=(), ignore=()):
             if ignore and num in ignore:
                 continue
             hits.setdefault(num, []).append((i, j))
-    sources, union = [], []
-    for num, pairs in hits.items():
+    blocked = {k for f, i in windows(q) if f in common for k in range(i, i + WINDOW)}
+    candidates = dict.fromkeys(hits)                    # texts with exact matches, then edited-copy candidates
+    for num in _seed_candidates(db, q, ignore):
+        candidates.setdefault(num, None)
+    texts = {}
+    for num in candidates:
+        identifier, raw, source_text = db.execute('SELECT id, metadata, text FROM sources WHERE num=?', (num,)).fetchone()
+        if json.loads(raw)['language'] == language:
+            texts[num] = _source_lexical(identifier, language, source_text)
+    blocked |= _shared_edits(q, list(texts.items()), blocked, limit, lambda num: work_sets([num])[num])
+    sources, union, exact_union = [], [], []
+    for num in candidates:
+        pairs = hits.get(num, [])
         identifier, raw, source_text = db.execute('SELECT id, metadata, text FROM sources WHERE num=?', (num,)).fetchone()
         metadata = json.loads(raw)
         if metadata['language'] != language:
             continue
         if identifier in exclude and metadata.get('rights_basis') in DEPOSITS:
             continue                                    # the same deposited document, checked again
-        evidence = match_source(q, _source_lexical(identifier, language, source_text), source_text, pairs, max_passages)
+        evidence = match_source(q, _source_lexical(identifier, language, source_text), source_text, pairs, max_passages,
+                                blocked=blocked)
         if not evidence:
             continue
         union.extend(evidence['intervals'])
+        exact_union.extend(evidence['exact_intervals'])
         public = {k: metadata.get(k) for k in ('title', 'authors', 'year', 'url', 'language', 'rights_basis', 'sha256')}
         if metadata.get('rights_basis') in DEPOSITS:
             # Unpublished deposit: other users see title, author and year, never its text.
@@ -393,15 +522,58 @@ def search(db, text, language, max_passages=5, exclude=(), ignore=()):
             public.update(url='', owner=metadata.get('owner', ''), collection=metadata.get('collection', ''))
         sources.append({**public, 'source_filename': metadata['title'], 'source_url': metadata['url'],
                         'matched_chars': evidence['matched_chars'], 'matched_words': evidence['matched_words'],
+                        'edited_words': evidence['edited_words'],
                         'passage_count': evidence['passage_count'], 'passages': evidence['passages']})
     counts = {lang: 0 for lang in LANGUAGES}
     for (raw,) in db.execute('SELECT metadata FROM sources'):
         counts[json.loads(raw)['language']] += 1
-    return {'query_text_length': len(text), 'unique_passages': merge(union), 'boilerplate_windows': len(common),
+    return {'query_text_length': len(text), 'unique_passages': merge(union), 'exact_passages': merge(exact_union),
+            'boilerplate_windows': len(common),
             'sources': sorted(sources, key=lambda s: (-s['matched_words'], s['title'])),
             'corpus_sources': sum(counts.values()), 'language_counts': counts,
             'corpus_version': corpus_version(db),
-            'coverage': f"Indexed full text only: uz={counts['uz']}, ru={counts['ru']}, en={counts['en']}. Exact seven-word matches; no translation or paraphrase detection."}
+            'coverage': f"Indexed full text only: uz={counts['uz']}, ru={counts['ru']}, en={counts['en']}. Exact seven-word matches and edited copies (words replaced, inserted or deleted); no translation or paraphrase detection."}
+
+
+EDITED_CANDIDATES = 30
+
+
+def _shared_edits(q, sources, blocked, limit, fingerprints):
+    """Manuscript tokens inside edited-copy regions found in `limit` or more different works: edited boilerplate
+    (a reworded licence or template line printed in many papers) is not counted, as for exact matches.
+    `sources`: (key, tokens); `fingerprints(key)`: the work's fingerprint set, to group copies of one work."""
+    if not limit or len(sources) < limit:
+        return set()
+    holders = {}
+    for key, s in sources:
+        for a, b, *_ in edited_runs(q, s, blocked):
+            for k in range(a, b):
+                holders.setdefault(k, set()).add(key)
+    shared, decided = set(), {}
+    for k, keys in holders.items():
+        if len(keys) < limit:
+            continue
+        group = tuple(sorted(keys))
+        if group not in decided:
+            decided[group] = len(group) > SAME_WORK_CHECK_MAX or distinct_works(
+                list(group), {key: fingerprints(key) for key in group}) >= limit
+        if decided[group]:
+            shared.add(k)
+    return shared
+
+
+def _seed_candidates(db, q, ignore=()):
+    """Library texts sharing at least 2 sampled three-word phrases with the manuscript (most shared first)."""
+    counts = {}
+    for f in {f for f, _ in grams(q) if f % SEED_SAMPLE == 0}:
+        holders = db.execute('SELECT source FROM seeds WHERE gram=? LIMIT ?', (f, SEED_MAX_SOURCES + 1)).fetchall()
+        if len(holders) > SEED_MAX_SOURCES:
+            continue                                    # a common phrase: says nothing about copying
+        for (num,) in holders:
+            if num not in ignore:
+                counts[num] = counts.get(num, 0) + 1
+    ranked = sorted((n for n, c in counts.items() if c >= 2), key=lambda n: -counts[n])
+    return ranked[:EDITED_CANDIDATES]
 
 
 # ------------------------------------------------------------------ import
@@ -786,6 +958,7 @@ def prune_collection(db, collection, keep_per_language, dry_run=True, chunk=100)
             marks = ','.join('?' * len(part))
             with db:
                 db.execute(f'DELETE FROM windows WHERE source IN ({marks})', part)
+                db.execute(f'DELETE FROM seeds WHERE source IN ({marks})', part)
                 db.execute(f'DELETE FROM sources WHERE num IN ({marks})', part)
             db.execute('PRAGMA wal_checkpoint(TRUNCATE)')
     return {**plan, 'removed': removed}

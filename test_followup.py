@@ -213,7 +213,7 @@ def test_summary_sanitizes_untrusted_fields():
     report['language_counts']['zz'] = 5
     src = engine_client.summarize(report)['sources'][0]
     assert src['year'] is None and len(src['authors']) == 300 and src['rights_basis'] == 'unknown'
-    assert 'extra' not in src and set(src['passages'][0]) == {'query_start', 'query_end', 'source_start', 'source_end', 'source_excerpt', 'words'}
+    assert 'extra' not in src and set(src['passages'][0]) == {'query_start', 'query_end', 'source_start', 'source_end', 'source_excerpt', 'words', 'type'}
     assert engine_client.summarize(report)['language_counts'] == {'uz': 0, 'ru': 0, 'en': 1}
 
 
@@ -221,6 +221,9 @@ def test_summary_sanitizes_untrusted_fields():
     lambda r: r.update(sources={'not': 'a list'}),
     lambda r: r['sources'][0].update(matched_chars=21),
     lambda r: r['sources'][0].update(passages=[{'query_start': 5, 'query_end': 2, 'source_start': 0, 'source_end': 1}]),
+    lambda r: r['sources'][0].update(passages=[{'query_start': 0, 'query_end': 2, 'source_start': 0, 'source_end': 1, 'type': 'semantic'}]),
+    lambda r: r['sources'][0].update(passages=[{'query_start': 0, 'query_end': 2, 'source_start': 0, 'source_end': 1, 'type': 'edited', 'similarity': 7}]),
+    lambda r: r.update(exact_passages=[[5, 2]]),
     lambda r: r.update(corpus_sources=7),
     lambda r: r.update(query_text_length=True),
 ])

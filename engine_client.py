@@ -120,6 +120,14 @@ def summarize(report: dict, max_sources=25) -> dict:
                 raise ValueError()
         intervals = merge(intervals)
         matched = sum(e-s for s, e in intervals)
+        exact = report.get("exact_passages", intervals)       # older engines: every match is exact
+        if not isinstance(exact, list) or len(exact) > 1_200_000:
+            raise ValueError()
+        for pair in exact:
+            if (not isinstance(pair, (list, tuple)) or len(pair) != 2 or any(type(x) is not int for x in pair)
+                    or not 0 <= pair[0] < pair[1] <= document_length):
+                raise ValueError()
+        exact = merge(exact)
         raw_counts = report.get('language_counts', {})
         if not isinstance(raw_counts, dict):
             raise ValueError()
@@ -146,8 +154,14 @@ def summarize(report: dict, max_sources=25) -> dict:
                     not 0 <= passage['query_start'] < passage['query_end'] <= document_length or
                     not 0 <= passage['source_start'] < passage['source_end']):
                     raise ValueError()
+                kind = passage.get('type', 'exact')
+                similarity = passage.get('similarity')
+                if kind not in ('exact', 'edited') or (kind == 'edited' and not (
+                        type(similarity) in (int, float) and 0 < similarity <= 1)):
+                    raise ValueError()
                 passages.append({k: passage[k] for k in ('query_start','query_end','source_start','source_end')}
-                                | {'source_excerpt': str(passage.get('source_excerpt', ''))[:501]})
+                                | {'source_excerpt': str(passage.get('source_excerpt', ''))[:501], 'type': kind}
+                                | ({'similarity': round(float(similarity), 2)} if kind == 'edited' else {}))
             matched_words = src.get("matched_words", 0)
             if type(matched_words) is not int or not 0 <= matched_words <= document_length:
                 raise ValueError()
@@ -164,6 +178,7 @@ def summarize(report: dict, max_sources=25) -> dict:
                 "collection": str(src.get("collection") or "")[:120] if src.get("rights_basis") == "institution_deposit" else "",
                 "matched_chars": matched_chars,
                 "matched_tokens": matched_words,
+                "edited_tokens": _int(src.get("edited_words", 0), 0, matched_words),
                 "authors": str(src.get("authors") or "")[:300],
                 "year": year if type(year) is int and 1000 <= year <= 2200 else None,
                 "language": src.get("language") if src.get("language") in LANGUAGES else None,
@@ -180,7 +195,7 @@ def summarize(report: dict, max_sources=25) -> dict:
                 "matched_chars": matched, "total_chars": document_length,
                 "coverage": str(report.get("coverage") or "unknown")[:500],
                 "corpus_size": sum(counts.values()),
-                "intervals": intervals, "sources": sources,
+                "intervals": intervals, "exact_intervals": exact, "sources": sources,
                 "language_counts": counts,
                 "matched_source_count": len(raw_sources),
                 "sources_truncated": len(raw_sources) > max_sources}

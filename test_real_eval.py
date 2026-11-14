@@ -22,7 +22,8 @@ def test_runs_and_finds_unchanged_copies(tmp_path):
     assert held == {"uz": 4} and size["uz"] == 8
     exact = results[("uz", "exact")]
     assert len(exact) == 6 and all(r["recall"] > 0.9 and r["right_source"] for r in exact)
-    assert all(r["recall"] < 0.5 for r in results[("uz", "heavy_edit")])
+    heavy = results[("uz", "heavy_edit")]          # one word in 4 replaced: found as edited copying, nothing else marked
+    assert all(r["recall"] > 0.9 and r["false"] == 0 for r in heavy)
     assert real_eval.uz_cyrillic_to_latin(real_eval.uz_latin_to_cyrillic("O‘zbekiston maktab")) == "O‘zbekiston maktab"
     text = real_eval.markdown(results, cases, whole, size, held, 3, 1.0)
     assert "| uz | copied unchanged | 6 |" in text

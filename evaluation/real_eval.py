@@ -37,7 +37,8 @@ sys.path.insert(0, str(ROOT))
 import corpus  # noqa: E402
 from extract import extract_text  # noqa: E402
 
-TRANSFORMS = ["exact", "reformatted", "script_switch", "lookalike_letters", "light_edit", "heavy_edit", "reordered"]
+TRANSFORMS = ["exact", "reformatted", "script_switch", "lookalike_letters", "light_edit", "heavy_edit", "inserted",
+              "deleted", "third_edit", "reordered"]
 DESCRIPTION = {
     "exact": "copied unchanged",
     "reformatted": "letter case, punctuation, spacing and line breaks changed",
@@ -45,6 +46,9 @@ DESCRIPTION = {
     "lookalike_letters": "a third of a/e/o/p/c/x/y letters swapped for the other alphabet's look-alikes",
     "light_edit": "one word in 12 replaced",
     "heavy_edit": "one word in 4 replaced",
+    "inserted": "a word inserted after every 5th word",
+    "deleted": "every 5th word deleted",
+    "third_edit": "one word in 3 replaced (beyond edited-copy detection)",
     "reordered": "sentences in a different order",
 }
 LENGTHS = (40, 80, 150)
@@ -107,6 +111,12 @@ def transform(name, passage, language, rng, replacement_words):
     if name in ("light_edit", "heavy_edit"):
         step = 12 if name == "light_edit" else 4
         return " ".join(rng.choice(replacement_words) if i % step == step - 1 else w for i, w in enumerate(words))
+    if name == "inserted":
+        return " ".join(w + (" " + rng.choice(replacement_words) if i % 5 == 4 else "") for i, w in enumerate(words))
+    if name == "deleted":
+        return " ".join(w for i, w in enumerate(words) if i % 5 != 4)
+    if name == "third_edit":
+        return " ".join(rng.choice(replacement_words) if i % 3 == 2 else w for i, w in enumerate(words))
     if name == "reordered":
         sentences = [s for s in re.split(r"(?<=[.!?])\s+", passage) if s]
         if len(sentences) < 2:

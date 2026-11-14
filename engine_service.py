@@ -112,26 +112,33 @@ def import_loop():
                                         {"error": type(exc).__name__ + ": " + str(exc)[:200]})
         import_stop.wait(hours * 3600)
 
-def ligature_upgrade_loop():
-    """Once: re-fingerprint stored texts containing ligatures (ﬁ, ﬂ ...), a batch at a time under the
-    search lock, so searches keep working (they only wait for one short batch)."""
-    while not import_stop.is_set():
-        try:
-            if not lock.acquire(timeout=queue_seconds()):
-                continue
+UPGRADES = (("ligature upgrade", corpus.ligature_upgrade, "all stored texts use expanded ligatures"),
+            ("edited-copy index", corpus.seeds_upgrade, "every stored text can be found for edited copying"))
+
+
+def index_upgrade_loop():
+    """Once, after start-up: bring texts indexed by an older version up to date, a batch at a time under the
+    search lock, so searches keep working (they only wait for one short batch). Ligatures (ﬁ, ﬂ ...) are
+    re-fingerprinted first, then the edited-copy seeds are added. Until the seeds are complete, edited copies
+    are found only in texts that already have them; exact matching is unaffected."""
+    for name, step, done in UPGRADES:
+        while not import_stop.is_set():
             try:
-                with closing(connect()) as db:
-                    remaining = corpus.ligature_upgrade(db)
-            finally:
-                lock.release()
-        except Exception as exc:                     # never stop the engine for this
-            log.warning("ligature upgrade failed: %s: %s", type(exc).__name__, str(exc)[:300])
-            return
-        if not remaining:
-            log.warning("ligature upgrade: all stored texts use expanded ligatures")
-            return
-        log.warning("ligature upgrade: %s texts left", remaining)
-        import_stop.wait(1)
+                if not lock.acquire(timeout=queue_seconds()):
+                    continue
+                try:
+                    with closing(connect()) as db:
+                        remaining = step(db)
+                finally:
+                    lock.release()
+            except Exception as exc:                 # never stop the engine for this
+                log.warning("%s failed: %s: %s", name, type(exc).__name__, str(exc)[:300])
+                break
+            if not remaining:
+                log.warning("%s: %s", name, done)
+                break
+            log.warning("%s: %s texts left", name, remaining)
+            import_stop.wait(1)
 
 
 @asynccontextmanager
@@ -161,7 +168,7 @@ async def lifespan(app):
         connect().close()                                # run any index upgrade before serving or importing
     except Exception as exc:
         log.warning("startup database check failed: %s: %s", type(exc).__name__, str(exc)[:300])
-    threading.Thread(target=ligature_upgrade_loop, name="ligature-upgrade", daemon=True).start()
+    threading.Thread(target=index_upgrade_loop, name="index-upgrade", daemon=True).start()
     worker = None
     if (import_job.settings()[0] or wikipedia_import.settings()[0] or cyberleninka.settings()[0]
             or uz_journals.settings()[0]):
