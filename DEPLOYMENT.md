@@ -485,6 +485,16 @@ Website service → **Variables**: add `OWNER_TELEGRAM_IDS` = your Telegram user
 The dashboard shows:
 - **Setup checklist:** each feature as ✅ on, ❌ missing (with the exact setting and DEPLOYMENT section), or ➖ optional.
 - **Library:** counts by source, the engine's disk use (a red warning above two thirds full) and every automatic import's last run and problem.
+- **Monitoring** (last 24 hours, 7 days and 30 days):
+  - how checks ended: completed, incomplete, or failed and why;
+  - the most common problems, by cause;
+  - time per check (median, 95% and slowest) for each mode;
+  - outside services: OpenAlex failures, full texts compared or cut off, library unreachable, web-search errors;
+  - OCR pages, edited copying found, AI-detector use with an estimated Pangram cost, amount charged;
+  - checks per day for 14 days;
+  - website storage: databases, stored reports and free space on `/data`.
+
+  A red line appears when more than 20% of the last day's checks (at least 5) did not complete normally. Details are in the Railway logs: search for `plagiq.check`. The figures contain no document text, file names or user identities and are kept for `METRICS_DAYS` (default 90).
 - **Usage:** accounts and checks.
 - **Backup downloads.**
 
