@@ -44,6 +44,7 @@ import csv
 import sqlite3
 import logging
 import reports_store
+import uzcyr
 import templates
 import metrics
 
@@ -322,9 +323,15 @@ VERIFY_TEXT = {
 }
 
 
+uzcyr.add_to(VERIFY_TEXT)
+VERIFY_LANGS = {"uz": "UZ", "uzc": "ЎЗ", "ru": "RU", "en": "EN"}
+
+
 @app.get("/verify", response_class=HTMLResponse)
 def verify_page(request: Request, ui: str = ""):
-    lang = ui if ui in VERIFY_TEXT else next((l for l in ("uz", "ru") if l in request.headers.get("accept-language", "")[:5]), "en")
+    accept = request.headers.get("accept-language", "")[:12].lower()
+    lang = ui if ui in VERIFY_TEXT else ("uzc" if accept.startswith("uz-cyrl") else
+                                         next((l for l in ("uz", "ru") if l in accept[:5]), "en"))
     t = VERIFY_TEXT[lang]
     valid, f = verify.check(request.query_params)
     status = t["off"] if not verify.secret() else (t["ok"] if valid else t["bad"])
@@ -337,9 +344,9 @@ def verify_page(request: Request, ui: str = ""):
             (t["rid"], f["r"]), (t["date"], when), (t["hash"], f["h"]), (t["mode"], t["modes"][f["m"]]),
             (t["result"], result), (t["words"], f["w"]), (t["sources"], f["n"]), (t["lang"], f["l"].upper()))
             + (((t["ai"], f["x"] + "%"),) if "x" in f else ()) + (((t["ex"], f["e"]),) if "e" in f else ()))
-    links = " · ".join(f'<a href="?{html.escape(str(request.query_params))}&amp;ui={l}">{l.upper()}</a>' for l in VERIFY_TEXT)
+    links = " · ".join(f'<a href="?{html.escape(str(request.query_params))}&amp;ui={l}">{VERIFY_LANGS.get(l, l.upper())}</a>' for l in VERIFY_TEXT)
     colour = "#0b6a64" if valid else "#9b2c16"
-    page = (f'<!doctype html><html lang="{lang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+    page = (f'<!doctype html><html lang="{"uz-Cyrl" if lang == "uzc" else lang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
             f'<title>{html.escape(t["title"])}</title><style>body{{font-family:system-ui,sans-serif;margin:0;background:#f7f9f7;color:#122a32}}'
             f'main{{max-width:640px;margin:40px auto;background:#fff;border:1px solid #dce6e5;border-radius:18px;padding:28px}}'
             f'h1{{font-size:22px;margin:0 0 6px}}.st{{font-weight:750;color:{colour};margin:14px 0}}table{{width:100%;border-collapse:collapse;font-size:14px}}'
@@ -1332,7 +1339,7 @@ def report(identifier:str, request:Request, lang:str="en", full:int=0):
     entry = owned(identifier, request)
     remaining = max(0, int((entry["expires"] - time.monotonic()) // 60))
     base = os.getenv("PUBLIC_ORIGIN", "").strip() or str(request.base_url)
-    lang = lang if lang in ("uz", "ru", "en") else "en"
+    lang = lang if lang in ("uz", "uzc", "ru", "en") else "en"
     link = verify.link(entry["result"], identifier, base)
     if full:
         content, name = build_pdf(entry["result"], identifier, lang, remaining, link), "PlagIQ-full-report.pdf"
