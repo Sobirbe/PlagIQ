@@ -49,7 +49,7 @@ T = {
     s_limits="5. Limitations",
     document="File name", date="Checked", sha="SHA-256 of extracted text", language="Manuscript language",
     mode="Comparison", method="Method", scope="Searched scope", status="Search status", expiry="Report availability",
-    expiry_v="Deleted from PlagIQ within {m} min; downloadable only in the submitting browser session",
+    expiry_v="Deleted from PlagIQ within {m}; available only to the submitting browser session and account",
     corpus_by_lang="Indexed sources by language", discovered="Records found / with abstract / full texts compared (not stored)",
     reference="Reference",
     matched="Matched portion within scope", basis_tokens="Share of the manuscript's words that lie inside at least one verified match of seven or more consecutive words. Each word is counted once, whatever the number of sources. The same measure is used in every mode.",
@@ -107,7 +107,7 @@ T = {
     s_limits="5. Ограничения",
     document="Имя файла", date="Проверено", sha="SHA-256 извлечённого текста", language="Язык рукописи",
     mode="Сравнение", method="Метод", scope="Охват поиска", status="Статус поиска", expiry="Доступность отчёта",
-    expiry_v="Удаляется из PlagIQ в течение {m} мин; скачивание только в сессии браузера отправителя",
+    expiry_v="Удаляется из PlagIQ в течение {m}; доступен только сессии браузера и аккаунту отправителя",
     corpus_by_lang="Индексированные источники по языкам", discovered="Найдено записей / с аннотацией / сравнено полных текстов (не сохранены)",
     reference="Источник",
     matched="Доля совпадений в охвате", basis_tokens="Доля слов рукописи, входящих хотя бы в одно проверенное совпадение не менее чем из семи слов подряд. Каждое слово учитывается один раз независимо от числа источников. Мера одинакова во всех режимах.",
@@ -165,7 +165,7 @@ T = {
     s_limits="5. Cheklovlar",
     document="Fayl nomi", date="Tekshirilgan", sha="Ajratilgan matnning SHA-256", language="Hujjat tili",
     mode="Solishtirish", method="Usul", scope="Qidiruv doirasi", status="Qidiruv holati", expiry="Hisobot mavjudligi",
-    expiry_v="PlagIQ’dan {m} daqiqa ichida o‘chiriladi; faqat yuborgan brauzer seansida yuklab olinadi",
+    expiry_v="PlagIQ’dan {m} ichida o‘chiriladi; faqat yuborgan brauzer seansi va hisob uchun",
     corpus_by_lang="Tillar bo‘yicha indekslangan manbalar", discovered="Topilgan yozuvlar / annotatsiyasi borlari / solishtirilgan to‘liq matnlar (saqlanmagan)",
     reference="Manba",
     matched="Doira ichidagi moslik ulushi", basis_tokens="Hujjatdagi so‘zlardan kamida yetti ketma-ket so‘zli tasdiqlangan moslik ichida bo‘lganlari ulushi. Har bir so‘z manbalar sonidan qat’i nazar bir marta sanaladi. O‘lchov barcha rejimlarda bir xil.",
@@ -368,6 +368,13 @@ EDITED_T = {
     "uz": dict(row="Ulardan tahrirlangan nusxa", value="{e} ta so‘z (so‘zlar almashtirilgan, qo‘shilgan yoki olib tashlangan; tekislash bilan tasdiqlangan)",
                tag=" · tahrirlangan nusxa, so‘zlarning {s}% bir xil"),
 }
+
+
+def _duration(minutes, lang):
+    """'23 h 59 min' / '23 soat 59 daqiqa' / '23 ч 59 мин'."""
+    h, m = divmod(max(0, int(minutes)), 60)
+    unit = {"uz": ("soat", "daqiqa"), "ru": ("ч", "мин")}.get(lang, ("h", "min"))
+    return (f"{h} {unit[0]} " if h else "") + f"{m} {unit[1]}"
 
 
 def _plagiarism_sections(result, mode, t, st, table, esc, headline, basis, lang):
@@ -711,7 +718,7 @@ def build_pdf(result, identifier, lang="en", minutes_left=15, verify_url=None):
         (t["language"], str(result.get("language", "")).upper() + (t["lang_detected"].format(
             s=result["language_note"]["selected"].upper()) if result.get("language_note") else "")),
         (t["sha"], result.get("sha256", "")),
-        (t["expiry"], t["expiry_v"].format(m=minutes_left)),
+        (t["expiry"], t["expiry_v"].format(m=_duration(minutes_left, lang))),
         (t["verify"], t["verify_v"].format(id=identifier[:12]) if verify_url else t["verify_none"])])]
     if verify_url:
         story.append(Paragraph(f'<link href="{esc(verify_url)}" color="#006D70">{esc(verify_url)}</link>', st["small"]))

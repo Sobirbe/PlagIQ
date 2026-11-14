@@ -191,7 +191,7 @@ Every PDF report now opens with a one-page **Certificate of check** (in Uzbek, R
 
 Every PDF report can carry a QR code. A supervisor or editor scans it and sees a PlagIQ page confirming the report's date, result, number of words, sources compared, language and the start of the document's fingerprint (SHA-256). If anyone changes those figures, the page says **not valid**.
 
-- **No storage needed.** The facts are signed with a secret only your server knows, so the codes keep working after the report itself is deleted (15 minutes) and after restarts. The link contains no file name and no text of the manuscript.
+- **No storage needed.** The facts are signed with a secret only your server knows, so the codes keep working after the report itself is deleted (24 hours) and after restarts. The link contains no file name and no text of the manuscript.
 - **To switch it on:** website service → **Variables** → add `VERIFY_SECRET` = a random secret of at least 40 characters (use your password manager's generator) → redeploy. Make sure `PUBLIC_ORIGIN` is your real address (e.g. `https://plagiq-production.up.railway.app`) so the QR code points there.
 - **Keep the secret unchanged.** Changing it makes all earlier QR codes show "not valid". Never share it.
 - Without `VERIFY_SECRET`, reports say "Online verification: not set up on this server".
@@ -466,6 +466,17 @@ PlagIQ also finds copied passages in which words were replaced, inserted or dele
   - Searches keep working meanwhile. Until it finishes, edited copies are found only in texts that already have the index.
   - New imports are indexed at once.
 - **Check before deploying:** the engine volume has room for about 20% more data (433 MB → about 520 MB).
+
+## Part 3s — "My checks": reports kept for 24 hours
+
+- **What users get:** every check is listed under **"My checks (last 24 hours)"** with its status, percentage, PDFs and an Open button, in the same browser or, when signed in, on any device. A user can close the page while a check runs; it finishes and appears there.
+- **What is stored:** the report with the document's text, compressed, in `plagiq-reports.sqlite3` next to the accounts database on the website's **`/data` volume** (the volume must be attached, as for accounts).
+- **When it is deleted:**
+  - automatically after **24 hours**; expired reports are deleted every 5 minutes and their disk space is given back;
+  - at once when the user presses "Delete";
+  - when the account is deleted.
+- **After a restart:** checks that were running are marked "interrupted", and any charge is refunded.
+- **Setting:** `REPORT_HOURS` (1–72, default 24). The privacy page says 24 hours, so change both together.
 
 ## Part 5a — Owner dashboard (/admin)
 

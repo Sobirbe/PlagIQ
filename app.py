@@ -39,7 +39,9 @@ import engine_client
 from report_pdf import build_pdf, build_short_pdf
 from security import SecurityMiddleware, MAX_REQUEST
 import checkstatus
+import sqlite3
 import logging
+import reports_store
 
 # The whole request is capped by SecurityMiddleware, so keep uploaded parts in
 # memory instead of letting Starlette spill files over 1 MB to a temp file on disk.
@@ -51,9 +53,17 @@ VERSION = "0.5"
 @asynccontextmanager
 async def lifespan(app):
     async def cleanup():
+        rounds = 0
         while True:
             await asyncio.sleep(30)
             purge_reports()
+            rounds += 1
+            if rounds % 10 == 0:                   # every 5 minutes: delete reports older than REPORT_HOURS
+                try:
+                    await run_in_threadpool(reports_store.purge)
+                except sqlite3.Error as exc:
+                    logging.getLogger("plagiq.check").error("report purge failed: %s", type(exc).__name__)
+    await run_in_threadpool(recover_interrupted)
     task = asyncio.create_task(cleanup())
     if telegram_bot.enabled():                 # let the bot answer /start (TELEGRAM_BOT_REPLIES=1), in the background
         asyncio.get_running_loop().run_in_executor(None, telegram_bot.register)
@@ -65,6 +75,16 @@ async def lifespan(app):
             await task
         except asyncio.CancelledError:
             pass
+
+def recover_interrupted():
+    """Checks cut off by a restart are marked failed ("interrupted") and their charge is given back."""
+    try:
+        for user_id, charge_id, price in reports_store.interrupted():
+            payments.refund({"id": user_id}, charge_id, price, "check interrupted by a restart")
+        reports_store.purge()
+    except sqlite3.Error as exc:
+        logging.getLogger("plagiq.check").error("report store unavailable at start-up: %s", type(exc).__name__)
+
 
 app = FastAPI(title="PlagIQ Pilot", version=VERSION, docs_url=None, redoc_url=None, openapi_url=None, lifespan=lifespan)
 app.add_middleware(SecurityMiddleware)
@@ -461,6 +481,7 @@ async def delete_me(request: Request):
         except payments.PaymentError as exc:
             raise ApiError(409, exc.code, str(exc))
     await run_in_threadpool(auth.forget, user)
+    await run_in_threadpool(reports_store.forget_user, user["id"])
     response = JSONResponse({"deleted": True})
     response.delete_cookie(auth.COOKIE)
     return response
@@ -837,15 +858,34 @@ async def check(request:Request, submission:UploadFile=File(...),
         raise ApiError(503, "server_busy", "PlagIQ is processing other documents. Try again in a minute.")
     rate_limit(request, user)
     active_scans += 1                          # reserve the slot before any await, so overlapping requests cannot all pass
+    # The check is recorded before it runs: if the browser is closed, it still finishes and appears in "My checks".
+    job = uuid.uuid4().hex
+    session = request.cookies.get("plagiq_session") or secrets.token_urlsafe(32)
     try:
+        await run_in_threadpool(reports_store.start, job, session, user["id"] if user else None,
+                                clean_filename(submission.filename, "Document"), mode)
         return await _run_check(request, user, anonymous, submission, reference, reference_text, language, mode,
-                                options, web_search, ai_check, deposit)
+                                options, web_search, ai_check, deposit, job, session)
+    except ApiError as exc:
+        if checkstatus.error_status(exc.code, exc.status_code) == "rejected":
+            await run_in_threadpool(reports_store.delete, job)   # not a check (sign-in, balance, limits)
+        else:
+            await run_in_threadpool(reports_store.fail, job, exc.code)
+            if not request.cookies.get("plagiq_session"):        # so the failed check shows under "My checks"
+                cookie = Response()
+                cookie.set_cookie("plagiq_session", session, max_age=reports_store.ttl(), httponly=True,
+                                  secure=_secure(request), samesite="strict")
+                exc.headers = {**(exc.headers or {}), "set-cookie": cookie.headers["set-cookie"]}
+        raise
+    except BaseException:
+        await run_in_threadpool(reports_store.fail, job, "internal_error")
+        raise
     finally:
         active_scans -= 1
 
 
 async def _run_check(request, user, anonymous, submission, reference, reference_text, language, mode, options,
-                     web_search, ai_check, deposit):
+                     web_search, ai_check, deposit, job=None, session=None):
     original, price, charge_id = None, 0, None
     if anonymous:                              # short texts can be checked without an account
         original = await read_file(submission)
@@ -868,6 +908,8 @@ async def _run_check(request, user, anonymous, submission, reference, reference_
                                                 + (", AI detector" if ai_check else ""))
         except payments.PaymentError as exc:
             raise ApiError(402, exc.code, str(exc))
+        if charge_id and job:
+            await run_in_threadpool(reports_store.charged, job, charge_id, price)
     try:
         result = await analyse(submission, reference, reference_text, language, mode, options, web_search, ai_check,
                                auth.owner_id(user), deposit, original)
@@ -883,7 +925,7 @@ async def _run_check(request, user, anonymous, submission, reference, reference_
         if compared_nothing:
             await run_in_threadpool(payments.refund, user, charge_id, compared_nothing, "nothing could be compared")
         result["charged_uzs"] = price - unused - compared_nothing
-    response = finish(request, result)
+    response = finish(request, result, job, session)
     if user:
         await run_in_threadpool(auth.log_check, user, result, response.headers.get("x-report-id", ""))
     if charge_id:
@@ -1165,17 +1207,17 @@ def highlight(text, segments, sources=None, marks=None):
     return "".join(out).replace("\n", "<br>")
 
 
-# Shown to the user once and never kept in the report cache. The manuscript itself ("_text", "_marks")
-# is kept with the report in memory for its 15 minutes, only for the PDF appendix: never on disk,
-# never in the browser reply a second time, gone when the report expires or is deleted.
+# Shown to the user once and never kept with the report. The manuscript itself ("_text", "_marks") is kept with
+# the report for REPORT_HOURS (24 h, reports_store.py) for the PDF appendix and for reopening the report from
+# "My checks"; it is deleted with the report.
 PRIVATE_FIELDS = ("highlight_html", "search_phrases", "integrity_examples", "ai_passages")
 
 
-def finish(request, result):
-    identifier = uuid.uuid4().hex
+def finish(request, result, identifier=None, session=None):
+    identifier = identifier or uuid.uuid4().hex
     while len(results) >= MAX_REPORTS:
         results.pop(next(iter(results)))
-    owner = request.cookies.get("plagiq_session") or secrets.token_urlsafe(32)
+    owner = session or request.cookies.get("plagiq_session") or secrets.token_urlsafe(32)
     response = JSONResponse({"report_id": identifier, **{k: v for k, v in result.items() if not k.startswith("_")}},
                             headers={"x-report-id": identifier})
     cached = {k:v for k,v in result.items() if k not in PRIVATE_FIELDS}
@@ -1183,17 +1225,38 @@ def finish(request, result):
         cached["sources"] = [{**s, "passages": [{k: v for k, v in p.items() if k != "query_excerpt"}
                                                 for p in s.get("passages") or []]} for s in cached["sources"]]
     results[identifier] = {"owner": owner, "expires": time.monotonic() + REPORT_TTL, "result": cached}
-    response.set_cookie("plagiq_session", owner, max_age=REPORT_TTL,
+    try:
+        reports_store.finish(identifier, cached)          # kept for REPORT_HOURS (24 h), then deleted
+    except sqlite3.Error as exc:
+        logging.getLogger("plagiq.check").error("report not stored: %s", type(exc).__name__)
+    response.set_cookie("plagiq_session", owner, max_age=reports_store.ttl(),
                         httponly=True, secure=_secure(request), samesite="strict")
     return response
 
 
 def owned(identifier, request):
+    """The report, for the browser session that ran it or the signed-in account it belongs to."""
     purge_reports()
+    session = request.cookies.get('plagiq_session', '')
     entry = results.get(identifier)
-    if entry is None or not secrets.compare_digest(entry['owner'].encode(), request.cookies.get('plagiq_session', '').encode()):
+    if entry is not None and secrets.compare_digest(entry['owner'].encode(), session.encode()):
+        return {**entry, "expires": time.monotonic() + _stored_seconds_left(identifier, entry["expires"] - time.monotonic())}
+    stored = reports_store.get(identifier) if re.fullmatch(r"[0-9a-f]{32}", identifier or "") else None
+    user = auth.read(request.cookies.get(auth.COOKIE))
+    mine = stored and (secrets.compare_digest(stored["owner"].encode(), session.encode())
+                       or (user is not None and stored["user"] == user["id"]))
+    if not mine or stored["state"] != "done" or not stored["result"]:
         raise ApiError(404, "report_unavailable", "Report unavailable or expired")
-    return entry
+    return {"owner": stored["owner"], "expires": time.monotonic() + max(0, stored["expires"] - time.time()),
+            "result": stored["result"]}
+
+
+def _stored_seconds_left(identifier, fallback):
+    try:
+        stored = reports_store.get(identifier)
+    except sqlite3.Error:
+        stored = None
+    return max(0, stored["expires"] - time.time()) if stored else fallback
 
 
 @app.get("/api/report/{identifier}.pdf")
@@ -1216,5 +1279,32 @@ def report(identifier:str, request:Request, lang:str="en", full:int=0):
 @app.delete("/api/report/{identifier}")
 def delete_report(identifier: str, request: Request):
     owned(identifier, request)
-    del results[identifier]
+    results.pop(identifier, None)
+    reports_store.delete(identifier)
     return {"deleted": True}
+
+
+@app.get("/api/reports")
+def my_reports(request: Request):
+    """Checks of the last REPORT_HOURS for this browser session and, when signed in, this account."""
+    user = auth.read(request.cookies.get(auth.COOKIE))
+    rows = reports_store.listing(request.cookies.get("plagiq_session", ""), user["id"] if user else None)
+    return {"hours": reports_store.hours(), "reports": [
+        {**r, "created": datetime.fromtimestamp(r["created"], timezone.utc).isoformat(timespec="seconds"),
+         "expires": datetime.fromtimestamp(r["expires"], timezone.utc).isoformat(timespec="seconds")} for r in rows]}
+
+
+@app.get("/api/report/{identifier}")
+def report_json(identifier: str, request: Request):
+    """Reopen a stored report: the result as first shown, rebuilt from the stored text and marks (the AI detector's
+    flagged passages and integrity examples are shown once only and are not part of it)."""
+    entry = owned(identifier, request)
+    result = dict(entry["result"])
+    text, marks = result.get("_text"), result.get("_marks")
+    if text is not None and marks is not None:
+        result["highlight_html"] = highlight(text, None, marks=[tuple(m) for m in marks])
+        result["sources"] = [{**src, "passages": [
+            {**p, "query_excerpt": text[p["query_start"]:p["query_end"]][:600] + ("…" if p["query_end"] - p["query_start"] > 600 else "")}
+            if type(p.get("query_start")) is int and type(p.get("query_end")) is int and 0 <= p["query_start"] < p["query_end"] <= len(text)
+            else p for p in src.get("passages") or []]} for src in result.get("sources") or []]
+    return {"report_id": identifier, "reopened": True, **{k: v for k, v in result.items() if not k.startswith("_")}}

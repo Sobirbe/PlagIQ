@@ -26,8 +26,8 @@ table{border-collapse:collapse;width:100%;font-size:14px}th,td{text-align:left;p
 <h3>Qanday ma’lumotlarni qayta ishlaymiz</h3>
 <table>
 <tr><th>Ma’lumot</th><th>Maqsad</th><th>Qancha saqlanadi</th></tr>
-<tr><td>Yuklangan hujjat matni</td><td>Tekshiruv</td><td>Tekshiruv vaqtida, so‘ng PDF hisobotdagi belgilangan matn uchun hisobot bilan birga 15 daqiqa faqat xotirada (faqat sizning brauzer seansingiz uchun); diskka hech qachon yozilmaydi. Arxivga qo‘shishni tanlasangiz — pastga qarang.</td></tr>
-<tr><td>Hisobot (manbalar, foizlar, hujjat SHA-256 izi)</td><td>Natijani ko‘rsatish va PDF</td><td>15 daqiqa, faqat sizning brauzeringizda</td></tr>
+<tr><td>Yuklangan hujjat matni</td><td>Tekshiruv</td><td>Tekshiruv vaqtida, so‘ng hisobot bilan birga <b>24 soat</b> (hisobotni qayta ochish va PDF dagi belgilangan matn uchun): siqilgan holda PlagIQ serverining yopiq diskida, faqat sizning brauzer seansingiz va hisobingiz uchun; 24 soatdan keyin avtomatik o‘chiriladi, «O‘chirish» tugmasi bilan esa darhol. Kutubxonaga qo‘shilmaydi va boshqalarga ko‘rsatilmaydi. Arxivga qo‘shishni tanlasangiz — pastga qarang.</td></tr>
+<tr><td>Hisobot (manbalar, foizlar, hujjat SHA-256 izi)</td><td>Natijani ko‘rsatish va PDF</td><td>24 soat, faqat sizning brauzer seansingiz va hisobingiz uchun («Mening tekshiruvlarim»)</td></tr>
 <tr><td>Telegram ID, ism, foydalanuvchi nomi; telefon raqam (faqat uni botga o‘zingiz yuborsangiz); email va parolning xeshi (email orqali ro‘yxatdan o‘tsangiz; parolning o‘zi saqlanmaydi)</td><td>Hisobga kirish</td><td>Hisobingizni o‘chirguningizcha</td></tr>
 <tr><td>Tekshiruvlar ro‘yxati (sana, rejim, so‘zlar soni, natija)</td><td>«So‘nggi tekshiruvlarim», statistika</td><td>Hisobingizni o‘chirguningizcha. Hujjat matni va fayl nomi saqlanmaydi.</td></tr>
 <tr><td>Himoyalangan arxiv (faqat roziligingiz bilan): to‘liq matn, sarlavha, muallif, yil</td><td>Kelajakdagi ko‘chirmalarni aniqlash</td><td>Uni o‘chirguningizcha. Boshqalar matnni ko‘rmaydi — faqat sarlavha, muallif va yil.</td></tr>
@@ -56,8 +56,8 @@ table{border-collapse:collapse;width:100%;font-size:14px}th,td{text-align:left;p
 <h3>Какие данные мы обрабатываем</h3>
 <table>
 <tr><th>Данные</th><th>Цель</th><th>Срок хранения</th></tr>
-<tr><td>Текст загруженного документа</td><td>Проверка</td><td>Во время проверки, а затем 15 минут вместе с отчётом — для текста с выделенными совпадениями в PDF — только в памяти и только для вашей сессии браузера; на диск никогда не записывается. Если вы выбрали архив — см. ниже.</td></tr>
-<tr><td>Отчёт (источники, проценты, отпечаток SHA-256)</td><td>Показ результата и PDF</td><td>15 минут, только в вашем браузере</td></tr>
+<tr><td>Текст загруженного документа</td><td>Проверка</td><td>Во время проверки, а затем <b>24 часа</b> вместе с отчётом (чтобы открыть отчёт снова и показать выделенный текст в PDF): в сжатом виде на закрытом диске сервера PlagIQ, только для вашей сессии браузера и вашего аккаунта; через 24 часа удаляется автоматически, кнопкой «Удалить» — сразу. В библиотеку не добавляется и другим не показывается. Если вы выбрали архив — см. ниже.</td></tr>
+<tr><td>Отчёт (источники, проценты, отпечаток SHA-256)</td><td>Показ результата и PDF</td><td>24 часа, только для вашей сессии браузера и аккаунта («Мои проверки»)</td></tr>
 <tr><td>Telegram ID, имя, имя пользователя; номер телефона (только если вы сами отправили его боту); email и хеш пароля (при регистрации по email; сам пароль не хранится)</td><td>Вход в аккаунт</td><td>До удаления аккаунта</td></tr>
 <tr><td>Список проверок (дата, режим, число слов, результат)</td><td>«Мои последние проверки», статистика</td><td>До удаления аккаунта. Текст и имя файла не хранятся.</td></tr>
 <tr><td>Защищённый архив (только с вашего согласия): полный текст, название, автор, год</td><td>Поиск будущих копий</td><td>Пока вы его не удалите. Другие не видят текст — только название, автора и год.</td></tr>
@@ -86,8 +86,8 @@ table{border-collapse:collapse;width:100%;font-size:14px}th,td{text-align:left;p
 <h3>What we process</h3>
 <table>
 <tr><th>Data</th><th>Purpose</th><th>Kept for</th></tr>
-<tr><td>Text of the uploaded document</td><td>The check</td><td>In memory during the check, then for 15 minutes with the report (for the highlighted text in the PDF), only for your browser session; never written to disk. If you choose the archive, see below.</td></tr>
-<tr><td>Report (sources, percentages, SHA-256 fingerprint)</td><td>Showing the result and the PDF</td><td>15 minutes, only in your browser session</td></tr>
+<tr><td>Text of the uploaded document</td><td>The check</td><td>During the check, then for <b>24 hours</b> with the report (to reopen the report and for the highlighted text in the PDF): compressed, on PlagIQ's private server disk, only for your browser session and your account; deleted automatically after 24 hours, or at once with “Delete”. Never added to the library or shown to anyone else. If you choose the archive, see below.</td></tr>
+<tr><td>Report (sources, percentages, SHA-256 fingerprint)</td><td>Showing the result and the PDF</td><td>24 hours, only for your browser session and account (“My checks”)</td></tr>
 <tr><td>Telegram ID, name, username; phone number (only if you share it with the bot yourself); email and a hash of your password (if you register by email; the password itself is never stored)</td><td>Signing in</td><td>Until you delete your account</td></tr>
 <tr><td>List of your checks (date, mode, word count, result)</td><td>"My recent checks", statistics</td><td>Until you delete your account. No text and no file names.</td></tr>
 <tr><td>Protected archive (only with your consent): full text, title, author, year</td><td>Finding later copies</td><td>Until you remove it. Others never see the text, only title, author and year.</td></tr>
