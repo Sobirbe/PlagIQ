@@ -42,6 +42,7 @@ import checkstatus
 import sqlite3
 import logging
 import reports_store
+import metrics
 
 # The whole request is capped by SecurityMiddleware, so keep uploaded parts in
 # memory instead of letting Starlette spill files over 1 MB to a temp file on disk.
@@ -861,16 +862,19 @@ async def check(request:Request, submission:UploadFile=File(...),
     # The check is recorded before it runs: if the browser is closed, it still finishes and appears in "My checks".
     job = uuid.uuid4().hex
     session = request.cookies.get("plagiq_session") or secrets.token_urlsafe(32)
+    started = time.monotonic()
     try:
         await run_in_threadpool(reports_store.start, job, session, user["id"] if user else None,
                                 clean_filename(submission.filename, "Document"), mode)
         return await _run_check(request, user, anonymous, submission, reference, reference_text, language, mode,
-                                options, web_search, ai_check, deposit, job, session)
+                                options, web_search, ai_check, deposit, job, session, started)
     except ApiError as exc:
-        if checkstatus.error_status(exc.code, exc.status_code) == "rejected":
+        status = checkstatus.error_status(exc.code, exc.status_code)
+        if status == "rejected":
             await run_in_threadpool(reports_store.delete, job)   # not a check (sign-in, balance, limits)
         else:
             await run_in_threadpool(reports_store.fail, job, exc.code)
+            await run_in_threadpool(metrics.record_failure, mode, status, exc.code, time.monotonic() - started)
             if not request.cookies.get("plagiq_session"):        # so the failed check shows under "My checks"
                 cookie = Response()
                 cookie.set_cookie("plagiq_session", session, max_age=reports_store.ttl(), httponly=True,
@@ -879,13 +883,14 @@ async def check(request:Request, submission:UploadFile=File(...),
         raise
     except BaseException:
         await run_in_threadpool(reports_store.fail, job, "internal_error")
+        await run_in_threadpool(metrics.record_failure, mode, "failed_internal", "internal_error", time.monotonic() - started)
         raise
     finally:
         active_scans -= 1
 
 
 async def _run_check(request, user, anonymous, submission, reference, reference_text, language, mode, options,
-                     web_search, ai_check, deposit, job=None, session=None):
+                     web_search, ai_check, deposit, job=None, session=None, started=None):
     original, price, charge_id = None, 0, None
     if anonymous:                              # short texts can be checked without an account
         original = await read_file(submission)
@@ -926,6 +931,8 @@ async def _run_check(request, user, anonymous, submission, reference, reference_
             await run_in_threadpool(payments.refund, user, charge_id, compared_nothing, "nothing could be compared")
         result["charged_uzs"] = price - unused - compared_nothing
     response = finish(request, result, job, session)
+    await run_in_threadpool(metrics.record_check, result, time.monotonic() - (started or time.monotonic()),
+                            result.get("charged_uzs"))
     if user:
         await run_in_threadpool(auth.log_check, user, result, response.headers.get("x-report-id", ""))
     if charge_id:

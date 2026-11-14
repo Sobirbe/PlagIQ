@@ -9,7 +9,9 @@ import os
 
 import aidetect
 import auth
+import checkstatus
 import institutions
+import metrics
 import payments
 import telegram_bot
 import verify
@@ -250,6 +252,85 @@ def diagnostic_form(result=None, error="", doi="", title=""):
     return form
 
 
+PROBLEMS = {"no_text": "No readable text in the file (even after OCR)", "extract_failed": "File could not be read",
+            "ocr_timeout": "OCR took too long", "ocr_too_many_pages": "Too many scanned pages for OCR",
+            "ocr_busy": "OCR busy with another upload", "pdf_pages": "PDF over the page limit",
+            "unsupported_type": "Unsupported file type", "doc_protected": "Password-protected Word file",
+            "engine_unavailable": "Library engine unreachable", "engine_timeout": "Library engine timed out",
+            "engine_busy": "Library engine busy", "internal_error": "PlagIQ error (see Railway logs)",
+            "interrupted": "Cut off by a restart"}
+
+
+def _issue(code):
+    return checkstatus.texts("en")["issues"].get(code, code).format(n="some")
+
+
+def _seconds(v):
+    return "—" if v is None else (f"{v:.0f} s" if v >= 10 else f"{v:.1f} s")
+
+
+def monitoring():
+    """Owner view of how checks are going: outcomes, failures by cause, time taken, outside services, storage."""
+    esc = html.escape
+    periods = [("24 hours", 24), ("7 days", 24 * 7), ("30 days", 24 * 30)]
+    data = [metrics.summary(h) for _, h in periods]
+    status = lambda d, k: d["statuses"].get(k, 0)
+    share = lambda n, d: f"{n:,} ({n / d['checks']:.0%})" if d["checks"] else f"{n:,}"
+    rows = [
+        ("Checks", [f"{d['checks']:,}" for d in data]),
+        ("Completed: matches found", [share(status(d, "completed_matches"), d) for d in data]),
+        ("Completed: no matches", [share(status(d, "completed_no_matches"), d) for d in data]),
+        ("Incomplete coverage", [share(status(d, "incomplete_coverage"), d) for d in data]),
+        ("Failed: source search", [share(status(d, "failed_search"), d) for d in data]),
+        ("Failed: file could not be read", [share(status(d, "failed_extraction"), d) for d in data]),
+        ("Failed: PlagIQ error", [share(status(d, "failed_internal"), d) for d in data]),
+        ("OpenAlex searches failed", [f"{d['openalex']['failed']:,} of {d['openalex']['queries']:,}" for d in data]),
+        ("Full texts compared", [f"{d['downloads']['compared']:,} of {d['downloads']['attempted']:,} tried; "
+                                 f"{d['downloads']['cut_off']:,} cut off" for d in data]),
+        ("Library searched / unreachable", [f"{d['library']['searched']:,} / {d['library']['errors']:,}" for d in data]),
+        ("Web search errors", [f"{d['web']['errors']:,} in {d['web']['searches']:,} searches" if d["web"]["checks"] else "off" for d in data]),
+        ("OCR", [f"{d['ocr']['pages']:,} pages in {d['ocr']['checks']:,} checks" + (f", {d['ocr']['seconds_per_page']} s/page" if d["ocr"]["seconds_per_page"] else "") for d in data]),
+        ("Edited copying found", [f"{d['edited']['checks']:,} checks, {d['edited']['words']:,} words" for d in data]),
+        ("AI detector (Pangram)", [f"{d['ai']['checks']:,} checks, about ${d['ai']['usd']:.2f}" + (f"; {d['ai']['failed']} failed" if d["ai"]["failed"] else "") for d in data]),
+        ("Charged (so'm, after refunds)", [f"{d['charged']:,}" for d in data]),
+    ]
+    table = ("<table><tr><th></th>" + "".join(f"<th>Last {esc(n)}</th>" for n, _ in periods) + "</tr>"
+             + "".join(f"<tr><th>{esc(label)}</th>" + "".join(f"<td>{esc(v)}</td>" for v in values) + "</tr>" for label, values in rows)
+             + "</table>")
+    day = data[0]
+    bad = status(day, "incomplete_coverage") + status(day, "failed_search") + status(day, "failed_extraction") + status(day, "failed_internal")
+    warn = (f'<p class="warn">{bad} of {day["checks"]} checks in the last 24 hours did not complete normally. '
+            f'See the causes below and the Railway logs (search for "plagiq.check").</p>'
+            if day["checks"] >= 5 and bad / day["checks"] > 0.2 else "")
+    week = data[1]
+    causes = sorted([(n, PROBLEMS.get(code, code)) for code, n in week["errors"].items()] +
+                    [(n, "Incomplete: " + _issue(code)) for code, n in week["issues"].items()], reverse=True)
+    problems = _table(["Checks", "Cause (last 7 days)"], [(n, c) for n, c in causes[:12]]) if causes else "<p>No problems in the last 7 days.</p>"
+    timing = _table(["Mode", "Checks", "Typical (median)", "Slow (95% finish within)", "Slowest"],
+                    [(m, t["checks"], _seconds(t["p50"]), _seconds(t["p95"]), _seconds(t["max"]))
+                     for m, t in week["timing"].items()]) if week["timing"] else "<p>No finished checks in the last 7 days.</p>"
+    days = metrics.per_day(14)
+    top = max([c for _, c, _ in days] + [1])
+    bars = "<table>" + "".join(
+        f'<tr><td>{esc(d)}</td><td style="width:70%"><span style="display:inline-block;height:12px;width:{100 * c / top:.0f}%;'
+        f'background:#0f6b5b;border-radius:3px"></span></td><td>{c}' + (f' <span class="note">({b} not completed)</span>' if b else "")
+        + "</td></tr>" for d, c, b in days) + "</table>"
+    store = metrics.storage()
+    files = "".join(f"<tr><th>{esc(n)}</th><td>{_size(b)}</td></tr>" for n, b in store["files"].items())
+    reports = store["reports"]
+    if reports:
+        files += f"<tr><th>Reports kept now</th><td>{reports['reports']:,} (deleted after {reports['hours']} hours)</td></tr>"
+    if store["free"] is not None:
+        used = 1 - store["free"] / store["total"]
+        css = ' class="warn"' if used > 0.8 else ""
+        files += (f"<tr><th>Website volume</th><td{css}>{used:.0%} used, "
+                  f"{_size(store['free'])} free of {_size(store['total'])}</td></tr>")
+    return (warn + table + "<h3>Problems by cause</h3>" + problems + "<h3>Time per check (last 7 days)</h3>" + timing
+            + "<h3>Checks per day (Tashkent time, last 14 days)</h3>" + bars + "<h3>Website storage</h3><table>" + files + "</table>"
+            + '<p class="note">Figures only: no document text, file names or user identities are recorded. '
+              f'Kept for {metrics.days()} days (METRICS_DAYS).</p>')
+
+
 def page(library, probe="", inventory=None, diagnostic="", pruning=None):
     esc = html.escape
     mark = lambda ok: "✅" if ok else "➖" if ok is None else "❌"          # None = optional, not set
@@ -315,5 +396,6 @@ def page(library, probe="", inventory=None, diagnostic="", pruning=None):
             f'<section><h2>Library details</h2>{details(inventory) if library and library.get("available") else "<p>The engine is not connected.</p>"}</section>'
             f'<section id="source-check"><h2>Source check (DOI or title)</h2>{diagnostic or diagnostic_form()}</section>'
             f'<section id="wikipedia-share"><h2>Wikipedia share</h2>{pruning if pruning is not None else (prune_form(inventory) if inventory else "<p>The engine is not connected.</p>")}</section>'
+            f'<section id="monitoring"><h2>Monitoring</h2>{monitoring()}</section>'
             f'<section><h2>Usage</h2>{use}</section><section><h2>Payments</h2>{pay}</section>'
             f'<section><h2>Backups</h2>{backup}</section></main></body></html>')
