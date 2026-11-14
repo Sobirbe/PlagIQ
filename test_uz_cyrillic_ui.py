@@ -24,7 +24,7 @@ CASES = {
     "PhD / DSc": "PhD / DSc", "tayyor": "тайёр", "sheʼr": "шеър", "Yevropa": "Европа", "‘Xavfsiz’ rejim": "‘Хавфсиз’ режим",
     "Word’da": "Word’да", "OʻZBEKISTON": "ЎЗБЕКИСТОН", "SENTABR": "СЕНТЯБРЬ",
 }
-TABLES = ['A', 'CST', 'E', 'EDT', 'G', 'HI', 'L', 'OCRN', 'OT', 'P', 'PY', 'PYE', 'R', 'SI', 'SIE', 'SV', 'TP', 'U', 'X', 'XS',
+TABLES = ['A', 'CST', 'E', 'EDT', 'G', 'HI', 'L', 'OCRN', 'OT', 'P', 'PG', 'PY', 'PYE', 'R', 'SI', 'SIE', 'SV', 'TP', 'U', 'X', 'XS',
           'searchStates']
 
 

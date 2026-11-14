@@ -53,6 +53,8 @@ Every finished check has a `status`:
 
 Error responses carry `failed_extraction`, `failed_search`, `failed_internal` or `rejected`. Unexpected errors are logged without the document text, and any charge for the check is returned.
 
+While a check runs, the page lists the steps the server is **actually** working through: reading the file, OCR (page by page), OpenAlex, full-text downloads, web search, the library, comparison, AI detector, archive and report. Stages a check does not use are never shown. If a check fails, the step where it stopped is marked (`progress.py`, `GET /api/progress/{token}`).
+
 The status appears on the result page, in the PDF report and on the certificate. An incomplete check is also flagged in the signed QR link. See `checkstatus.py`.
 
 ## Citation-aware results (optional exclusions)
