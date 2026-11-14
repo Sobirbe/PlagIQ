@@ -457,6 +457,16 @@ The Dockerfile installs Tesseract, so after merging, **redeploy the website serv
 
 In testing (development sandbox; Railway may differ) a page took 2.5–6.5 seconds, so 240 seconds covers roughly 40–90 scanned pages. A whole scanned dissertation needs a higher `OCR_MAX_SECONDS`, or the user uploads the chapter they need.
 
+## Part 3r — Edited copying (on automatically)
+
+PlagIQ also finds copied passages in which words were replaced, inserted or deleted, and labels them "edited copy" (`evaluation/EDITED.md`).
+- **Checks on the website:** nothing to set.
+- **Library:** the engine keeps a small extra index of sampled three-word phrases (table `seeds`, roughly 15–20% of the library database).
+  - After deploying, **redeploy the engine**. It fills the index for existing texts in the background, 50 texts at a time; the logs say "edited-copy index: N texts left" and finally "every stored text can be found for edited copying".
+  - Searches keep working meanwhile. Until it finishes, edited copies are found only in texts that already have the index.
+  - New imports are indexed at once.
+- **Check before deploying:** the engine volume has room for about 20% more data (433 MB → about 520 MB).
+
 ## Part 5a — Owner dashboard (/admin)
 
 Website service → **Variables**: add `OWNER_TELEGRAM_IDS` = your Telegram user ID (get it from @userinfobot; separate several IDs with commas). Sign in with Telegram, then open `https://<your site>/admin`. Anyone else gets "Not found".

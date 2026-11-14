@@ -360,13 +360,25 @@ def integrity_section(data, lang, st, table):
     return [Paragraph(html.escape(t["title"]), st["h"]), table(rows), Paragraph(html.escape(t["note"]), st["small"])]
 
 
+EDITED_T = {
+    "en": dict(row="Of which edited copying", value="{e} words (words replaced, inserted or deleted; verified by word alignment)",
+               tag=" · edited copy, {s}% identical words"),
+    "ru": dict(row="Из них отредактированная копия", value="{e} слов (слова заменены, добавлены или удалены; подтверждено выравниванием)",
+               tag=" · отредактированная копия, {s}% слов совпадают"),
+    "uz": dict(row="Ulardan tahrirlangan nusxa", value="{e} ta so‘z (so‘zlar almashtirilgan, qo‘shilgan yoki olib tashlangan; tekislash bilan tasdiqlangan)",
+               tag=" · tahrirlangan nusxa, so‘zlarning {s}% bir xil"),
+}
+
+
 def _plagiarism_sections(result, mode, t, st, table, esc, headline, basis, lang):
     """Result, indicators, AI detector and sources sections of a plagiarism check."""
     story = []
     pasted = lambda name: t["pasted"] if name == "Pasted reference" else name
     c = result.get("citation")
     counted = c["matched_words_counted"] if c else (result.get("matched_tokens") or 0)
-    result_rows = checkstatus.rows(result, lang) + [(t["units_tokens"], t["tokens_v"].format(a=counted, b=result.get("total_tokens") or 0)),
+    edited_rows = [(EDITED_T.get(lang, EDITED_T["en"])["row"], EDITED_T.get(lang, EDITED_T["en"])["value"].format(
+        e=result["edited_tokens"]))] if result.get("edited_tokens") else []
+    result_rows = checkstatus.rows(result, lang) + [(t["units_tokens"], t["tokens_v"].format(a=counted, b=result.get("total_tokens") or 0))] + edited_rows + [
                    (t["units_chars"], t["chars_v"].format(a=result.get("matched_chars") or 0, b=result.get("total_chars") or 0))]
     if c:
         o, ex = c["exclusions"], c["excluded"]
@@ -430,7 +442,9 @@ def _plagiarism_sections(result, mode, t, st, table, esc, headline, basis, lang)
             block.extend([
                 Paragraph(esc(t["passage"].format(i=i) + " — " + t["loc"].format(
                     qs=passage.get("query_start"), qe=passage.get("query_end"),
-                    ss=passage.get("source_start"), se=passage.get("source_end"))), st["small"]),
+                    ss=passage.get("source_start"), se=passage.get("source_end"))
+                    + (EDITED_T.get(lang, EDITED_T["en"])["tag"].format(s=round(100 * float(passage.get("similarity") or 0)))
+                       if passage.get("type") == "edited" else "")), st["small"]),
                 Paragraph(esc(passage.get("source_excerpt") or (t["cov"].get(source.get("coverage"), "")
                                                                  if source.get("coverage") in ("archive", "own_archive") else "")), st["quote"])])
             story.append(KeepTogether(block))  # first passage stays with the source heading
