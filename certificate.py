@@ -20,7 +20,7 @@ C = {
         sources="Sources compared", src_academic="Full texts: {f} · abstracts: {a}{w}", src_web=" · web pages: {n}",
         src_ai="Not applicable (AI check only)", scope_ai="AI-writing detector only (Pangram); no plagiarism comparison", ai_row="AI detector (Pangram estimate)", ai_v="AI {a}% · AI-assisted {s}% · human {h}%", ai_unsupported="Not available for Uzbek (not sent)", ai_error="Could not be completed", ai_too_long="Too long for the AI detector (over {n} words)", ai_ring="AI-written or AI-assisted (Pangram estimate)", 
         src_reference="1 reference document", src_corpus="{n} indexed sources",
-        exclusions="Exclusions", ex_none="No exclusions", ex_q="quotations", ex_b="bibliography", ex_s="matches under {m} words",
+        exclusions="Exclusions", ex_none="No exclusions", ex_q="quotations", ex_b="bibliography", ex_s="matches under {m} words", ex_src="{n} source(s) excluded by the report owner (before: {p}%)",
         integrity="AI and manipulation indicators", ind_none="No indicators found", ind_review="Review suggested ({n})",
         scope="Scope", scopes=dict(academic="Open academic publications found through OpenAlex{w}",
                                    reference="Comparison with one reference document supplied by the user",
@@ -40,7 +40,7 @@ C = {
         sources="Сравнено источников", src_academic="полных текстов {f} · аннотаций {a}{w}", src_web=" · веб-страниц {n}",
         src_ai="Не применимо (только ИИ-проверка)", scope_ai="Только ИИ-детектор (Pangram); сравнение на плагиат не проводилось", ai_row="ИИ-детектор (оценка Pangram)", ai_v="ИИ {a}% · с помощью ИИ {s}% · человек {h}%", ai_unsupported="Недоступно для узбекского (текст не отправлялся)", ai_error="Не удалось выполнить", ai_too_long="Слишком длинный для ИИ-детектора (более {n} слов)", ai_ring="Написано ИИ или с помощью ИИ (оценка Pangram)", 
         src_reference="1 документ-источник", src_corpus="индексированных источников: {n}",
-        exclusions="Исключения", ex_none="Нет", ex_q="цитаты", ex_b="список литературы", ex_s="совпадения короче {m} слов",
+        exclusions="Исключения", ex_none="Нет", ex_q="цитаты", ex_b="список литературы", ex_s="совпадения короче {m} слов", ex_src="источников исключено владельцем отчёта: {n} (до исключения: {p}%)",
         integrity="Индикаторы ИИ и манипуляций", ind_none="Не найдены", ind_review="Рекомендуется проверка ({n})",
         scope="Охват", scopes=dict(academic="Открытые научные публикации, найденные через OpenAlex{w}",
                                    reference="Сравнение с одним документом, предоставленным пользователем",
@@ -61,7 +61,7 @@ C = {
         sources="Solishtirilgan manbalar", src_academic="{f} ta to‘liq matn · {a} ta annotatsiya{w}", src_web=" · {n} ta veb-sahifa",
         src_ai="Qo‘llanilmaydi (faqat AI tekshiruvi)", scope_ai="Faqat AI detektor (Pangram); plagiatga solishtirilmadi", ai_row="AI detektor (Pangram bahosi)", ai_v="AI {a}% · AI yordamida {s}% · inson {h}%", ai_unsupported="O‘zbek tili uchun mavjud emas (yuborilmadi)", ai_error="Bajarib bo‘lmadi", ai_too_long="AI detektor uchun juda uzun ({n} so‘zdan ortiq)", ai_ring="AI yozgan yoki AI yordamida (Pangram bahosi)", 
         src_reference="1 ta manba hujjat", src_corpus="{n} ta indekslangan manba",
-        exclusions="Istisnolar", ex_none="Yo‘q", ex_q="iqtiboslar", ex_b="adabiyotlar ro‘yxati", ex_s="{m} so‘zdan qisqa mosliklar",
+        exclusions="Istisnolar", ex_none="Yo‘q", ex_q="iqtiboslar", ex_b="adabiyotlar ro‘yxati", ex_s="{m} so‘zdan qisqa mosliklar", ex_src="hisobot egasi {n} ta manbani chiqarib tashlagan (undan oldin: {p}%)",
         integrity="Sun’iy intellekt va manipulyatsiya ko‘rsatkichlari", ind_none="Topilmadi", ind_review="Tekshirish tavsiya etiladi ({n})",
         scope="Doira", scopes=dict(academic="OpenAlex orqali topilgan ochiq ilmiy nashrlar{w}",
                                    reference="Foydalanuvchi bergan bitta hujjat bilan solishtirish",
@@ -112,6 +112,9 @@ def facts(result, lang):
         chosen.append(t["ex_b"])
     if (o.get("min_words") or 7) > 7:
         chosen.append(t["ex_s"].format(m=o["min_words"]))
+    if result.get("excluded_sources"):
+        chosen.append(t["ex_src"].format(n=len(result["excluded_sources"]),
+                                         p=(result.get("before_source_exclusion") or {}).get("percent")))
     integrity = result.get("integrity") or {}
     signals = len(integrity.get("signals") or [])
     providers = ", ".join(web.get("providers") or [])

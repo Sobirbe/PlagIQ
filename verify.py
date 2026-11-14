@@ -17,10 +17,11 @@ import re
 from urllib.parse import urlencode
 
 FIELDS = ("r", "d", "h", "m", "p", "w", "n", "l")
-OPTIONAL = ("x", "c")                  # x = AI detector estimate (AI + AI-assisted %), only when it ran;
-                                       # c = "i" when source coverage was incomplete (percentage is a minimum)
+OPTIONAL = ("x", "c", "e")                  # x = AI detector estimate (AI + AI-assisted %), only when it ran;
+                                       # c = "i" when source coverage was incomplete (percentage is a minimum);
+                                       # e = number of sources the owner excluded (percentage is after exclusion)
 MODES = {"reference": "r", "academic": "a", "corpus": "c", "ai": "i"}
-PATTERNS = {"r": r"[0-9a-f]{12}", "d": r"\d{8}T\d{4}", "h": r"[0-9a-f]{16}", "m": r"[raci]", "x": r"\d{1,3}(\.\d)?", "c": r"i", "p": r"NE|\d{1,3}(\.\d{1,2})?",
+PATTERNS = {"r": r"[0-9a-f]{12}", "d": r"\d{8}T\d{4}", "h": r"[0-9a-f]{16}", "m": r"[raci]", "x": r"\d{1,3}(\.\d)?", "c": r"i", "e": r"\d{1,3}", "p": r"NE|\d{1,3}(\.\d{1,2})?",
             "w": r"\d{1,7}", "n": r"\d{1,7}", "l": r"uz|ru|en"}
 
 
@@ -51,7 +52,8 @@ def facts(result, identifier):
             "p": "NE" if percent is None else f"{float(percent):g}", "w": str(int(result.get("total_tokens") or 0)),
             "n": str(int(compared)), "l": result.get("language", "en") if result.get("language") in ("uz", "ru", "en") else "en",
             **({"x": f"{ai_share(result):g}"} if ai_share(result) is not None else {}),
-            **({"c": "i"} if result.get("status") == "incomplete_coverage" else {})}
+            **({"c": "i"} if result.get("status") == "incomplete_coverage" else {}),
+            **({"e": str(len(result["excluded_sources"]))} if result.get("excluded_sources") else {})}
 
 
 def ai_share(result):
