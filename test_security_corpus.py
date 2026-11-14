@@ -43,9 +43,12 @@ def test_report_ownership_expiry_delete():
     assert owner.delete(f'/api/report/{identifier}').status_code == 200
     assert owner.get(url).status_code == 404
     identifier = upload(owner).json()['report_id']
-    web.results[identifier]['expires'] = time.monotonic()-1
-    assert owner.get(f'/api/report/{identifier}.pdf?full=1').status_code == 404
+    web.results[identifier]['expires'] = time.monotonic()-1          # gone from memory after 15 minutes ...
+    assert owner.get(f'/api/report/{identifier}.pdf?full=1').status_code == 200   # ... still stored (24 hours)
     assert identifier not in web.results
+    import reports_store
+    assert reports_store.purge(time.time() + reports_store.ttl() + 1) >= 1          # 24 hours later: deleted
+    assert owner.get(f'/api/report/{identifier}.pdf?full=1').status_code == 404
 
 
 def test_cross_site_and_large_request():
