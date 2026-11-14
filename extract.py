@@ -1,5 +1,6 @@
 """Bounded text extraction shared by the website and the owner-run importer."""
 import io
+import tempfile
 import threading
 import os
 import struct
@@ -177,7 +178,47 @@ def doc_text(content):
 # long an upload waits while another one is being read.
 
 OCR_ALL = "uzb+uzb_cyrl+rus+eng"
-_OCR_SLOT = threading.BoundedSemaphore(1)      # one upload at a time: Tesseract is CPU- and memory-heavy
+class _OcrLock:
+    """One OCR job at a time, also across the separate processes that read files (sandbox.py): a thread lock for
+    this process plus an exclusive lock on a file in the temporary folder. Tesseract is CPU- and memory-heavy."""
+
+    def __init__(self):
+        self._thread = threading.BoundedSemaphore(1)
+        self._file = None
+
+    def acquire(self, timeout=60):
+        deadline = time.monotonic() + max(0.0, timeout)
+        if not self._thread.acquire(timeout=max(0.0, timeout)):
+            return False
+        try:
+            import fcntl
+        except ImportError:                              # Windows: the thread lock is all there is
+            return True
+        handle = open(os.path.join(tempfile.gettempdir(), "plagiq-ocr.lock"), "a+")
+        while True:
+            try:
+                fcntl.flock(handle, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                self._file = handle
+                return True
+            except OSError:
+                if time.monotonic() >= deadline:
+                    handle.close()
+                    self._thread.release()
+                    return False
+                time.sleep(0.2)
+
+    def release(self):
+        if self._file is not None:
+            try:
+                import fcntl
+                fcntl.flock(self._file, fcntl.LOCK_UN)
+            finally:
+                self._file.close()
+                self._file = None
+        self._thread.release()
+
+
+_OCR_SLOT = _OcrLock()
 TESSDATA_DIRS = ("/usr/share/tesseract-ocr/5/tessdata", "/usr/share/tesseract-ocr/4.00/tessdata", "/usr/share/tessdata")
 
 
@@ -311,5 +352,9 @@ def extract_text(name, content, max_pages=MAX_PDF_PAGES, ocr=False, info=None):
             return expand_ligatures(dehyphenate("\n".join(texts)))
     except ExtractError:
         raise
-    except Exception:
+    except Exception as exc:
+        if isinstance(exc, MemoryError) or re.search(r"malloc|out of memory|cannot allocate", str(exc), re.I):
+            # the memory limit of the reading process (sandbox.py) was reached
+            raise ExtractError(400, "file_too_complex", "This file needs more memory or time to read than PlagIQ allows. "
+                                                         "Save it again (for example as a new PDF) or split it.")
         raise ExtractError(400, "extract_failed", "Could not read this file. Check that it is a valid DOCX or text-based PDF.")

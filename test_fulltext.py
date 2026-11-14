@@ -36,6 +36,11 @@ def publisher():
                       '/content/works/W7.pdf': (200, 'application/pdf', pdf(ARTICLE)),
                       '/landing': (200, 'text/html', b'<html><head><meta name="citation_pdf_url" content="/article.pdf"></head></html>'),
                       '/broken.pdf': (200, 'application/pdf', b'not a pdf'),
+                      '/2007/11/working-paper-2007-35/': (200, 'text/html', b'<html><body><a href="/uploads/annual-report-2007.pdf">Annual report</a>'
+                                                          b'<a href="/uploads/wp07-34.pdf">Previous paper</a><a href="/uploads/wp07-35.pdf">Download PDF</a></body></html>'),
+                      '/uploads/wp07-35.pdf': (200, 'application/pdf', pdf(ARTICLE)),
+                      '/uploads/wp07-34.pdf': (200, 'application/pdf', pdf("A different working paper about exchange rates. " * 30)),
+                      '/unclear': (200, 'text/html', b'<html><body><a href="/one.pdf">One</a><a href="/two.pdf">Two</a></body></html>'),
                       '/robots.txt': (404, 'text/plain', b'')}
             if self.path == '/slow.pdf':
                 time.sleep(3)
@@ -100,8 +105,8 @@ def test_open_access_links_only_from_open_locations():
                           {'is_oa': True, 'pdf_url': 'https://repo.uz/a.pdf'}, {'is_oa': True, 'pdf_url': 'http://insecure/x.pdf'}],
             'open_access': {'oa_url': 'https://j.uz/a'}, 'has_content': {'pdf': True}}
     links = discovery.open_access_links(work)
-    assert links == {'openalex_id': 'W9', 'pdf_urls': ['https://j.uz/a.pdf', 'https://repo.uz/a.pdf'],
-                     'pages': ['https://j.uz/a'], 'openalex_pdf': True}
+    assert links == {'openalex_id': 'W9', 'pdf_urls': ['https://j.uz/a.pdf', 'https://repo.uz/a.pdf', 'https://insecure/x.pdf'],
+                     'pages': ['https://j.uz/a'], 'openalex_pdf': True}      # http links are fetched over HTTPS only
 
 
 def test_settings_bounded(monkeypatch):
@@ -150,3 +155,25 @@ def test_language_detected_from_text_and_reported(monkeypatch):
     with pymupdf.open(stream=pdf, filetype='pdf') as doc:
         text = ' '.join(''.join(p.get_text() for p in doc).split())
     assert 'EN (matndan aniqlandi; tanlangan: UZ)' in text
+
+
+def test_landing_page_without_pdf_tag_uses_the_matching_pdf_link(publisher):
+    """Bank of Canada style: no citation_pdf_url, several PDF links; the one named after the work is used."""
+    text, via = fulltext.fetch_one({"pages": [publisher + "/2007/11/working-paper-2007-35/"]}, local_fetcher(), False)
+    assert via == "article page" and BODY.split()[3] in text
+    with pytest.raises(Exception) as exc:                          # two unrelated PDF links: none is guessed
+        fulltext.fetch_one({"pages": [publisher + "/unclear"]}, local_fetcher(), False)
+    assert "no PDF link on page" in str(exc.value)
+
+
+def test_open_access_links_upgrade_http_and_skip_closed_copies():
+    work = {"id": "https://openalex.org/W2117806408",
+            "best_oa_location": {"is_oa": True, "landing_page_url": "http://hdl.handle.net/10419/53831"},
+            "locations": [{"is_oa": False, "landing_page_url": "https://www.bankofcanada.ca/wp-content/uploads/2010/02/wp07-35.pdf"},
+                          {"is_oa": True, "landing_page_url": "https://doi.org/10.34989/swp-2007-35"},
+                          {"is_oa": True, "landing_page_url": "https://repo.example/files/paper.PDF"}],
+            "open_access": {"oa_url": "http://hdl.handle.net/10419/53831"}}
+    links = discovery.open_access_links(work)
+    assert links["pages"] == ["https://hdl.handle.net/10419/53831", "https://doi.org/10.34989/swp-2007-35"]
+    assert links["pdf_urls"] == ["https://repo.example/files/paper.PDF"]          # a PDF given as a landing page
+    assert not any("bankofcanada" in u for u in links["pdf_urls"] + links["pages"])  # not marked open access: never fetched
