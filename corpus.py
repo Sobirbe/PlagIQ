@@ -112,6 +112,9 @@ def reindex(db):
                    'token_index INTEGER NOT NULL, PRIMARY KEY (fingerprint, source, token_index)) WITHOUT ROWID')
         for num, raw, text in db.execute('SELECT num, metadata, text FROM sources').fetchall():
             _store_windows(db, num, text, json.loads(raw)['language'])
+        db.execute('CREATE TABLE IF NOT EXISTS corpus_meta (key TEXT PRIMARY KEY, value TEXT)')
+        for key in ('uz_loanwords', 'seeds_indexed'):          # a full rebuild already uses the current rules
+            db.execute("INSERT OR REPLACE INTO corpus_meta VALUES (?, ?)", (key, datetime.now(timezone.utc).isoformat(timespec='seconds')))
         db.execute(f'PRAGMA user_version={NORMALIZATION_VERSION}')
 
 
@@ -126,6 +129,40 @@ def _store_seeds(db, num, words):
     find library texts that may contain an edited copy; every candidate is then verified against its full text."""
     db.executemany('INSERT OR IGNORE INTO seeds VALUES (?,?)',
                    ((f, num) for f in {f for f, _ in grams(words) if f % SEED_SAMPLE == 0}))
+
+
+def uz_fold_upgrade(db, batch=50):
+    """Re-fingerprint Uzbek texts after the loanword folding rules (textfold._loanwords) were added, `batch` texts
+    per call, in source order, so the engine never rebuilds the whole index at start-up. Returns how many Uzbek
+    texts still need it. Texts imported meanwhile are fingerprinted with the new rules at import."""
+    db.execute('CREATE TABLE IF NOT EXISTS corpus_meta (key TEXT PRIMARY KEY, value TEXT)')
+    if db.execute("SELECT 1 FROM corpus_meta WHERE key='uz_loanwords'").fetchone():
+        return 0
+    row = db.execute("SELECT value FROM corpus_meta WHERE key='uz_loanwords_upto'").fetchone()
+    upto = int(row[0]) if row else 0
+    uz = "json_extract(metadata, '$.language') = 'uz'"
+    chosen = db.execute(f'SELECT num, text FROM sources WHERE num > ? AND {uz} ORDER BY num LIMIT ?', (upto, batch)).fetchall()
+    if chosen:
+        nums = [num for num, _ in chosen]
+        marks = ','.join('?' * len(nums))
+        with db:
+            db.execute(f'DELETE FROM windows WHERE source IN ({marks})', nums)
+            db.execute(f'DELETE FROM seeds WHERE source IN ({marks})', nums)
+            for num, text in chosen:
+                _store_windows(db, num, text, 'uz')
+            db.execute("INSERT OR REPLACE INTO corpus_meta VALUES ('uz_loanwords_upto', ?)", (str(nums[-1]),))
+        try:
+            db.execute('PRAGMA wal_checkpoint(TRUNCATE)')
+        except sqlite3.Error:
+            pass
+    remaining = db.execute(f'SELECT COUNT(*) FROM sources WHERE num > ? AND {uz}',
+                           (chosen[-1][0] if chosen else upto,)).fetchone()[0]
+    if not remaining:
+        with db:
+            db.execute("DELETE FROM corpus_meta WHERE key='uz_loanwords_upto'")
+            db.execute("INSERT OR REPLACE INTO corpus_meta VALUES ('uz_loanwords', ?)",
+                       (datetime.now(timezone.utc).isoformat(timespec='seconds'),))
+    return remaining
 
 
 def seeds_upgrade(db, batch=50):
@@ -536,6 +573,8 @@ def search(db, text, language, max_passages=5, exclude=(), ignore=()):
 
 
 EDITED_CANDIDATES = 30
+SEED_RARE_SOURCES = 1          # a sampled phrase found in only one library text is evidence enough on its own
+EDITED_RARE_CANDIDATES = 8      # ... but at most this many texts are checked on one rare phrase alone
 
 
 def _shared_edits(q, sources, blocked, limit, fingerprints):
@@ -564,7 +603,7 @@ def _shared_edits(q, sources, blocked, limit, fingerprints):
 
 def _seed_candidates(db, q, ignore=()):
     """Library texts sharing at least 2 sampled three-word phrases with the manuscript (most shared first)."""
-    counts = {}
+    counts, rare = {}, set()
     for f in {f for f, _ in grams(q) if f % SEED_SAMPLE == 0}:
         holders = db.execute('SELECT source FROM seeds WHERE gram=? LIMIT ?', (f, SEED_MAX_SOURCES + 1)).fetchall()
         if len(holders) > SEED_MAX_SOURCES:
@@ -572,8 +611,13 @@ def _seed_candidates(db, q, ignore=()):
         for (num,) in holders:
             if num not in ignore:
                 counts[num] = counts.get(num, 0) + 1
-    ranked = sorted((n for n, c in counts.items() if c >= 2), key=lambda n: -counts[n])
-    return ranked[:EDITED_CANDIDATES]
+                if len(holders) <= SEED_RARE_SOURCES:
+                    rare.add(num)
+    # Two shared sampled phrases, or one rare one: a short, heavily edited passage keeps only a few phrases, and
+    # 1 in 4 of them is sampled, so requiring two would miss it by chance. Every candidate is verified in full.
+    strong = sorted((n for n, c in counts.items() if c >= 2), key=lambda n: -counts[n])[:EDITED_CANDIDATES]
+    single = [n for n in rare if counts[n] == 1][:EDITED_RARE_CANDIDATES]
+    return strong + single
 
 
 # ------------------------------------------------------------------ import

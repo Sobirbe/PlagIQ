@@ -480,6 +480,8 @@ PlagIQ also finds copied passages in which words were replaced, inserted or dele
   - New imports are indexed at once.
 - **Check before deploying:** the engine volume has room for about 20% more data (433 MB → about 520 MB).
 
+**Uzbek loanwords (later update):** after redeploying the engine, it re-fingerprints Uzbek texts in the background so that loanwords match across scripts and spellings (sentabr = сентябрь = sentyabr; `evaluation/LOANWORDS.md`). The logs say "Uzbek loanword fingerprints: N texts left" and finally "Uzbek texts match loanwords across scripts". Checks keep working meanwhile.
+
 ## Part 3s — "My checks": reports kept for 24 hours
 
 - **What users get:** every check is listed under **"My checks (last 24 hours)"** with its status, percentage, PDFs and an Open button, in the same browser or, when signed in, on any device. A user can close the page while a check runs; it finishes and appears there.
