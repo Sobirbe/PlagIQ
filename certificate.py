@@ -4,6 +4,7 @@ It certifies what PlagIQ did (which document, when, in which scope, with which
 result), never that the document is original or free of plagiarism. The figures
 are the same signed facts that the QR code's /verify page confirms.
 """
+import checkstatus
 from reportlab.lib import colors
 from reportlab.lib.units import mm
 from reportlab.platypus import Flowable, Paragraph
@@ -117,7 +118,8 @@ def facts(result, lang):
     scope = t["scope_ai"] if mode == "ai" else t["scopes"].get(mode, "").format(w=t["scope_web"].format(p=providers) if web.get("enabled") else "")
     if mode == "academic" and (result.get("library") or {}).get("searched"):
         scope += t["scope_library"]
-    rows = [(t["sources"], sources)] + ([] if mode == "ai" else [(t["exclusions"], ", ".join(chosen) or t["ex_none"])])
+    rows = ([] if mode == "ai" else checkstatus.rows(result, lang)) + [(t["sources"], sources)] + \
+        ([] if mode == "ai" else [(t["exclusions"], ", ".join(chosen) or t["ex_none"])])
     ai = result.get("ai") or {}
     if ai.get("status") == "done":
         rows.append((t["ai_row"], t["ai_v"].format(a=ai["fraction_ai"], s=ai["fraction_ai_assisted"], h=ai["fraction_human"])))
@@ -227,8 +229,8 @@ class CertificatePage(Flowable):
             path.arc(cx - ring, cy - ring, cx + ring, cy + ring, startAng=90, extent=-max(2.0, 3.6 * float(percent)))
             c.drawPath(path, stroke=1, fill=0)
         c.setFillColor(TEAL)
-        label = t["not_evaluated"] if percent is None else f"{percent}%"
-        c.setFont(self.bold, 22 if percent is not None else 12)
+        label = t["not_evaluated"] if percent is None else (f"{percent}%" if ai_mode else checkstatus.headline(r, self.lang))
+        c.setFont(self.bold, 12 if percent is None else 22 if label.endswith("%") and label[0].isdigit() else 13)
         c.drawCentredString(cx, cy - 7, label)
         self._para(esc(t["ai_ring"] if ai_mode else t["result"]), cx - ring - 4 * mm, cy - ring - 6 * mm, 2 * ring + 8 * mm, 8.5, self.bold, align=1)
         citation = r.get("citation") or {}
