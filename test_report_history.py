@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 
 import app as web
 import reports_store
-from test_auth_ai import EN, login, sign_in      # noqa: F401  (fixture)
+from test_auth_ai import EN, login, pilot_tester, sign_in      # noqa: F401  (fixture)
 from test_payments import balance, pay, top_up   # noqa: F401  (fixture)
 
 SOURCE = EN
@@ -22,6 +22,7 @@ def check(client, text=EN, name="essay.txt"):
 
 
 def test_listed_and_reopened_after_memory_is_gone(login):
+    pilot_tester(login)
     data = check(login).json()
     listing = login.get("/api/reports").json()
     assert listing["hours"] == 24 and len(listing["reports"]) == 1
@@ -40,7 +41,7 @@ def test_listed_and_reopened_after_memory_is_gone(login):
 
 
 def test_only_the_owner_sees_a_report(login):
-    sign_in(login)
+    pilot_tester(login)
     data = check(login).json()
     stranger = TestClient(web.app)
     assert stranger.get("/api/reports").json()["reports"] == []
@@ -55,6 +56,7 @@ def test_only_the_owner_sees_a_report(login):
 
 
 def test_failed_checks_are_listed_and_rejected_requests_are_not(login):
+    pilot_tester(login)
     blank = pymupdf.open(); blank.new_page()
     response = check(login, blank.tobytes(), "scan.pdf")
     assert response.json()["status"] == "failed_extraction"
@@ -65,6 +67,7 @@ def test_failed_checks_are_listed_and_rejected_requests_are_not(login):
 
 
 def test_deleted_after_24_hours_and_on_request(login):
+    pilot_tester(login)
     first = check(login).json()["report_id"]
     second = check(login).json()["report_id"]
     assert login.delete(f"/api/report/{first}").json() == {"deleted": True}
@@ -77,13 +80,14 @@ def test_deleted_after_24_hours_and_on_request(login):
 
 
 def test_flagged_ai_passages_and_integrity_examples_are_never_stored(login):
+    pilot_tester(login)
     data = check(login).json()
     stored = reports_store.get(data["report_id"])["result"]
     assert not {"ai_passages", "integrity_examples", "highlight_html", "search_phrases"} & set(stored)
 
 
 def test_account_deletion_removes_reports(login):
-    sign_in(login)
+    pilot_tester(login)
     identifier = check(login).json()["report_id"]
     assert login.delete("/api/me").status_code == 200
     assert reports_store.get(identifier) is None

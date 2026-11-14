@@ -244,14 +244,15 @@ The result is "Review suggested" or "No indicators found". Neither is a verdict:
 
 To switch the DOI lookups off, set `INTEGRITY_DOI_CHECK=0` on the website service.
 
-## Part 3i — Sign-in (Telegram, phone number, email)
+## Part 3i — Sign-in (Continue with Telegram / Continue with Email)
 
-People can sign in in three ways, all under the "Sign in" button at the top of the site:
-- **Telegram:** "Sign in with Telegram" on the website (steps 1–5 below).
-- **Phone number through the Telegram bot** (needs step 6): the person opens the bot, presses "📱 Share my number", and the bot replies with a one-time sign-in link (valid 10 minutes). Only the sender's *own* number is accepted (Telegram tells the bot whose number it is). The link opens the site in Telegram's built-in browser; people who prefer their usual browser can choose "Open in browser".
-- **Email and password:** on by default (`EMAIL_LOGIN=0` turns it off). **No email is sent and the address is not verified**: the email is only a login name. The password is stored only as a scrypt hash, and after 10 wrong passwords that email and that connection must wait 15 minutes. If someone forgets their password, the account cannot be recovered; they create a new one. Email-only sites (no Telegram bot) need `SESSION_SECRET` (32+ characters) to sign sessions.
+Signing in and creating an account are the same step. The "Sign in" button at the top offers exactly two ways:
+- **Continue with Telegram** (steps 1–5 below). Telegram's signature is checked on the server.
+- **Continue with Email:** no password. PlagIQ e-mails a 6-digit code and a one-time link (15 minutes, single use, at most 5 wrong guesses; at most 3 e-mails per address and 20 per network an hour). The answer never reveals whether an address already has an account. The first correct code creates the account. Codes are sent only after **you** switch them on: set up SMTP (Part 3v), send yourself a test e-mail from **/admin → Pilot testers and e-mail**, and only when it arrives set `EMAIL_SIGNIN=1`. Until then, accounts created earlier with an e-mail and password can still sign in with their password (no new password accounts are created), and new users continue with Telegram. `EMAIL_LOGIN=0` turns e-mail off entirely. For development only, `MAIL_BACKEND=dev` writes codes to the server log instead of e-mailing them — **never set it on the public site**.
+- A signed-in user can add the other method (account menu → "Add Telegram" / "Add email"); both then open the same account and share its one free check. A method that already belongs to another account with checks or payments is refused (accounts are never merged automatically).
+- The phone-number link through the bot is no longer offered on the site (links already sent keep working).
 
-**Without an account:** plagiarism checks of texts up to `ANON_MAX_WORDS` words (default **1000**, the Free plan) need no sign-in. Longer texts, the AI detector, the archive and paid checks always need an account. `ANON_MAX_WORDS=0` makes every check need sign-in.
+**Every check needs an account** whenever sign-in is set up: the one free check belongs to the account. `ANON_MAX_WORDS` and `LOGIN_REQUIRED` are no longer read — you can delete them from Railway.
 
 PlagIQ stores the Telegram ID, name and username; the phone number only if the person shares it with the bot; the email and password hash for email accounts; and a list of checks (date, mode, word count, result and AI estimate). It never stores documents or file names. Users can delete their account from the menu.
 
@@ -259,7 +260,7 @@ PlagIQ stores the Telegram ID, name and username; the phone number only if the p
 2. Still in @BotFather, send `/setdomain`, choose your bot, and send your site address without `https://`, for example `plagiq-production.up.railway.app`. Without this step Telegram refuses the sign-in.
 3. Railway → **website** service → **Settings → Volumes** → add a volume mounted at **`/data`**. Accounts are kept there, so they survive redeploys. Without a volume, accounts are lost at each deploy.
 4. Railway → **website** service → **Variables**: add `TELEGRAM_BOT_TOKEN` = the token, and `TELEGRAM_BOT_USERNAME` = the bot username without @. Deploy.
-5. Open the site. "Sign in with Telegram" appears at the top. Checks need sign-in by default; set `LOGIN_REQUIRED=0` to make it optional.
+5. Open the site. "Sign in" appears at the top, with "Continue with Telegram".
 6. Recommended: make the bot answer people who open it and press **/start**, and turn on sign-in by phone number (otherwise the bot stays silent, and people think sign-in is broken). Add `TELEGRAM_BOT_REPLIES=1` on the website service and redeploy. At start-up the site registers its address (`PUBLIC_ORIGIN` + `/telegram/webhook`) with Telegram. From then on the bot replies, in the user's Telegram language, with how to sign in and a "📱 Share my number" button, and the site shows "With my phone number (Telegram bot)" in the sign-in menu. /admin shows "Bot answers /start" ✅ once Telegram has accepted it. The bot stores only the phone numbers people choose to share. Do not turn this on if the same bot is already used by another program, because a bot can have only one webhook.
 
 The QR verification page (`/verify`) stays public, so supervisors can scan certificates without an account.
@@ -389,23 +390,31 @@ Optional settings on the **website** service:
 
 A check now takes a little longer (usually a few seconds, at most `FULLTEXT_SECONDS`). Watch the website's memory on Railway's **Metrics** tab after the change.
 
-## Part 3d — Prices shown on the website
+## Part 3d — Prices, the free check and rechecks
 
-The website shows the word count and the **planned** price as soon as a file is chosen, plus a price table and calculator. **No money is taken** while payments are off (the default), and the page says checks are free during the pilot. Payments in the providers' **test mode** are described in Part 3o.
+"One document. One payment. No subscription." The price depends only on the number of words. After a file is chosen the page shows the word count, the cheapest plan and — for a signed-in user — what this check is for their account (free check, recheck, pilot test check) and its total. Every price comes from the server; the browser only shows it.
 
-Default plans: Free up to 1,000 words (0 UZS), Researcher 1,001–3,500 words (15,000 UZS), Extended 3,501–15,000 words (25,000 UZS), Thesis 15,001–40,000 words (35,000 UZS), PhD/DSc dissertation 40,001–150,000 words (39,000 UZS). Uploads may be up to 20 MB per file and 500 PDF pages, so a whole PhD or DSc dissertation can be checked before submission to the OAK. Larger documents are shown as "contact us". Other services shown: AI detector 3 UZS per word (minimum 6,000), certificate with QR code included free, packages "10 checks → +2 free" and "20 checks → +5 free". For comparison, antiplag.uz (November 2026) charges 46,000 UZS per plagiarism check, 4 UZS per word for its AI detector (minimum 10,000), 6,000 UZS for a certificate, and gives +1 free for 10 checks and +3 for 20.
+| Plan | Up to | Price (UZS) | Recheck (−20%) |
+|---|---|---|---|
+| Free trial | 1,000 words | 0 | — |
+| Student | 3,500 | 15,000 | 12,000 |
+| Researcher ("Recommended for Journal Articles") | 10,000 | 25,000 | 20,000 |
+| Extended | 25,000 | 39,000 | 31,200 |
+| Master's Thesis | 40,000 | 49,000 | 39,200 |
+| PhD/DSc | 150,000 | 79,000 | 63,200 |
 
-**AI detector cost:** Pangram's list price is $0.05 per 100 words, which is about 6 UZS per word at 12,500 UZS/$. At 3 UZS per word you cover the cost only with Pangram's **Professional** plan ($65 a month including $200 of API credits, so about 2 UZS per word while those credits last). On the pay-as-you-go price, every AI check loses money. Set `AI_PRICE_PER_WORD` and `AI_MIN_PRICE` to your own figures, and check the current exchange rate.
+- **Free trial:** one check per account for life, up to 1,000 words, plagiarism only (no AI detector or archive), results **on screen only** — the server refuses the PDF, certificate and CSV of a free check. It is reserved in a database transaction before the check runs, used up only when the check produced a result, and given back if the check failed. Clearing cookies, another device, or deleting and re-creating the account do not bring it back (a keyed hash of the Telegram ID / e-mail is kept for this; no IP address or device fingerprint is used).
+- **Paid check:** on-screen results, source matching, highlights, PDF report and certificate of check with QR code. The certificate says what was checked, when and in which scope; it never says the document is free of plagiarism and is not an accredited certificate.
+- **Rechecks:** within 30 days of a successful paid check, the same account may recheck a revised version of the same manuscript twice at 20% off. "Same manuscript" is decided by a fingerprint of hashed word sequences (not the text), lenient enough for real revisions. Each recheck is a complete new check; failed rechecks are not counted. If the revision grew into a larger plan, it is not a discounted recheck: the larger plan's full price is shown before payment. Settings: `RECHECK_PERCENT` (80), `RECHECK_DAYS` (30), `RECHECK_LIMIT` (2).
+- **Pilot (payments off, `PAYMENTS_ENABLED` not 1 — the current setting):** prices are shown as future prices and nothing is charged. Beyond the free check, a check needs a **test allowance** you grant on **/admin → Pilot testers and e-mail** (account ID from the tester's account menu, number of checks, word limit, days). There are no unlimited free checks. Pilot checks give the full report and are recorded as "pilot", never as payments.
+- "My checks" (signed in) lists each check's type, words, date, result, available reports, recheck window and rechecks left, and payment status.
+- Packages of several checks are no longer offered on the site.
 
-To change the plans, add a `PRICING_TIERS` variable to the website service in Railway, for example:
+**Important if you set `PRICING_TIERS` earlier:** that variable overrides these prices. Delete it in Railway (website → Variables) to use the table above, or update it with the new ids `free`, `student`, `researcher`, `extended`, `masters`, `phd`, which have names in all languages. Other services: AI detector `AI_PRICE_PER_WORD` (3) and `AI_MIN_PRICE` (6,000), added to a paid check's total when chosen.
 
-```json
-[{"id":"free","max_words":1000,"price_uzs":0},{"id":"researcher","max_words":3500,"price_uzs":15000},{"id":"extended","max_words":15000,"price_uzs":25000},{"id":"thesis","max_words":40000,"price_uzs":35000},{"id":"phd","max_words":150000,"price_uzs":39000}]
-```
+**AI detector cost:** Pangram's list price is $0.05 per 100 words, about 6 UZS per word at 12,500 UZS/$. At 3 UZS per word you cover the cost only with Pangram's Professional plan. Check the current exchange rate.
 
-`PRICING_PACKAGES` changes the packages, for example `[{"checks":10,"bonus":2},{"checks":20,"bonus":5}]`.
-
-Keep the ids `free`, `researcher`, `extended`, `thesis` and `phd`, which have names and descriptions in all three languages. Change only the numbers. If the value is invalid, the site quietly uses the defaults. Before charging real money, measure the real cost per check; switching from test mode to real payments needs a separate, reviewed change (Part 3o).
+Switching from test mode to real payments needs a separate, reviewed change (Part 3o).
 
 ## Part 3o — Payments with Payme, Click and Uzum Bank (TEST MODE ONLY)
 

@@ -11,7 +11,7 @@ import admin
 import app as web
 import fulltext
 import metrics
-from test_auth_ai import EN, login, sign_in      # noqa: F401  (fixture)
+from test_auth_ai import EN, login, pilot_tester, sign_in      # noqa: F401  (fixture)
 
 SECRET_NAME = "Karimova_dissertation_final.txt"
 
@@ -22,6 +22,7 @@ def reference(client, text=EN, name=SECRET_NAME):
 
 
 def test_checks_and_failures_are_counted_without_text_or_names(login):
+    pilot_tester(login)
     assert reference(login).status_code == 200
     blank = pymupdf.open(); blank.new_page()
     assert reference(login, blank.tobytes(), "scan.pdf").json()["status"] == "failed_extraction"
@@ -36,6 +37,7 @@ def test_checks_and_failures_are_counted_without_text_or_names(login):
 
 
 def test_coverage_problems_and_outside_services(login, monkeypatch):
+    pilot_tester(login)
     record = {"title": "W", "url": "https://doi.org/10.1/w", "year": 2024, "coverage": "abstract", "abstract": EN}
     monkeypatch.setattr(web, "discover", lambda text, *a: {"status": "partial", "failed_queries": 2, "sources": [record],
                                                            "queries": 4, "message": ""})

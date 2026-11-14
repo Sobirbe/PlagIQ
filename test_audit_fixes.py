@@ -8,7 +8,7 @@ from fastapi.testclient import TestClient
 import app as web
 import engine_service
 from test_archive import engine  # noqa: F401  (fixture: engine with a temporary corpus)
-from test_auth_ai import EN, login, sign_in  # noqa: F401  (fixture)
+from test_auth_ai import EN, login, pilot_tester, sign_in  # noqa: F401  (fixture)
 
 
 def test_engine_waits_for_its_turn(engine, monkeypatch):
@@ -35,13 +35,12 @@ def test_signed_in_users_have_their_own_allowance(login, monkeypatch):
     form = {"mode": "reference", "language": "en", "reference_text": EN}
     run = lambda client: client.post("/api/check", data=form, files={"submission": ("m.txt", EN.encode())})
     anonymous = TestClient(web.app)
-    assert run(anonymous).status_code == 200
-    assert run(anonymous).json()["code"] == "rate_limited"           # same address, no account
-    sign_in(login, user_id=42)
+    assert run(anonymous).json()["code"] == "login_required"          # every check needs an account now
+    pilot_tester(login, user_id=42)
     assert run(login).status_code == 200 and run(login).status_code == 200    # per account, not per address
     assert run(login).json()["code"] == "rate_limited"
     other = TestClient(web.app)
-    sign_in(other, user_id=43)
+    pilot_tester(other, user_id=43)
     assert run(other).status_code == 200                              # a classmate on the same network
 
 
@@ -54,6 +53,7 @@ def test_slot_reserved_before_reading(login, monkeypatch):
         raise web.ApiError(400, "too_short", "x")
 
     monkeypatch.setattr(web, "analyse", slow_analyse)
+    pilot_tester(login)
     r = login.post("/api/check", data={"mode": "reference", "language": "en", "reference_text": EN},
                    files={"submission": ("m.txt", EN.encode())})
     assert r.status_code == 400 and seen == [1] and web.active_scans == 0       # released after failure

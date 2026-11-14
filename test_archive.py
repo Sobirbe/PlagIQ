@@ -73,6 +73,8 @@ def signed_in(client, user_id):
     check = "\n".join(f"{k}={data[k]}" for k in sorted(data))
     data["hash"] = hmac.new(hashlib.sha256(TOKEN.encode()).digest(), check.encode(), hashlib.sha256).hexdigest()
     assert client.post("/auth/telegram", json=data).status_code == 200
+    from test_auth_ai import grant_tester
+    grant_tester(user_id)
     return client
 
 

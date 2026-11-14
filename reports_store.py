@@ -53,6 +53,8 @@ def _connect():
     db.execute("CREATE TABLE IF NOT EXISTS reports (id TEXT PRIMARY KEY, owner TEXT NOT NULL, user INTEGER, "
                "created REAL NOT NULL, expires REAL NOT NULL, state TEXT NOT NULL, filename TEXT, mode TEXT, "
                "words INTEGER, status TEXT, percent REAL, error TEXT, charge TEXT, price INTEGER, payload BLOB)")
+    if "kind" not in {row[1] for row in db.execute("PRAGMA table_info(reports)")}:
+        db.execute("ALTER TABLE reports ADD COLUMN kind TEXT")    # "trial": on-screen only (no PDF or CSV)
     db.execute("CREATE INDEX IF NOT EXISTS reports_owner ON reports (owner)")
     db.execute("CREATE INDEX IF NOT EXISTS reports_user ON reports (user)")
     db.execute("CREATE INDEX IF NOT EXISTS reports_expires ON reports (expires)")
@@ -76,9 +78,9 @@ def charged(identifier, charge_id, price):
 def finish(identifier, result):
     payload = zlib.compress(json.dumps(result, ensure_ascii=False, separators=(",", ":")).encode(), 6)
     with _lock, closing(_connect()) as db, db:
-        db.execute("UPDATE reports SET state='done', status=?, percent=?, words=?, mode=?, payload=?, charge=NULL "
+        db.execute("UPDATE reports SET state='done', status=?, percent=?, words=?, mode=?, payload=?, charge=NULL, kind=? "
                    "WHERE id=?", (result.get("status"), result.get("percent"), int(result.get("total_tokens") or 0),
-                                  result.get("mode"), payload, identifier))
+                                  result.get("mode"), payload, (result.get("entitlement") or {}).get("kind"), identifier))
 
 
 def fail(identifier, code):
@@ -103,11 +105,11 @@ def get(identifier):
 def listing(owner, user_id):
     """Checks of this browser session and (signed in) this account, newest first, without payloads."""
     with _lock, closing(_connect()) as db:
-        rows = db.execute("SELECT id, created, expires, state, filename, mode, words, status, percent, error FROM reports "
+        rows = db.execute("SELECT id, created, expires, state, filename, mode, words, status, percent, error, kind FROM reports "
                           "WHERE expires>? AND (owner=? OR (user IS NOT NULL AND user=?)) ORDER BY created DESC LIMIT ?",
                           (time.time(), owner or "-", user_id if user_id is not None else -10**18, LIST_LIMIT)).fetchall()
-    return [dict(zip(("id", "created", "expires", "state", "filename", "mode", "words", "status", "percent", "error"), r))
-            for r in rows]
+    return [dict(zip(("id", "created", "expires", "state", "filename", "mode", "words", "status", "percent", "error", "kind"), r),
+                 exports=r[10] != "trial") for r in rows]
 
 
 def delete(identifier):

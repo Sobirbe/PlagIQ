@@ -11,7 +11,7 @@ import app as web
 import citations
 import corpus
 import templates
-from test_auth_ai import login, sign_in      # noqa: F401  (fixture)
+from test_auth_ai import login, pilot_tester, sign_in      # noqa: F401  (fixture)
 
 TEMPLATE = ("O‘ZBEKISTON RESPUBLIKASI OLIY TA’LIM, FAN VA INNOVATSIYALAR VAZIRLIGI TOSHKENT DAVLAT IQTISODIYOT "
             "UNIVERSITETI. Men ushbu bitiruv malakaviy ishini mustaqil bajarganimni va unda boshqa mualliflarning "
@@ -31,6 +31,13 @@ def setup(login, monkeypatch):
     return admin
 
 
+def student_client(user_id=50):
+    """A signed-in pilot tester (every check needs an account; the free trial would give no PDF)."""
+    client = TestClient(web.app)
+    pilot_tester(client, user_id=user_id)
+    return client
+
+
 def check(client, text, institution=""):
     return client.post("/api/check", data={"mode": "reference", "language": "uz", "institution": institution,
                                            "reference_text": TEMPLATE + " " + COPIED},
@@ -38,7 +45,7 @@ def check(client, text, institution=""):
 
 
 def test_template_wording_is_excluded_but_copying_is_not(setup):
-    student = TestClient(web.app)
+    student = student_client()
     doc = TEMPLATE + " " + OWN + " " + COPIED
     plain = check(student, doc)
     with_template = check(student, doc, "TDIU")
@@ -58,12 +65,12 @@ def test_cyrillic_template_matches_a_latin_document(setup):
     import evaluation.real_eval as real_eval  # noqa: F401
     from evaluation.real_eval import uz_latin_to_cyrillic
     setup.post("/api/institution/templates", data={"institution": "TDIU", "title": "Kirill", "text": uz_latin_to_cyrillic(OWN)})
-    data = check(TestClient(web.app), TEMPLATE + " " + OWN + " " + COPIED, "TDIU")
+    data = check(student_client(), TEMPLATE + " " + OWN + " " + COPIED, "TDIU")
     assert data["citation"]["excluded"]["template"] >= len(corpus.lexical(TEMPLATE, "uz"))
 
 
 def test_students_see_titles_only_and_only_admins_manage(setup):
-    student = TestClient(web.app)
+    student = student_client()
     listed = student.get("/api/templates").json()
     assert listed == {"institutions": [{"name": "TDIU", "templates": 1}]}
     assert student.get("/api/institution/templates?institution=TDIU").status_code == 403
@@ -78,7 +85,7 @@ def test_students_see_titles_only_and_only_admins_manage(setup):
 
 
 def test_unknown_university_and_limits(setup):
-    response = TestClient(web.app).post("/api/check", data={"mode": "reference", "language": "uz", "institution": "Nowhere",
+    response = student_client().post("/api/check", data={"mode": "reference", "language": "uz", "institution": "Nowhere",
                                                             "reference_text": COPIED},
                                         files={"submission": ("a.txt", io.BytesIO(COPIED.encode()))})
     assert response.status_code == 400 and response.json()["code"] == "institution_unknown"
@@ -89,7 +96,7 @@ def test_unknown_university_and_limits(setup):
 
 
 def test_source_exclusion_keeps_the_template_rule(setup):
-    student = TestClient(web.app)
+    student = student_client()
     data = check(student, TEMPLATE + " " + OWN + " " + COPIED, "TDIU")
     same = student.post(f"/api/report/{data['report_id']}/exclude", json={"sources": []}).json()
     assert same["citation"]["excluded"]["template"] == data["citation"]["excluded"]["template"]

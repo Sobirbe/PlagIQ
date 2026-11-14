@@ -17,11 +17,11 @@ def test_word_count_is_fair_across_languages():
 def test_tiers_and_boundaries(monkeypatch):
     monkeypatch.delenv('PRICING_TIERS', raising=False)
     assert pricing.quote(1000)['id'] == 'free' and pricing.quote(1000)['price_uzs'] == 0
-    assert pricing.quote(1001)['id'] == 'researcher' and pricing.quote(1001)['price_uzs'] == 15000
-    assert pricing.quote(3500)['id'] == 'researcher'
-    assert pricing.quote(3501)['id'] == 'extended' and pricing.quote(3501)['price_uzs'] == 25000
-    assert pricing.quote(15000)['id'] == 'extended'
-    assert pricing.quote(15001)['id'] == 'thesis' and pricing.quote(40001)['id'] == 'phd' and pricing.quote(150001) == {'id': 'contact', 'max_words': None, 'price_uzs': None, 'words': 150001, 'fits': False}
+    assert pricing.quote(1001)['id'] == 'student' and pricing.quote(1001)['price_uzs'] == 15000
+    assert pricing.quote(3500)['id'] == 'student'
+    assert pricing.quote(3501)['id'] == 'researcher' and pricing.quote(3501)['price_uzs'] == 25000
+    assert pricing.quote(25000)['id'] == 'extended'
+    assert pricing.quote(25001)['id'] == 'masters' and pricing.quote(40001)['id'] == 'phd' and pricing.quote(150001) == {'id': 'contact', 'max_words': None, 'price_uzs': None, 'words': 150001, 'fits': False}
 
 
 def test_owner_configuration_and_invalid_fallback(monkeypatch):
@@ -38,11 +38,12 @@ def test_quote_endpoint_counts_words_and_stores_nothing(monkeypatch):
     client = TestClient(web.app)
     text = ('word ' * 2500).encode()
     data = client.post('/api/quote', files={'submission': ('a.txt', text)}).json()
-    assert data['words'] == 2500 and data['id'] == 'researcher' and data['price_uzs'] == 15000 and data['payments_enabled'] is False
+    assert data['words'] == 2500 and data['id'] == 'student' and data['price_uzs'] == 15000 and data['payments_enabled'] is False
+    assert 'decision' not in data                                # signed out: no personal entitlement in the answer
     assert not web.results and not web.RATE                       # no report, no scan allowance used
     assert client.post('/api/quote', files={'submission': ('a.exe', b'x')}).json()['code'] == 'unsupported_type'
     config = client.get('/api/pricing').json()
-    assert config['payments_enabled'] is False and config['status'] == 'planned' and len(config['tiers']) == 5
+    assert config['payments_enabled'] is False and config['status'] == 'planned' and len(config['tiers']) == 6
 
 
 def test_check_result_includes_plan():
@@ -59,7 +60,7 @@ def test_other_services_prices(monkeypatch):
     assert pricing.ai_price(1000) == 6000 and pricing.ai_price(5000) == 15000          # 3 so'm/word, minimum 6,000
     config = pricing.public_config()
     assert config['ai'] == {'per_word': 3, 'minimum': 6000} and config['certificate'] == 0
-    assert config['packages'] == [{'checks': 10, 'bonus': 2}, {'checks': 20, 'bonus': 5}]
+    assert 'packages' not in config                                                    # no packages on the main pages
     monkeypatch.setenv('AI_PRICE_PER_WORD', '2')
     monkeypatch.setenv('PRICING_PACKAGES', '[{"checks": 5, "bonus": 9}]')                  # invalid: bonus > checks
     assert pricing.ai_price(5000) == 10000 and pricing.packages()[0] == {'checks': 10, 'bonus': 2}
