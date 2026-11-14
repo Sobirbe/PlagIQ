@@ -16,7 +16,7 @@ CYR = {
     "а":"a","б":"b","в":"v","г":"g","д":"d","ё":"yo","ж":"j",
     "з":"z","и":"i","й":"y","к":"k","л":"l","м":"m","н":"n",
     "о":"o","п":"p","р":"r","с":"s","т":"t","у":"u","ф":"f",
-    "х":"x","ч":"ch","ш":"sh","щ":"sh","ъ":"'","ы":"i","ь":"",
+    "х":"x","ч":"ch","ш":"sh","щ":"shch","ъ":"'","ы":"i","ь":"",
     "э":"e","ю":"yu","я":"ya","қ":"q","ҳ":"h","ў":O_CANON,
     "ғ":G_CANON,"ŏ":O_CANON,"ğ":G_CANON,
 }
@@ -132,9 +132,38 @@ def fold_with_map(text: str):
         if c not in BREVES:
             collapsed.append((c,start,end))
         i += 1
+    collapsed = _loanwords(collapsed)
     return ("".join(c for c,_,_ in collapsed),
             [start for _,start,_ in collapsed],
             [end for _,_,end in collapsed])
+
+
+LATIN_VOWELS = frozenset("aeiou" + O_CANON)
+
+
+def _consonant(c):
+    return c == G_CANON or (c.isalpha() and c not in LATIN_VOWELS and c != "y")
+
+
+def _loanwords(chars):
+    """Fold the spellings of Russian loanwords that Uzbek Latin and Cyrillic write differently, the same way on
+    both sides (so only matching changes; the official spelling of either script is never "corrected"):
+      consonant + y + a/o/u/e/oʻ  -> the y is dropped   сентябрь = sentabr = sentyabr, актёр = aktyor
+      consonant + ' + y           -> the ' is dropped   объект = obyekt = ob'yekt, подъезд = podyezd
+      word-initial ts             -> s                  цивилизация = sivilizatsiya = tsivilizatsiya
+    Measured on Uzbek vocabulary in evaluation/LOANWORDS.md (how many different words newly fold together)."""
+    out = []
+    for i, (c, start, end) in enumerate(chars):
+        prev = out[-1][0] if out else ""
+        nxt = chars[i + 1][0] if i + 1 < len(chars) else ""
+        if c == "'" and nxt == "y" and _consonant(prev):
+            continue
+        if c == "y" and nxt in "aoue" + O_CANON and nxt and _consonant(prev):
+            continue
+        if c == "t" and nxt == "s" and not (prev.isalpha() or prev in ("'", O_CANON, G_CANON)):
+            continue
+        out.append((c, start, end))
+    return out
 
 def fold(text: str) -> str:
     return fold_with_map(text)[0]

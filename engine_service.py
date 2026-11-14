@@ -113,7 +113,8 @@ def import_loop():
         import_stop.wait(hours * 3600)
 
 UPGRADES = (("ligature upgrade", corpus.ligature_upgrade, "all stored texts use expanded ligatures"),
-            ("edited-copy index", corpus.seeds_upgrade, "every stored text can be found for edited copying"))
+            ("edited-copy index", corpus.seeds_upgrade, "every stored text can be found for edited copying"),
+            ("Uzbek loanword fingerprints", corpus.uz_fold_upgrade, "Uzbek texts match loanwords across scripts"))
 
 
 def index_upgrade_loop():
