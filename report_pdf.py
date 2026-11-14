@@ -382,7 +382,7 @@ EDITED_T = {
 def _duration(minutes, lang):
     """'23 h 59 min' / '23 soat 59 daqiqa' / '23 ч 59 мин'."""
     h, m = divmod(max(0, int(minutes)), 60)
-    unit = {"uz": ("soat", "daqiqa"), "ru": ("ч", "мин")}.get(lang, ("h", "min"))
+    unit = {"uz": ("soat", "daqiqa"), "uzc": ("соат", "дақиқа"), "ru": ("ч", "мин")}.get(lang, ("h", "min"))
     return (f"{h} {unit[0]} " if h else "") + f"{m} {unit[1]}"
 
 
@@ -810,3 +810,8 @@ def build_pdf(result, identifier, lang="en", minutes_left=15, verify_url=None):
                             subject=t["subtitle"])
     doc.build(story, canvasmaker=_numbered_canvas(t, identifier))
     return out.getvalue()
+
+
+import uzcyr  # noqa: E402  (Uzbek Cyrillic texts, generated from the Uzbek Latin ones)
+for _table in (T, VIEW_T, INTEGRITY_T, AI_T, EDITED_T, EXCLUDED_T):
+    uzcyr.add_to(_table)

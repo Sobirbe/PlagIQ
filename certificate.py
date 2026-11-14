@@ -276,3 +276,7 @@ class CertificatePage(Flowable):
             c.setDash()
             ty = self._para(esc(t["verify"]), pad, top, text_w, 11, self.bold)
             self._para(esc(t["verify_off"]), pad, ty - 3, text_w, 8.5, color=MUTED)
+
+
+import uzcyr  # noqa: E402  (Uzbek Cyrillic texts, generated from the Uzbek Latin ones)
+uzcyr.add_to(C)

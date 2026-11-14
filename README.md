@@ -22,6 +22,17 @@ Every mode (own reference, OpenAlex abstracts, private corpus) uses the same cod
 
 Sequences (exact or edited) that occur in 3 or more different works (journal headers, licence lines, site banners) are treated as boilerplate and not counted; copies of one work count once (`evaluation/SAME_WORK.md`). The result is evidence with character positions in both texts. Accuracy on real texts: `evaluation/REAL_RESULTS.md` and `evaluation/EDITED.md`. Paraphrase and translation are not detected, and neither is heavier editing such as one word in three replaced.
 
+## Interface languages
+
+The site, the PDF reports, the certificate and the verification page are available in **Uzbek (Latin)**, **Ўзбекча (кирилл)**, **Russian** and **English** (the "ЎЗ" button). Browsers set to Uzbek Cyrillic open in it.
+
+The Cyrillic texts are **generated** from the Uzbek Latin ones (`uzcyr.py`, and the same rules in `index.html`), so the two never drift apart:
+- oʻ → ў, gʻ → ғ, sh/ch, ye/yo/yu/ya, э at the start of a word, the tutuq belgisi between letters → ъ, ts → ц;
+- loanword exceptions such as sentabr → сентябрь, kompyuter → компьютер, kvitansiya → квитанция;
+- kept in Latin: service names, foreign abbreviations (PDF, OCR, QR), links and {placeholders}.
+
+`test_uz_cyrillic_ui.py` checks that the page and the server produce identical text for every string, and that no Latin word is left. To correct a word, add it to `uzcyr.EXCEPTIONS`; the page copy is built from the same list (copy `UZC_EX` in `index.html`). Not yet in Cyrillic: the separate privacy page and the Telegram bot's replies.
+
 ## Excluding sources and the source list
 
 The owner of a report can **exclude a source** from the result page, for example their own earlier paper or a template their university approved. The percentage is recalculated:

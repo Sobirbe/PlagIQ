@@ -60,3 +60,7 @@ def show(value, lang="en", seconds=False, with_label=True):
     local = moment.astimezone(zone())
     shown = local.strftime("%Y-%m-%d %H:%M:%S" if seconds else "%Y-%m-%d %H:%M")
     return f"{shown} ({label(lang)})" if with_label else shown
+
+
+import uzcyr  # noqa: E402  (Uzbek Cyrillic label, generated from the Uzbek Latin one)
+uzcyr.add_to(LABEL)

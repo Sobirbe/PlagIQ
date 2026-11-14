@@ -146,3 +146,7 @@ def describe(result, lang):
     status = result.get("status") or "completed_no_matches"
     return t.get(status, status), [t["issues"].get(i["code"], i["code"]).format(n=i.get("count", 1))
                                    for i in result.get("coverage_issues") or []]
+
+
+import uzcyr  # noqa: E402  (Uzbek Cyrillic texts, generated from the Uzbek Latin ones)
+uzcyr.add_to(T)
