@@ -261,6 +261,8 @@ def _ocr_pdf(pdf, texts, info):
         for n, i in enumerate(scanned):
             if time.monotonic() - started > budget:
                 raise ExtractError(413, "ocr_timeout", f"Reading the scanned pages took longer than {budget} seconds")
+            if callable(info.get("progress")):
+                info["progress"]("ocr", f"{n + 1}/{len(scanned)}")
             texts[i] = _ocr_page(pdf[i], models, dpi, tessdata)
             if models == OCR_ALL:                   # until a page has enough text to tell the script
                 models = _models_for(texts[i])

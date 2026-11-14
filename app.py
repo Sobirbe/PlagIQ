@@ -43,6 +43,7 @@ import io
 import csv
 import sqlite3
 import logging
+import progress
 import reports_store
 import uzcyr
 import templates
@@ -214,8 +215,10 @@ async def read_file(upload, kind="document"):
     content = await upload.read(MAX_BYTES + 1)
     if len(content) > MAX_BYTES:
         raise ApiError(413, "file_too_large", f"File exceeds {MAX_BYTES // (1024 * 1024)} MB")
-    info = {}
+    progress.step("read")
+    info = {"progress": progress.callback()}
     text = await run_in_threadpool(extract_text, name, content, info)
+    info.pop("progress", None)
     upload.ocr_info = info                      # OCR pages for the result; the PDF's stored title for the search
     if len(text) > MAX_CHARS:
         raise ApiError(413, "text_too_long", f"Extracted text exceeds the {MAX_CHARS:,}-character limit")
@@ -873,7 +876,8 @@ async def check(request:Request, submission:UploadFile=File(...),
                 exclude_quotes:bool=Form(False),exclude_bibliography:bool=Form(False),min_words:int=Form(7),
                 web_search:bool=Form(False),ai_check:bool=Form(False),ai_consent:bool=Form(False),
                 archive:bool=Form(False),archive_consent:bool=Form(False),archive_title:str=Form("",max_length=300),
-                archive_author:str=Form("",max_length=300),institution:str=Form("",max_length=80)):
+                archive_author:str=Form("",max_length=300),institution:str=Form("",max_length=80),
+                progress_token:str=Form("",alias="progress",max_length=40)):
     global active_scans
     purge_reports()
     user = auth.read(request.cookies.get(auth.COOKIE))
@@ -921,6 +925,7 @@ async def check(request:Request, submission:UploadFile=File(...),
     job = uuid.uuid4().hex
     session = request.cookies.get("plagiq_session") or secrets.token_urlsafe(32)
     started = time.monotonic()
+    progress.begin(progress_token)
     try:
         await run_in_threadpool(reports_store.start, job, session, user["id"] if user else None,
                                 clean_filename(submission.filename, "Document"), mode)
@@ -933,6 +938,7 @@ async def check(request:Request, submission:UploadFile=File(...),
         else:
             await run_in_threadpool(reports_store.fail, job, exc.code)
             await run_in_threadpool(metrics.record_failure, mode, status, exc.code, time.monotonic() - started)
+            progress.finish(failed=True)
             if not request.cookies.get("plagiq_session"):        # so the failed check shows under "My checks"
                 cookie = Response()
                 cookie.set_cookie("plagiq_session", session, max_age=reports_store.ttl(), httponly=True,
@@ -942,9 +948,11 @@ async def check(request:Request, submission:UploadFile=File(...),
     except BaseException:
         await run_in_threadpool(reports_store.fail, job, "internal_error")
         await run_in_threadpool(metrics.record_failure, mode, "failed_internal", "internal_error", time.monotonic() - started)
+        progress.finish(failed=True)
         raise
     finally:
         active_scans -= 1
+        progress.finish()
 
 
 async def _run_check(request, user, anonymous, submission, reference, reference_text, language, mode, options,
@@ -1020,6 +1028,7 @@ async def search_library(result, original, language, owner):
     if not corpus_configured():
         return {"searched": False}
     try:
+        progress.step("library")
         summary = summarize(await run_check(original, language, [hashlib.sha256(original.encode()).hexdigest()]))
         if summary["total_chars"] != len(original):
             raise EngineError("Engine returned inconsistent document length.")
@@ -1091,6 +1100,7 @@ async def analyse(submission, reference, reference_text, language, mode, options
             raise ApiError(413, "reference_too_long", f"Reference exceeds the {MAX_CHARS:,}-character limit")
         require_tokens(source, language, "reference_too_short",
                        "The reference needs at least 7 words of readable text.")
+        progress.step("compare")
         result = await run_in_threadpool(compare, original, source, language)
         same = original.strip() == source.strip()
         name = clean_filename(reference.filename, "Pasted reference") if reference and reference.filename else "Pasted reference"
@@ -1103,6 +1113,7 @@ async def analyse(submission, reference, reference_text, language, mode, options
                        "self_comparison":same})
     elif mode == "academic":
         pdf_title = (getattr(submission, "ocr_info", None) or {}).get("pdf_title")
+        progress.step("discover")
         discovery = await run_in_threadpool(discover, original, 8, language, pdf_title)
         import discovery as finder
         stems = await run_in_threadpool(finder.document_stems, original, language)
@@ -1115,15 +1126,18 @@ async def analyse(submission, reference, reference_text, language, mode, options
         fetched = {"attempted": 0, "compared": 0, "failed": 0, "timed_out": 0}
         if enabled and ranked:
             # Transient: full texts are compared for this check only and discarded with `discovery`.
+            progress.step("fulltext", min(len(ranked), max_works))
             fetched = await run_in_threadpool(fulltext.fetch_fulltexts, ranked, max_works, seconds, paid)
         web = {"enabled": False}
         if web_search and websearch.settings()[0]:
             # Separate consent: the same excerpts are sent to the search providers; pages are compared once and discarded.
             from discovery import spread_excerpts
             excerpts = spread_excerpts(original, websearch.excerpt_count(pricing.count_words(original)), pdf_title)
+            progress.step("web")
             web_sources, web = await run_in_threadpool(websearch.run, excerpts, language)
             known = {s.get("url") for s in discovery["sources"]}
             discovery["sources"] = discovery["sources"] + [s for s in web_sources if s["url"] not in known]
+        progress.step("compare")
         result = await run_in_threadpool(compare_sources, original, discovery["sources"], language)
         evaluated = sum(bool(s.get("abstract") or s.get("fulltext")) for s in discovery["sources"])
         result["fulltext"] = fetched
@@ -1152,6 +1166,7 @@ async def analyse(submission, reference, reference_text, language, mode, options
                                    if web.get("enabled") else "No web-wide plagiarism check.")})
     else:
         try:
+            progress.step("library")
             engine_report = await run_check(original, language, [hashlib.sha256(original.encode()).hexdigest()])
             summary = summarize(engine_report)
             if summary['total_chars'] != len(original):
@@ -1200,6 +1215,7 @@ async def analyse(submission, reference, reference_text, language, mode, options
         result["edited_tokens"] = max(0, corpus.words_in_intervals(lex, intervals) - corpus.words_in_intervals(lex, exact_intervals))
     result["highlight_html"] = ""
     if result.get("percent") is not None:
+        progress.step("report")
         review = await run_in_threadpool(citations.assess, original, language, intervals, **(options or {}))
         marks = marks_for(original, review.pop("segments"), result.get("sources"))
         result["highlight_html"] = highlight(original, None, marks=marks)
@@ -1214,9 +1230,11 @@ async def analyse(submission, reference, reference_text, language, mode, options
         integrity.assess, original, mode == "academic")
     words = pricing.count_words(original)
     if archive:
+        progress.step("archive")
         result["archive"] = await deposit_work(original, language, owner, archive, submission.filename)
     if ai_check:
         # Separate consent: the full text goes to Pangram; flagged passages stay out of the cache and PDF.
+        progress.step("ai")
         result["ai"], result["ai_passages"] = await run_in_threadpool(aidetect.detect, original, language, words)
     for source in result.get("sources") or []:
         for passage in source.get("passages") or []:
@@ -1462,6 +1480,16 @@ def report_sources_csv(identifier: str, request: Request):
                          src.get("edited_tokens") or 0, src.get("passage_count") or 0, "yes" if src.get("excluded") else ""])
     return Response("\ufeff" + out.getvalue(), media_type="text/csv; charset=utf-8",
                     headers={"Content-Disposition": 'attachment; filename="PlagIQ-sources.csv"', "Cache-Control": "no-store"})
+
+
+@app.get("/api/progress/{token}")
+def check_progress(token: str):
+    """The steps a running check has passed through (see progress.py). Only the browser that chose the random
+    token knows it; no document text is included."""
+    state = progress.read(token) if progress.TOKEN.fullmatch(token or "") else None
+    if state is None:
+        raise ApiError(404, "report_unavailable", "Not found")
+    return JSONResponse(state, headers={"Cache-Control": "no-store"})
 
 
 @app.get("/api/reports")
