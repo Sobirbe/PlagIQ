@@ -174,7 +174,7 @@ async def read_file(upload, kind="document"):
         raise ApiError(413, "file_too_large", f"File exceeds {MAX_BYTES // (1024 * 1024)} MB")
     info = {}
     text = await run_in_threadpool(extract_text, name, content, info)
-    upload.ocr_info = info                      # reported with the result ("N pages read by OCR")
+    upload.ocr_info = info                      # OCR pages for the result; the PDF's stored title for the search
     if len(text) > MAX_CHARS:
         raise ApiError(413, "text_too_long", f"Extracted text exceeds the {MAX_CHARS:,}-character limit")
     if not text.strip():
@@ -963,7 +963,8 @@ async def analyse(submission, reference, reference_text, language, mode, options
                        "scope":"One user-provided reference; no public academic databases searched.",
                        "self_comparison":same})
     elif mode == "academic":
-        discovery = await run_in_threadpool(discover, original, 8, language)
+        pdf_title = (getattr(submission, "ocr_info", None) or {}).get("pdf_title")
+        discovery = await run_in_threadpool(discover, original, 8, language, pdf_title)
         import discovery as finder
         stems = await run_in_threadpool(finder.document_stems, original, language)
         for source in discovery["sources"]:            # topic relevance of each OpenAlex result (title + abstract)
@@ -980,7 +981,7 @@ async def analyse(submission, reference, reference_text, language, mode, options
         if web_search and websearch.settings()[0]:
             # Separate consent: the same excerpts are sent to the search providers; pages are compared once and discarded.
             from discovery import spread_excerpts
-            excerpts = spread_excerpts(original, websearch.excerpt_count(pricing.count_words(original)))
+            excerpts = spread_excerpts(original, websearch.excerpt_count(pricing.count_words(original)), pdf_title)
             web_sources, web = await run_in_threadpool(websearch.run, excerpts, language)
             known = {s.get("url") for s in discovery["sources"]}
             discovery["sources"] = discovery["sources"] + [s for s in web_sources if s["url"] not in known]

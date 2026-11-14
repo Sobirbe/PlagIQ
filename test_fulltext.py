@@ -139,7 +139,7 @@ def test_language_detected_from_text_and_reported(monkeypatch):
                                                                query_texts=['q'], language_used=a[1] if len(a) > 1 else None))
     calls = []
     real = web.discover
-    monkeypatch.setattr(web, 'discover', lambda text, n, lang: calls.append(lang) or real(text, n, lang))
+    monkeypatch.setattr(web, 'discover', lambda text, n, lang, title=None: calls.append(lang) or real(text, n, lang, title))
     web.RATE.clear(); web.results.clear()
     english = ('The quality of higher education is assessed with the help of new indicators for the region and the country. ' * 8)
     client = TestClient(web.app)

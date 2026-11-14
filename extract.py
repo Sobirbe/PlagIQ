@@ -213,9 +213,33 @@ def _models_for(sample):
     return OCR_ALL
 
 
+FUNCTION_WORDS = {"a", "an", "as", "at", "by", "in", "is", "it", "of", "on", "or", "to", "the", "va", "da", "bu",
+                  "в", "и", "к", "о", "с", "у", "во", "из", "на", "не", "по", "от", "до", "за", "со", "ва"}
+# Scanner-app logos printed on every page ("CamScanner", "Scanned with Adobe Scan").
+SCANNER_MARK = re.compile(r"camscanner|scanned with|adobe scan|microsoft lens|genius scan|vflat|tapscanner", re.I)
+
+
+def _clean_ocr(text):
+    """Drop OCR lines that are not text: scanner-app logos, and lines made of stray letters and symbols
+    (stamps, signatures, table rules). Lines with real words are kept as read."""
+    kept = []
+    for line in text.split("\n"):
+        tokens = line.split()
+        if not tokens:
+            kept.append(line)
+            continue
+        if SCANNER_MARK.search(line) and len(tokens) <= 4:
+            continue
+        words = [t for t in tokens if sum(c.isalpha() for c in t) >= 3 or t.lower() in FUNCTION_WORDS]
+        if not words and not any(t.isdigit() for t in tokens):
+            continue                                   # "|", "‘ a", "2 ie" ... (numbers alone are kept: tables)
+        kept.append(line)
+    return "\n".join(kept)
+
+
 def _ocr_page(page, models, dpi, tessdata):
     textpage = page.get_textpage_ocr(language=models, dpi=dpi, full=True, tessdata=tessdata)
-    return page.get_text(textpage=textpage)
+    return _clean_ocr(page.get_text(textpage=textpage))
 
 
 def _ocr_pdf(pdf, texts, info):
@@ -278,6 +302,7 @@ def extract_text(name, content, max_pages=MAX_PDF_PAGES, ocr=False, info=None):
         with fitz.open(stream=content, filetype="pdf") as pdf:
             if pdf.page_count > max_pages:
                 raise ExtractError(400, "pdf_pages", f"PDF exceeds {max_pages} pages")
+            info["pdf_title"] = (pdf.metadata or {}).get("title") or ""
             texts = [page.get_text() for page in pdf]
             if ocr:
                 texts = _ocr_pdf(pdf, texts, info)
