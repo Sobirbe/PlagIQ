@@ -88,8 +88,11 @@ def bot_id():
 
 def public_config():
     import telegram_bot
+    import mailer
     return {"enabled": enabled(), "required": required(), "bot_id": bot_id(), "telegram": telegram_enabled(),
-            "email": email_enabled(), "phone_bot": telegram_bot.enabled(), "anon_max_words": anon_max_words(),
+            "email": email_enabled(), "email_recovery": email_enabled() and mailer.configured(),
+            "email_verify_required": verification_required(),
+            "phone_bot": telegram_bot.enabled(), "anon_max_words": anon_max_words(),
             "bot_username": os.environ.get("TELEGRAM_BOT_USERNAME", "").lstrip("@")[:64]}
 
 
@@ -133,7 +136,7 @@ def _b64(data):
 
 def issue(user, now=None):
     payload = _b64(json.dumps({"id": user["id"], "name": user["name"], "username": user.get("username", ""),
-                               "exp": int((now or time.time()) + SESSION_DAYS * 86400)},
+                               "iat": int((now or time.time()) * 1000), "exp": int((now or time.time()) + SESSION_DAYS * 86400)},
                               separators=(",", ":"), ensure_ascii=False).encode())
     return payload + "." + _b64(hmac.new(_key(), payload.encode(), hashlib.sha256).digest())
 
@@ -151,7 +154,18 @@ def read(cookie, now=None):
         return None
     if not isinstance(data, dict) or data.get("exp", 0) < (now or time.time()):
         return None
+    if int(data["id"]) < 0 and _password_changed(-int(data["id"])) > int(data.get("iat", 0)):
+        return None                                   # signed in before the password was reset
     return {"id": int(data["id"]), "name": str(data.get("name", "")), "username": str(data.get("username", ""))}
+
+
+def _password_changed(account):
+    try:
+        with _lock, _connect() as db:
+            row = db.execute("SELECT password_changed FROM email_accounts WHERE id=?", (account,)).fetchone()
+    except sqlite3.Error:
+        return 0
+    return int(row[0] or 0) if row else 0
 
 
 def is_owner(user):
@@ -209,6 +223,14 @@ def _connect():
     columns = {row[1] for row in db.execute("PRAGMA table_info(users)")}
     if "phone" not in columns:
         db.execute("ALTER TABLE users ADD COLUMN phone TEXT")
+    email_columns = {row[1] for row in db.execute("PRAGMA table_info(email_accounts)")}
+    if "verified" not in email_columns:
+        db.execute("ALTER TABLE email_accounts ADD COLUMN verified TEXT")             # when the address was confirmed
+    if "password_changed" not in email_columns:
+        db.execute("ALTER TABLE email_accounts ADD COLUMN password_changed INTEGER")  # ms; sessions issued before end
+    # Single-use links for e-mail confirmation and password recovery: only a hash of the token is stored.
+    db.execute("CREATE TABLE IF NOT EXISTS email_tokens (hash TEXT PRIMARY KEY, account INTEGER NOT NULL, kind TEXT NOT NULL, "
+               "expires INTEGER NOT NULL, used INTEGER NOT NULL DEFAULT 0)")
     return db
 
 
@@ -336,9 +358,147 @@ def login_email(email, password, client=""):
     if not row or not _matches(str(password), row[1]):
         _failed(keys)
         raise AccountError("login_failed_email", "Wrong email or password.", 401)
+    if verification_required() and not _verified(row[0]):
+        raise AccountError("email_unverified", "Confirm your email address first: open the link we sent you, or send it again.", 403)
     user = {"id": -row[0], "name": (name[0] if name else "") or email.split("@")[0], "username": ""}
     remember(user)
     return user
+
+
+# ------------------------------------------------------- e-mail confirmation and password recovery
+TOKEN_HOURS = {"verify": 48, "reset": 1}
+_SENDS = {}                                    # key -> [times]: confirmation / recovery e-mails sent
+SEND_LIMIT, SEND_WINDOW = 3, 3600
+
+
+def verification_required():
+    """Sign-in waits for a confirmed address only when the owner asks for it (EMAIL_VERIFY_REQUIRED=1) and e-mail
+    can actually be sent; by default accounts work at once and confirmation is offered."""
+    import mailer
+    return os.environ.get("EMAIL_VERIFY_REQUIRED") == "1" and mailer.configured()
+
+
+def _verified(account):
+    with _lock, _connect() as db:
+        row = db.execute("SELECT verified FROM email_accounts WHERE id=?", (account,)).fetchone()
+    return bool(row and row[0])
+
+
+def email_status(user):
+    """{"email", "verified"} for an e-mail account, None for Telegram accounts."""
+    if not user or user["id"] >= 0:
+        return None
+    with _lock, _connect() as db:
+        row = db.execute("SELECT email, verified FROM email_accounts WHERE id=?", (-user["id"],)).fetchone()
+    return {"email": row[0], "verified": bool(row[1])} if row else None
+
+
+def _token(account, kind):
+    raw = secrets.token_urlsafe(32)
+    with _lock, _connect() as db:
+        db.execute("DELETE FROM email_tokens WHERE expires < ?", (int(time.time()),))
+        db.execute("INSERT INTO email_tokens (hash, account, kind, expires) VALUES (?, ?, ?, ?)",
+                   (hashlib.sha256(raw.encode()).hexdigest(), account, kind, int(time.time()) + TOKEN_HOURS[kind] * 3600))
+    return raw
+
+
+def _take(raw, kind):
+    """The account a valid, unused token belongs to (and mark it used), or None."""
+    if not isinstance(raw, str) or not 20 <= len(raw) <= 100:
+        return None
+    digest = hashlib.sha256(raw.encode()).hexdigest()
+    with _lock, _connect() as db:
+        row = db.execute("SELECT account FROM email_tokens WHERE hash=? AND kind=? AND used=0 AND expires>=?",
+                         (digest, kind, int(time.time()))).fetchone()
+        if row:
+            db.execute("UPDATE email_tokens SET used=1 WHERE hash=?", (digest,))
+    return row[0] if row else None
+
+
+IP_SEND_LIMIT = 20                             # one university network can hold many students
+
+
+def _may_send(keys, now=None):
+    """At most SEND_LIMIT e-mails per address and IP_SEND_LIMIT per network address in SEND_WINDOW."""
+    now = now or time.time()
+    for key in keys:
+        recent = [t for t in _SENDS.get(key, []) if now - t < SEND_WINDOW]
+        _SENDS[key] = recent
+        if len(recent) >= (IP_SEND_LIMIT if "-ip:" in key else SEND_LIMIT):
+            return False
+    for key in keys:
+        _SENDS[key].append(now)
+    return True
+
+
+MAIL_T = {
+    "verify": ("Confirm your PlagIQ email address",
+               "Hello,\n\nplease confirm this address for your PlagIQ account by opening the link below (valid for 48 hours):\n\n{link}\n\n"
+               "If you did not create a PlagIQ account, ignore this message.\n\n"
+               "Assalomu alaykum! PlagIQ hisobingiz uchun manzilni tasdiqlang: {link}\nЗдравствуйте! Подтвердите адрес для аккаунта PlagIQ: {link}\n"),
+    "reset": ("Reset your PlagIQ password",
+              "Hello,\n\nsomeone asked to reset the password of the PlagIQ account for this address. To choose a new password, "
+              "open the link below (valid for 1 hour, once):\n\n{link}\n\nIf it was not you, ignore this message; your password "
+              "stays the same.\n\nParolni tiklash havolasi (1 soat): {link}\nСсылка для смены пароля (1 час): {link}\n"),
+}
+
+
+def send_link(kind, account, email, origin):
+    """E-mail a confirmation or recovery link. Returns True when sent."""
+    import mailer
+    link = origin.rstrip("/") + ("/auth/verify-email?t=" if kind == "verify" else "/auth/reset?t=") + _token(account, kind)
+    subject, body = MAIL_T[kind]
+    try:
+        mailer.send(email, subject, body.format(link=link))
+        return True
+    except mailer.MailError:
+        return False
+
+
+def request_verification(user, origin, client=""):
+    status = email_status(user)
+    if not status or status["verified"]:
+        return False
+    if not _may_send(["verify:" + status["email"]] + (["verify-ip:" + client] if client else [])):
+        raise AccountError("too_many_emails", "Too many emails requested. Try again in an hour.", 429)
+    return send_link("verify", -user["id"], status["email"], origin)
+
+
+def confirm_email(raw):
+    account = _take(raw, "verify")
+    if account is None:
+        return False
+    with _lock, _connect() as db:
+        db.execute("UPDATE email_accounts SET verified=? WHERE id=?", (_now(), account))
+    return True
+
+
+def request_reset(email, origin, client=""):
+    """Send a recovery link if the address has an account. The answer never says whether it has one."""
+    try:
+        email = _clean_email(email)
+    except AccountError:
+        return
+    if not _may_send(["reset:" + email] + (["reset-ip:" + client] if client else [])):
+        raise AccountError("too_many_emails", "Too many emails requested. Try again in an hour.", 429)
+    with _lock, _connect() as db:
+        row = db.execute("SELECT id FROM email_accounts WHERE email=?", (email,)).fetchone()
+    if row:
+        send_link("reset", row[0], email, origin)
+
+
+def reset_password(raw, password):
+    """Set a new password from a recovery link. Ends all earlier sessions and confirms the address."""
+    if not isinstance(password, str) or len(password) < MIN_PASSWORD or len(password) > 200:
+        raise AccountError("weak_password", f"The password needs at least {MIN_PASSWORD} characters.")
+    account = _take(raw, "reset")
+    if account is None:
+        raise AccountError("reset_link_invalid", "This link has expired or was already used. Ask for a new one.", 400)
+    with _lock, _connect() as db:
+        db.execute("UPDATE email_accounts SET password=?, password_changed=?, verified=COALESCE(verified, ?) WHERE id=?",
+                   (_hash(password), int(time.time() * 1000), _now(), account))
+        db.execute("UPDATE email_tokens SET used=1 WHERE account=? AND kind='reset'", (account,))
+    return True
 
 
 # ------------------------------------------------------------- one-time links from the bot

@@ -12,6 +12,7 @@ import auth
 import checkstatus
 import institutions
 import metrics
+import operator_info
 import payments
 import telegram_bot
 import verify
@@ -99,6 +100,10 @@ def checklist(library, probe=""):
         ("Partner universities", bool(institutions.configured()) or None, ", ".join(institutions.configured()) or "none yet (optional)",
          "INSTITUTIONS on the website (Part 3l)"),
     ]
+    pending = operator_info.missing()
+    rows.append(("Privacy notice and support contact", not pending,
+                 "complete" if not pending else "missing: " + ", ".join(pending),
+                 "Set these on the website service (docs/LEGAL-CHECKLIST.md); /privacy shows them as pending until then."))
     return rows
 
 

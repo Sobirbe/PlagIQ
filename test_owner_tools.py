@@ -95,8 +95,11 @@ def test_privacy_page_public_in_three_languages(monkeypatch):
     monkeypatch.setenv("PRIVATE_PILOT_PASSWORD", "p" * 20)
     page = TestClient(web.app).get("/privacy")
     assert page.status_code == 200
-    for expected in ("Maxfiylik siyosati", "Политика конфиденциальности", "Privacy notice", "ZRU-547", "Pangram", "DRAFT"):
+    for expected in ("Maxfiylik siyosati", "Политика конфиденциальности", "Privacy notice", "Pangram", "Draft",
+                     "to be completed by the operator", "Awaiting confirmation by legal counsel"):
         assert expected in page.text
+    assert "ZRU-547" not in page.text and "Lawyer's decision" not in page.text   # internal legal notes: docs/LEGAL-CHECKLIST.md
+    assert "{{" not in page.text and "[bracketed]" not in page.text
 
 
 @pytest.mark.parametrize("url, key, expected", [

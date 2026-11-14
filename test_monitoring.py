@@ -58,11 +58,14 @@ def test_old_figures_are_deleted_and_days_are_tashkent_dates(monkeypatch):
     metrics.record_failure("reference", "failed_internal", "internal_error", 1.0)
     with sqlite3.connect(metrics._path()) as db:
         assert db.execute("SELECT COUNT(*) FROM checks").fetchone()[0] == 1             # older than 90 days: gone
-    # 20:00 UTC is already the next day in Tashkent (UTC+5)
+    # 20:00 UTC is already the next day in Tashkent (UTC+5); start from an empty table so the time of day the tests
+    # run cannot matter
+    with sqlite3.connect(metrics._path()) as db:
+        db.execute("DELETE FROM checks")
     evening = time.mktime(time.strptime("2026-11-14 20:00", "%Y-%m-%d %H:%M")) - time.timezone
     metrics.record_check({"mode": "reference", "status": "completed_no_matches", "total_tokens": 10}, 1.0)
     with sqlite3.connect(metrics._path()) as db:
-        db.execute("UPDATE checks SET time=? WHERE error IS NULL", (evening,))
+        db.execute("UPDATE checks SET time=?", (evening,))
     days = dict((d, c) for d, c, _ in metrics.per_day(3, now=evening + 3600))
     assert days.get("2026-11-15") == 1
 

@@ -44,6 +44,9 @@ import csv
 import sqlite3
 import logging
 import progress
+import operator_info
+import sample_report
+import mailer
 import reports_store
 import sandbox
 import uzcyr
@@ -365,7 +368,7 @@ def verify_page(request: Request, ui: str = ""):
 def health():
     return {"status":"ok","version":VERSION,"corpus_engine_configured":corpus_configured(),
             "web_search":websearch.settings()[0],"web_providers":websearch.providers(),"web_max_excerpts":websearch.max_queries(),
-            "ocr":extract.ocr_available(),"login":auth.public_config(),"ai_detector":aidetect.settings(),"archive":corpus_configured() and auth.enabled(),
+            "ocr":extract.ocr_available(),"fulltext":fulltext.settings()[0],"login":auth.public_config(),"ai_detector":aidetect.settings(),"archive":corpus_configured() and auth.enabled(),
             "payments":{"enabled":payments.enabled(),"mode":payments.mode() if payments.enabled() else ""}}
 
 
@@ -375,7 +378,19 @@ def _secure(request):
 
 @app.get("/privacy", response_class=HTMLResponse)
 def privacy_page():
-    return HTMLResponse(Path(__file__).with_name("privacy.html").read_text("utf-8"))
+    return HTMLResponse(operator_info.privacy_html())
+
+
+@app.get("/api/sample-report")
+def sample_report_json():
+    """The labelled sample report (sample_report.py): fictional document and sources, real matching."""
+    return JSONResponse(sample_report.build(), headers={"Cache-Control": "no-store"})
+
+
+@app.get("/api/support")
+def support_details():
+    """Support and operator details the owner has set (operator_info.py); empty fields are not set yet."""
+    return operator_info.support()
 
 
 @app.get("/login", response_class=HTMLResponse)
@@ -424,7 +439,11 @@ async def email_register(request: Request):
         user = await run_in_threadpool(auth.register_email, data.get("email"), data.get("password"), data.get("name", ""))
     except auth.AccountError as exc:
         raise ApiError(exc.status, exc.code, str(exc))
-    return signed_in_response(request, JSONResponse({"user": user}), user)
+    sent = mailer.configured() and await run_in_threadpool(auth.request_verification, user, _origin(request), client_key(request))
+    response = JSONResponse({"user": user, "verification": "sent" if sent else "off"})
+    if auth.verification_required():
+        return response                               # signs in once the address is confirmed
+    return signed_in_response(request, response, user)
 
 
 @app.post("/auth/login")
@@ -474,7 +493,115 @@ def logout():
 async def me(request: Request):
     user = auth.read(request.cookies.get(auth.COOKIE))
     return {"auth": auth.public_config(), "user": user,
+            "email": await run_in_threadpool(auth.email_status, user) if user else None,
             "history": await run_in_threadpool(auth.history, user) if user else []}
+
+
+def _origin(request):
+    return os.getenv("PUBLIC_ORIGIN", "").strip() or str(request.base_url)
+
+
+ACCOUNT_T = {
+    "en": dict(title="PlagIQ account", verified="Your email address is confirmed. You can close this page.",
+               verify_bad="This confirmation link has expired or was already used. Sign in and send a new one.",
+               reset_title="Choose a new password", reset_label="New password (at least 8 characters)", reset_button="Save the new password",
+               reset_done="Your password was changed and every earlier sign-in was ended. Sign in with the new password.",
+               back="Back to PlagIQ"),
+    "ru": dict(title="Аккаунт PlagIQ", verified="Адрес электронной почты подтверждён. Эту страницу можно закрыть.",
+               verify_bad="Срок действия ссылки истёк или она уже использована. Войдите и отправьте новую.",
+               reset_title="Новый пароль", reset_label="Новый пароль (не менее 8 символов)", reset_button="Сохранить пароль",
+               reset_done="Пароль изменён, все прежние входы завершены. Войдите с новым паролем.", back="Вернуться в PlagIQ"),
+    "uz": dict(title="PlagIQ hisobi", verified="Elektron pochta manzilingiz tasdiqlandi. Bu sahifani yopishingiz mumkin.",
+               verify_bad="Bu havolaning muddati tugagan yoki u ishlatilgan. Tizimga kirib, yangisini yuboring.",
+               reset_title="Yangi parol", reset_label="Yangi parol (kamida 8 belgi)", reset_button="Yangi parolni saqlash",
+               reset_done="Parolingiz o‘zgartirildi va avvalgi barcha kirishlar tugatildi. Yangi parol bilan kiring.",
+               back="PlagIQ’ga qaytish"),
+}
+uzcyr.add_to(ACCOUNT_T)
+
+
+def _account_page(request, body, ui=""):
+    accept = request.headers.get("accept-language", "")[:12].lower()
+    lang = ui if ui in ACCOUNT_T else ("uzc" if accept.startswith("uz-cyrl") else next((l for l in ("uz", "ru") if l in accept[:5]), "en"))
+    t = ACCOUNT_T[lang]
+    page = (f'<!doctype html><html lang="{"uz-Cyrl" if lang == "uzc" else lang}"><head><meta charset="utf-8">'
+            f'<meta name="viewport" content="width=device-width,initial-scale=1"><title>{html.escape(t["title"])}</title>'
+            '<style>body{font-family:system-ui,sans-serif;margin:0;background:#f7f9f7;color:#122a32}main{max-width:520px;margin:40px auto;'
+            'background:#fff;border:1px solid #dce6e5;border-radius:18px;padding:28px}h1{font-size:22px}label{display:block;margin:14px 0 6px}'
+            'input{width:100%;box-sizing:border-box;padding:10px;border:1px solid #cfe0dd;border-radius:10px;font:inherit}'
+            'button{margin-top:14px;padding:10px 18px;border:0;border-radius:10px;background:#0f6b5b;color:#fff;font:inherit;font-weight:700}'
+            '.err{color:#9b2c16}@media(max-width:600px){main{margin:0;border-radius:0}}</style></head><body><main>'
+            f'<h1>{html.escape(t["title"])}</h1>{body(t, lang)}<p><a href="/">{html.escape(t["back"])}</a></p></main></body></html>')
+    return HTMLResponse(page, headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"})
+
+
+@app.post("/auth/verify/resend")
+async def resend_verification(request: Request):
+    user = auth.read(request.cookies.get(auth.COOKIE))
+    if not user or user["id"] >= 0:
+        raise ApiError(401, "login_required", "Sign in with your email account first.")
+    if not mailer.configured():
+        raise ApiError(503, "mail_not_configured", "Sending email is not set up on this server.")
+    try:
+        sent = await run_in_threadpool(auth.request_verification, user, _origin(request), client_key(request))
+    except auth.AccountError as exc:
+        raise ApiError(exc.status, exc.code, str(exc))
+    return {"sent": bool(sent)}
+
+
+@app.get("/auth/verify-email", response_class=HTMLResponse)
+async def verify_email_page(request: Request, t: str = "", ui: str = ""):
+    ok = await run_in_threadpool(auth.confirm_email, t)
+    return _account_page(request, lambda tx, lang: f'<p class="{"" if ok else "err"}">{html.escape(tx["verified"] if ok else tx["verify_bad"])}</p>', ui)
+
+
+@app.post("/auth/forgot")
+async def forgot_password(request: Request):
+    """Always the same answer, whether or not the address has an account."""
+    data = await _account_form(request)
+    if not auth.email_enabled() or not mailer.configured():
+        raise ApiError(503, "recovery_not_configured", "Password recovery by email is not set up on this server yet.")
+    try:
+        await run_in_threadpool(auth.request_reset, data.get("email"), _origin(request), client_key(request))
+    except auth.AccountError as exc:
+        raise ApiError(exc.status, exc.code, str(exc))
+    return {"sent": True}
+
+
+@app.get("/auth/reset", response_class=HTMLResponse)
+def reset_page(request: Request, t: str = "", ui: str = ""):
+    # Sent with fetch: a plain form post carries "Origin: null" under the site's no-referrer policy and would be
+    # refused by the cross-site check (security.py), which stays strict.
+    form = lambda tx, lang: (f'<form id="reset" method="post" action="/auth/reset?ui={lang}"><input type="hidden" name="t" value="{html.escape(t)}">'
+                             f'<label for="password">{html.escape(tx["reset_label"])}</label>'
+                             '<input id="password" name="password" type="password" minlength="8" maxlength="200" autocomplete="new-password" required>'
+                             f'<button type="submit">{html.escape(tx["reset_button"])}</button><p id="reset-out" role="status"></p></form>'
+                             '<script>document.getElementById("reset").addEventListener("submit",async e=>{e.preventDefault();'
+                             'let f=e.target,out=document.getElementById("reset-out");out.className="";'
+                             'try{let r=await fetch(f.action,{method:"POST",body:new FormData(f),headers:{Accept:"application/json"}}),d=await r.json();'
+                             'out.textContent=d.message;if(r.ok){f.querySelector("input[type=password]").disabled=true;f.querySelector("button").hidden=true}else out.className="err"}'
+                             'catch(_){out.className="err";out.textContent="Network error"}})</script>')
+    return _account_page(request, form, ui)
+
+
+@app.post("/auth/reset", response_class=HTMLResponse)
+async def reset_submit(request: Request, t: str = Form("", max_length=100), password: str = Form("", max_length=200), ui: str = ""):
+    wants_json = "application/json" in request.headers.get("accept", "")
+    try:
+        await run_in_threadpool(auth.reset_password, t, password)
+    except auth.AccountError as exc:
+        message = str(exc)
+        if wants_json:
+            return JSONResponse({"code": exc.code, "message": message}, 400)
+        return _account_page(request, lambda tx, lang: f'<p class="err">{html.escape(message)}</p>'
+                             + (f'<p><a href="/auth/reset?t={html.escape(t)}&amp;ui={lang}">↺</a></p>' if exc.code == "weak_password" else ""), ui)
+    if wants_json:
+        lang = ui if ui in ACCOUNT_T else "en"
+        response = JSONResponse({"code": "password_changed", "message": ACCOUNT_T[lang]["reset_done"]})
+    else:
+        response = _account_page(request, lambda tx, lang: f'<p>{html.escape(tx["reset_done"])}</p>', ui)
+    response.delete_cookie(auth.COOKIE)
+    return response
 
 
 @app.delete("/api/me")
@@ -1048,7 +1175,9 @@ async def search_library(result, original, language, owner):
     if result.get("percent") is not None or summary["language_counts"].get(language, 0):
         result["percent"] = _percent(matched, len(q))
         result.pop("not_evaluated_reason", None)
-    return {"searched": True, "size": summary["corpus_size"],
+    return {"searched": True, "size": summary["corpus_size"], "language": language,
+            "language_size": summary["language_counts"].get(language, 0),
+            "collections": (summary.get("collection_counts") or {}).get(language),
             "matched_sources": sum(1 for s in summary["sources"] if s["matched_tokens"])}
 
 

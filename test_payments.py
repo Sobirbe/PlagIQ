@@ -481,3 +481,19 @@ def test_uzum_callback_bypasses_pilot_password(pay, monkeypatch):
     monkeypatch.setenv("PRIVATE_PILOT_USER", "pilot")
     monkeypatch.setenv("PRIVATE_PILOT_PASSWORD", "a-long-pilot-password")
     assert uzum(pay, "status", {"serviceId": 101202, "timestamp": 1, "transId": "x"})[1]["errorCode"] == "10014"
+
+
+def test_refunds_never_exceed_the_charge(pay):
+    """A repeated or overlapping refund (retry, restart) cannot create credit."""
+    sign_in(pay)
+    top_up(pay, 20000)
+    user = {"id": 42}
+    charge = payments.charge(user, 15000, "reference check")
+    assert payments.refund(user, charge, 15000, "check failed") == 15000
+    assert payments.refund(user, charge, 15000, "check failed again") == 0          # already given back
+    assert balance(pay) == 20000
+    other = payments.charge(user, 15000, "academic check, AI detector")
+    assert payments.refund(user, other, 5000, "AI detector did not run") == 5000
+    assert payments.refund(user, other, 15000, "nothing could be compared") == 10000   # capped at what is left
+    assert balance(pay) == 20000
+    assert payments.refund({"id": 77}, other, 1000, "someone else's charge") == 0

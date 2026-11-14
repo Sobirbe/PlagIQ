@@ -562,9 +562,14 @@ def search(db, text, language, max_passages=5, exclude=(), ignore=()):
                         'edited_words': evidence['edited_words'], 'intervals': evidence['intervals'][:2000],
                         'passage_count': evidence['passage_count'], 'passages': evidence['passages']})
     counts = {lang: 0 for lang in LANGUAGES}
+    groups = {lang: {} for lang in LANGUAGES}
     for (raw,) in db.execute('SELECT metadata FROM sources'):
-        counts[json.loads(raw)['language']] += 1
+        m = json.loads(raw)
+        counts[m['language']] += 1
+        group = collection_group(m)
+        groups[m['language']][group] = groups[m['language']].get(group, 0) + 1
     return {'query_text_length': len(text), 'unique_passages': merge(union), 'exact_passages': merge(exact_union),
+            'collection_counts': groups,
             'boilerplate_windows': len(common),
             'sources': sorted(sources, key=lambda s: (-s['matched_words'], s['title'])),
             'corpus_sources': sum(counts.values()), 'language_counts': counts,
@@ -776,6 +781,16 @@ def category(metadata):
     if host.endswith('.uz') or 'oai' in (metadata.get('permission_reference') or '').lower():
         return 'journals'
     return 'other'
+
+
+COLLECTION_GROUPS = {'journals': 'academic', 'cyberleninka': 'academic', 'zenodo': 'academic', 'other': 'academic',
+                     'wikipedia': 'wikipedia', 'archive': 'deposits', 'university': 'deposits'}
+
+
+def collection_group(metadata):
+    """academic (journals, CyberLeninka, Zenodo, OpenAlex/CORE imports), wikipedia (encyclopaedia, not academic) or
+    deposits (unpublished works deposited by authors and universities): reports state what was compared."""
+    return COLLECTION_GROUPS.get(category(metadata), 'academic')
 
 
 def count_category(db, name, language=None):

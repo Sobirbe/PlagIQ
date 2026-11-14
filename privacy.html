@@ -12,17 +12,16 @@ nav a{margin-right:14px;font-weight:700;color:#006d70}
 section{background:#fff;border:1px solid #dce6e5;border-radius:14px;padding:20px;margin:18px 0}
 h1{font-size:26px}h2{font-size:21px;margin-top:0}h3{font-size:16px;margin-bottom:4px}
 table{border-collapse:collapse;width:100%;font-size:14px}th,td{text-align:left;padding:7px;border-bottom:1px solid #e6eeed;vertical-align:top}
-</style>
+.pending{background:#fff3cd;color:#6b4e00;border-radius:4px;padding:0 4px;font-style:italic}</style>
 </head>
 <body><main>
 <h1>PlagIQ</h1>
-<p class="draft"><b>LOYIHA / ПРОЕКТ / DRAFT.</b> Prepared for review by the owner's lawyer before public launch. Fill in the
-[bracketed] details. The section "Where data is stored" needs a legal decision (see note).</p>
+{{DRAFT_NOTICE}}
 <nav><a href="#uz">O‘zbekcha</a><a href="#ru">Русский</a><a href="#en">English</a></nav>
 
 <section id="uz" lang="uz">
 <h2>Maxfiylik siyosati</h2>
-<p><b>Operator:</b> [Egasining F.I.Sh. yoki tashkilot nomi], [manzil], [e-pochta]. Savollar va so‘rovlar uchun: [e-pochta / Telegram].</p>
+<p><b>Operator:</b> {{OPERATOR}}, {{ADDRESS}}, {{EMAIL}}. Savollar va so‘rovlar uchun: {{CONTACT}}.</p>
 <h3>Qanday ma’lumotlarni qayta ishlaymiz</h3>
 <table>
 <tr><th>Ma’lumot</th><th>Maqsad</th><th>Qancha saqlanadi</th></tr>
@@ -43,16 +42,16 @@ table{border-collapse:collapse;width:100%;font-size:14px}th,td{text-align:left;p
 </ul>
 <p>Bu xizmatlar o‘z maxfiylik siyosatlariga ko‘ra ishlaydi; PlagIQ hisobotni o‘chirgani ular saqlagan ma’lumotni o‘chirmaydi.</p>
 <h3>Huquqlaringiz</h3>
-<p>Hisobingizni va tekshiruvlar tarixini ismingiz ostidagi menyuda «Hisobimni o‘chirish» orqali o‘chirishingiz mumkin; arxivdagi ishlaringiz va to‘lov yozuvlaringiz ham o‘chiriladi, sarflanmagan balans yo‘qoladi. Arxivdagi alohida ishni «Arxivdagi ishlarim» bo‘limida o‘chirish mumkin. Boshqa so‘rovlar: [e-pochta].</p>
+<p>Hisobingizni va tekshiruvlar tarixini ismingiz ostidagi menyuda «Hisobimni o‘chirish» orqali o‘chirishingiz mumkin; arxivdagi ishlaringiz va to‘lov yozuvlaringiz ham o‘chiriladi, sarflanmagan balans yo‘qoladi. Arxivdagi alohida ishni «Arxivdagi ishlarim» bo‘limida o‘chirish mumkin. Boshqa so‘rovlar: {{EMAIL}}.</p>
 <h3>Ma’lumotlar qayerda saqlanadi</h3>
-<p>[Huquqshunos qarori: hozir server [Railway, mamlakat/mintaqa]da. O‘RQ-547 talabiga ko‘ra O‘zbekiston fuqarolarining shaxsiy ma’lumotlari O‘zbekistondagi ma’lumotlar bazalarida saqlanishi kerak — yuqoridagi hisob va arxiv ma’lumotlari uchun mahalliy joylashtirish talab qilinishi mumkin.]</p>
-<h3>Huquqiy asos</h3><p>Rozilik (tekshiruv, internet qidiruvi, AI detektor va arxiv uchun alohida) va xizmatni ko‘rsatish. [Huquqshunos tomonidan tasdiqlanadi.]</p>
-<p>Oxirgi yangilanish: [sana].</p>
+<p>{{DATA_LOCATION_UZ}}</p>
+<h3>Huquqiy asos</h3><p>Rozilik (tekshiruv, internet qidiruvi, AI detektor va arxiv uchun alohida) va xizmatni ko‘rsatish. {{COUNSEL}}</p>
+<p>Oxirgi yangilanish: {{UPDATED}}.</p>
 </section>
 
 <section id="ru" lang="ru">
 <h2>Политика конфиденциальности</h2>
-<p><b>Оператор:</b> [ФИО владельца или название организации], [адрес], [e-mail]. Вопросы и запросы: [e-mail / Telegram].</p>
+<p><b>Оператор:</b> {{OPERATOR}}, {{ADDRESS}}, {{EMAIL}}. Вопросы и запросы: {{CONTACT}}.</p>
 <h3>Какие данные мы обрабатываем</h3>
 <table>
 <tr><th>Данные</th><th>Цель</th><th>Срок хранения</th></tr>
@@ -73,16 +72,16 @@ table{border-collapse:collapse;width:100%;font-size:14px}th,td{text-align:left;p
 </ul>
 <p>Эти сервисы работают по своим политикам; удаление отчёта в PlagIQ не удаляет данные, сохранённые ими.</p>
 <h3>Ваши права</h3>
-<p>Аккаунт и историю проверок можно удалить в меню под вашим именем («Удалить мой аккаунт»); ваши работы в архиве и записи о платежах удаляются вместе с ним, неизрасходованный баланс сгорает. Отдельную работу можно удалить в разделе «Мои работы в архиве». Другие запросы: [e-mail].</p>
+<p>Аккаунт и историю проверок можно удалить в меню под вашим именем («Удалить мой аккаунт»); ваши работы в архиве и записи о платежах удаляются вместе с ним, неизрасходованный баланс сгорает. Отдельную работу можно удалить в разделе «Мои работы в архиве». Другие запросы: {{EMAIL}}.</p>
 <h3>Где хранятся данные</h3>
-<p>[Решение юриста: сейчас сервер находится у [Railway, страна/регион]. По закону ЗРУ-547 персональные данные граждан Узбекистана должны храниться в базах данных на территории Узбекистана — для аккаунтов и архива может потребоваться локальное размещение.]</p>
-<h3>Правовое основание</h3><p>Согласие (отдельное для проверки, поиска в интернете, ИИ-детектора и архива) и оказание услуги. [Подтверждается юристом.]</p>
-<p>Последнее обновление: [дата].</p>
+<p>{{DATA_LOCATION_RU}}</p>
+<h3>Правовое основание</h3><p>Согласие (отдельное для проверки, поиска в интернете, ИИ-детектора и архива) и оказание услуги. {{COUNSEL}}</p>
+<p>Последнее обновление: {{UPDATED}}.</p>
 </section>
 
 <section id="en" lang="en">
 <h2>Privacy notice</h2>
-<p><b>Controller:</b> [owner's name or organisation], [address], [email]. Questions and requests: [email / Telegram].</p>
+<p><b>Controller:</b> {{OPERATOR}}, {{ADDRESS}}, {{EMAIL}}. Questions and requests: {{CONTACT}}.</p>
 <h3>What we process</h3>
 <table>
 <tr><th>Data</th><th>Purpose</th><th>Kept for</th></tr>
@@ -103,10 +102,10 @@ table{border-collapse:collapse;width:100%;font-size:14px}th,td{text-align:left;p
 </ul>
 <p>These services follow their own privacy policies; deleting a PlagIQ report does not delete what they keep.</p>
 <h3>Your rights</h3>
-<p>Delete your account and check history from the menu under your name ("Delete my account"); your archived works and payment records are removed with it, and any unspent balance is lost. Remove a single archived work under "My archived works". Other requests: [email].</p>
+<p>Delete your account and check history from the menu under your name ("Delete my account"); your archived works and payment records are removed with it, and any unspent balance is lost. Remove a single archived work under "My archived works". Other requests: {{EMAIL}}.</p>
 <h3>Where data is stored</h3>
-<p>[Lawyer's decision: the server is currently with [Railway, country/region]. Under Law ZRU-547, personal data of citizens of Uzbekistan must be stored in databases located in Uzbekistan; the account and archive data may need local hosting.]</p>
-<h3>Legal basis</h3><p>Consent (separately for the check, web search, the AI detector and the archive) and providing the service. [To be confirmed by counsel.]</p>
-<p>Last updated: [date].</p>
+<p>{{DATA_LOCATION_EN}}</p>
+<h3>Legal basis</h3><p>Consent (separately for the check, web search, the AI detector and the archive) and providing the service. {{COUNSEL}}</p>
+<p>Last updated: {{UPDATED}}.</p>
 </section>
 </main></body></html>

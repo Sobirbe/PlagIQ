@@ -310,9 +310,12 @@ def library():
         rows = inventory(db)
         version = corpus_version(db)
     counts = {lang: sum(m['language'] == lang for m in rows) for lang in LANGUAGES}
-    by_source = {}
+    by_source, groups = {}, {lang: {} for lang in LANGUAGES}
     for m in rows:
         by_source[category(m)] = by_source.get(category(m), 0) + 1
+        if m['language'] in groups:
+            g = corpus.collection_group(m)
+            groups[m['language']][g] = groups[m['language']].get(g, 0) + 1
     allowed = ({f'wikipedia-{lang}' for lang in LANGUAGES} | {f'zenodo-{lang}' for lang in LANGUAGES} | set(LANGUAGES)
                | {'cyberleninka', 'uz-journals', 'disk', 'uz-from-ru'})
     status = {name: {k: v for k, v in info.items() if k in (
@@ -328,7 +331,7 @@ def library():
                 'free_bytes': usage.free, 'total_bytes': usage.total}
     except OSError:
         disk = None
-    return {'language_counts': counts, 'by_source': by_source, 'total': len(rows), 'corpus_version': version, 'disk': disk,
+    return {'language_counts': counts, 'by_source': by_source, 'collection_counts': groups, 'total': len(rows), 'corpus_version': version, 'disk': disk,
             'auto_import': import_job.settings()[0], 'auto_import_wikipedia': wikipedia_import.settings()[0],
             'imports': status}
 
