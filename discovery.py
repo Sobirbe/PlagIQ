@@ -6,7 +6,7 @@ short excerpt of the manuscript; the service only compares returned abstracts.
 import json
 import os
 import re
-from urllib.parse import urlencode
+from urllib.parse import urlsplit, urlencode
 from urllib.request import urlopen, Request
 from urllib.error import HTTPError, URLError
 from concurrent.futures import ThreadPoolExecutor
@@ -403,15 +403,24 @@ def open_access_links(work):
     best = work.get("best_oa_location") if isinstance(work.get("best_oa_location"), dict) else {}
     locations = [best] + [l for l in work.get("locations") or [] if isinstance(l, dict) and l is not best]
     pdfs, pages = [], []
+
+    def add(value, bucket):
+        # Repository links are often recorded as http:// (hdl.handle.net, older DSpace sites); they are fetched over
+        # HTTPS only. A "landing page" that is really a PDF file is tried as a PDF.
+        if not isinstance(value, str) or not value.startswith(("https://", "http://")):
+            return
+        value = "https://" + value[len("http://"):] if value.startswith("http://") else value
+        bucket = pdfs if urlsplit(value).path.lower().endswith(".pdf") else bucket
+        if value not in pdfs + pages:
+            bucket.append(value[:500])
+
     for location in locations:
         if not location.get("is_oa", location is best):
-            continue
-        for value, bucket in ((location.get("pdf_url"), pdfs), (location.get("landing_page_url"), pages)):
-            if isinstance(value, str) and value.startswith("https://") and value not in bucket:
-                bucket.append(value[:500])
+            continue                                       # only open-access copies are fetched
+        add(location.get("pdf_url"), pdfs)
+        add(location.get("landing_page_url"), pages)
     oa_url = (work.get("open_access") or {}).get("oa_url") if isinstance(work.get("open_access"), dict) else None
-    if isinstance(oa_url, str) and oa_url.startswith("https://") and oa_url not in pdfs + pages:
-        (pdfs if oa_url.lower().endswith(".pdf") else pages).append(oa_url[:500])
+    add(oa_url, pages)
     return {"openalex_id": str(work.get("id") or "").rsplit("/", 1)[-1], "pdf_urls": pdfs[:4], "pages": pages[:3],
             "openalex_pdf": bool((work.get("has_content") or {}).get("pdf")) if isinstance(work.get("has_content"), dict) else False}
 
