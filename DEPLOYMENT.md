@@ -432,6 +432,31 @@ This version takes **sandbox payments only**: it refuses to switch on unless `PA
 
 **Turning it off:** set `PAYMENTS_ENABLED=0` (or delete it). Checks become free again; balances stay stored.
 
+## Part 3p — Zenodo (Uzbek works, and Russian works by Uzbek institutions)
+
+Zenodo's robots.txt does not allow automatic use of its `/api`, so PlagIQ finds Zenodo records through **OpenAlex** (source `S4306400562`, open licence only) and downloads each PDF from the file link the record page itself publishes (`citation_pdf_url`), at most one request every 10 seconds (Zenodo's crawl delay). Each record keeps its DOI, licence and Zenodo link, and shows as "Zenodo" on /admin.
+
+**Engine variables:**
+- `AUTO_IMPORT_ZENODO` — languages to collect, e.g. `uz,ru` (empty = off, the default).
+- `ZENODO_BATCH` (default 100) — records per run.
+- `ZENODO_MAX_COST` (default 0.05) — OpenAlex spending limit per run, in US dollars.
+- `ZENODO_RU_ANY_COUNTRY=1` — also take Russian works without an Uzbek institution (off by default).
+
+## Part 3q — Reading scanned PDFs (OCR)
+
+Pages of an uploaded PDF that have **no text layer** (scans, photos) are read by Tesseract with the Uzbek Latin, Uzbek Cyrillic, Russian and English models. Pages with a text layer are never OCR'd. The result page and the PDF report say how many pages were read by OCR. Recognition errors can only hide a match (a misread word breaks a seven-word sequence), never create one, so OCR can under-count copying but not over-count it. Measured accuracy is in `evaluation/OCR.md`.
+
+The Dockerfile installs Tesseract, so after merging, **redeploy the website service**; `/health` then shows `"ocr": true`.
+
+**Website variables (all optional):**
+- `OCR_ENABLED=0` — switch OCR off (scanned PDFs are then refused with "no readable text").
+- `OCR_MAX_PAGES` (default 120) — more scanned pages than this are refused.
+- `OCR_MAX_SECONDS` (default 240) — time limit for one upload.
+- `OCR_DPI` (default 300) — rendering resolution.
+- `OCR_QUEUE_SECONDS` (default 60) — only one upload is OCR'd at a time (Tesseract needs CPU and memory, and the service has 1 GB); another one waits up to this long, then gets "try again in a minute".
+
+In testing (development sandbox; Railway may differ) a page took 2.5–6.5 seconds, so 240 seconds covers roughly 40–90 scanned pages. A whole scanned dissertation needs a higher `OCR_MAX_SECONDS`, or the user uploads the chapter they need.
+
 ## Part 5a — Owner dashboard (/admin)
 
 Website service → **Variables**: add `OWNER_TELEGRAM_IDS` = your Telegram user ID (get it from @userinfobot; separate several IDs with commas). Sign in with Telegram, then open `https://<your site>/admin`. Anyone else gets "Not found".

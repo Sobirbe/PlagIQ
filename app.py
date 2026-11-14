@@ -157,10 +157,10 @@ def compare_sources(text, sources, language):
     return result
 
 
-def extract_text(name, content):
-    """Extract text from bounded bytes. Runs in a worker thread, not the event loop."""
+def extract_text(name, content, info=None):
+    """Extract text from bounded bytes (scanned PDF pages by OCR). Runs in a worker thread, not the event loop."""
     try:
-        return extract.extract_text(name, content)
+        return extract.extract_text(name, content, ocr=True, info=info)
     except extract.ExtractError as exc:
         raise ApiError(exc.status, exc.code, str(exc))
 
@@ -172,11 +172,14 @@ async def read_file(upload, kind="document"):
     content = await upload.read(MAX_BYTES + 1)
     if len(content) > MAX_BYTES:
         raise ApiError(413, "file_too_large", f"File exceeds {MAX_BYTES // (1024 * 1024)} MB")
-    text = await run_in_threadpool(extract_text, name, content)
+    info = {}
+    text = await run_in_threadpool(extract_text, name, content, info)
+    upload.ocr_info = info                      # reported with the result ("N pages read by OCR")
     if len(text) > MAX_CHARS:
         raise ApiError(413, "text_too_long", f"Extracted text exceeds the {MAX_CHARS:,}-character limit")
     if not text.strip():
-        raise ApiError(400, "no_text", "No readable text detected. Scanned or image-only PDFs need OCR first.")
+        raise ApiError(400, "no_text", "No readable text detected." + ("" if extract.ocr_available() else
+                       " Scanned or image-only PDFs need OCR, which is not available on this server."))
     return text
 
 
@@ -309,7 +312,7 @@ def verify_page(request: Request, ui: str = ""):
 def health():
     return {"status":"ok","version":VERSION,"corpus_engine_configured":corpus_configured(),
             "web_search":websearch.settings()[0],"web_providers":websearch.providers(),"web_max_excerpts":websearch.max_queries(),
-            "login":auth.public_config(),"ai_detector":aidetect.settings(),"archive":corpus_configured() and auth.enabled(),
+            "ocr":extract.ocr_available(),"login":auth.public_config(),"ai_detector":aidetect.settings(),"archive":corpus_configured() and auth.enabled(),
             "payments":{"enabled":payments.enabled(),"mode":payments.mode() if payments.enabled() else ""}}
 
 
@@ -1066,6 +1069,9 @@ async def analyse(submission, reference, reference_text, language, mode, options
             if type(qs) is int and type(qe) is int and 0 <= qs < qe <= len(original):
                 passage["query_excerpt"] = original[qs:qe][:600] + ("…" if qe - qs > 600 else "")
     result["plan"] = pricing.quote(words)
+    ocr = getattr(submission, "ocr_info", None) or {}
+    if ocr.get("ocr_pages"):
+        result["ocr"] = {"pages": ocr["ocr_pages"], "models": ocr.get("ocr_models", ""), "seconds": ocr.get("ocr_seconds")}
     result.update({"document":clean_filename(submission.filename, "Document"),
                    "date":datetime.now(timezone.utc).isoformat(timespec="seconds"),
                    "quotations_excluded":False, "bibliography_excluded":False,

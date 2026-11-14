@@ -1,7 +1,10 @@
 FROM python:3.12-slim
 WORKDIR /app
 # DejaVu fonts give the PDF report Uzbek/Russian (Cyrillic) glyphs and bold headings.
-RUN apt-get update && apt-get install -y --no-install-recommends fonts-dejavu-core && rm -rf /var/lib/apt/lists/*
+# Tesseract with the Uzbek (Latin, Cyrillic), Russian and English models reads scanned PDF pages (OCR).
+RUN apt-get update && apt-get install -y --no-install-recommends fonts-dejavu-core \
+        tesseract-ocr tesseract-ocr-uzb tesseract-ocr-uzb-cyrl tesseract-ocr-rus tesseract-ocr-eng \
+    && rm -rf /var/lib/apt/lists/*
 COPY requirements.lock .
 RUN pip install --no-cache-dir -r requirements.lock
 COPY . .

@@ -151,6 +151,8 @@ def openalex_filter(args):
         parts.append(f"from_publication_date:{args.since}-01-01" if len(args.since) == 4 else f"from_publication_date:{args.since}")
     if args.source_id:
         parts.append("primary_location.source.id:" + args.source_id)
+    if getattr(args, "location_source_id", None):            # works with a copy there (e.g. Zenodo), wherever first published
+        parts.append("locations.source.id:" + args.location_source_id)
     if args.pdf_from == "openalex":
         parts.append("has_content.pdf:true")
     return ",".join(parts)
@@ -398,6 +400,7 @@ def main():
     parser.add_argument("--country", help="institution country code, e.g. UZ")
     parser.add_argument("--since", help="publication year or date, e.g. 2020")
     parser.add_argument("--source-id", help="OpenAlex source (journal) ID, e.g. S1234567")
+    parser.add_argument("--location-source-id", help="works with a copy on this OpenAlex source, e.g. S4306400562 (Zenodo)")
     parser.add_argument("--query", help="OpenAlex search words, or a CORE query")
     parser.add_argument("--download", action="store_true", help="download PDFs of accepted OpenAlex works")
     parser.add_argument("--pdf-from", choices=["publisher", "openalex"], default="publisher",
