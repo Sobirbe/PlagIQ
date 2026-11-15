@@ -7,10 +7,13 @@ from combined import fit_folds, cat, REGIMES
 from baseline import clean
 
 arts = re.split(r"(?m)^===== ARTICLE \d+: (.+?) =====\s*$", open(sys.argv[1] if len(sys.argv) > 1 else "gemini1.txt").read())
+if len(arts) == 1: arts = ["", "Document", arts[0]]                     # a single document without ARTICLE markers
 paras, owner = [], []
 for name, body in zip(arts[1::2], arts[2::2]):
     for p in re.split(r"\n\s*\n", body.split("ADABIYOTLAR VA QISQARTMALAR")[0]):
         p = re.sub(r"\$[^$]*\$", " ", p.strip())
+        p = " ".join(x for x in re.split(r"(?<=[.!?])\s+", p) if not re.search(r"[а-яёА-ЯЁқғҳўұ]{4}", x))  # Uzbek (Latin) sentences only
+        if p.startswith("|"): continue                                       # tables
         if p.startswith("MAVZU") or len(p.split()) < 40: continue        # headings and formulas fall out here
         p = re.sub(r"^[A-Z‘’ ]+\n", "", p)                               # section heading on the first line
         paras.append(clean(p)); owner.append(name)
