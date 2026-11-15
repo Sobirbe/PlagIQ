@@ -1645,6 +1645,23 @@ async def search_library(result, original, language, owner):
             "matched_sources": sum(1 for s in summary["sources"] if s["matched_tokens"])}
 
 
+def ai_highlight(text, passages):
+    """HTML of the document with AI-written (class ai-a) and AI-assisted (class ai-s) passages marked, from the
+    detector's character offsets; passages without valid offsets are left out."""
+    spans = sorted((p["start"], p["end"], "ai-a" if p.get("label") == "ai" else "ai-s") for p in passages
+                   if type(p.get("start")) is int and type(p.get("end")) is int and 0 <= p["start"] < p["end"] <= len(text))
+    out, pos = [], 0
+    for start, end, cls in spans:
+        start = max(start, pos)
+        if start >= end:
+            continue
+        out.append(html.escape(text[pos:start]))
+        out.append(f'<mark class="{cls}">{html.escape(text[start:end])}</mark>')
+        pos = end
+    out.append(html.escape(text[pos:]))
+    return "".join(out).replace("\n", "<br>")
+
+
 def own_translated(items, owner, original):
     """Possible translated reuse for the result: the user's own archived works are labelled, and the manuscript side of
     each sentence pair is added (shown on the page only, like other excerpts)."""
@@ -1847,6 +1864,10 @@ async def analyse(submission, reference, reference_text, language, mode, options
         # Separate consent: the full text goes to Pangram; flagged passages stay out of the cache and PDF.
         progress.step("ai")
         result["ai"], result["ai_passages"] = await run_in_threadpool(aidetect.detect, original, language, words)
+        if result["ai"].get("status") == "done":
+            # The whole document with Pangram's AI and AI-assisted passages marked, for the page only (like the
+            # flagged passages it is never cached, stored or put in the PDF).
+            result["ai_highlight_html"] = ai_highlight(original, result["ai_passages"])
     for source in result.get("sources") or []:
         for passage in source.get("passages") or []:
             qs, qe = passage.get("query_start"), passage.get("query_end")
@@ -1912,7 +1933,7 @@ def highlight(text, segments, sources=None, marks=None):
 # Shown to the user once and never kept with the report. The manuscript itself ("_text", "_marks") is kept with
 # the report for REPORT_HOURS (24 h, reports_store.py) for the PDF appendix and for reopening the report from
 # "My checks"; it is deleted with the report.
-PRIVATE_FIELDS = ("highlight_html", "search_phrases", "integrity_examples", "ai_passages")
+PRIVATE_FIELDS = ("highlight_html", "search_phrases", "integrity_examples", "ai_passages", "ai_highlight_html")
 
 
 def finish(request, result, identifier=None, session=None):

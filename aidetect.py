@@ -79,12 +79,24 @@ def billed_units(words):
     return max(1, -(-words // 100))
 
 
-def _summary(data, words):
+def _label(raw):
+    """Pangram's window label -> "ai", "assisted" or "human" (it also uses graded labels such as
+    "Lightly AI-Assisted" or "Moderately AI-Assisted")."""
+    raw = str(raw or "")
+    if raw in LABELS:
+        return LABELS[raw]
+    return "assisted" if "assist" in raw.lower() else "ai" if "ai" in raw.lower().split("-")[0].split() else "human"
+
+
+def _summary(data, words, length=None):
     windows = []
     for w in data.get("windows") or []:
         if not isinstance(w, dict):
             continue
-        windows.append({"label": LABELS.get(str(w.get("label")), "human"),
+        start, end = w.get("start_index"), w.get("end_index")
+        span = ({"start": start, "end": end} if type(start) is int and type(end) is int and length is not None
+                and 0 <= start < end <= length else {})
+        windows.append({**span, "label": _label(w.get("label")),
                         "score": round(float(w.get("ai_assistance_score") or 0), 3),
                         "confidence": str(w.get("confidence") or "")[:8],
                         "humanized": bool(w.get("is_humanized")),
@@ -120,7 +132,7 @@ def detect(text, language, words, poll=1.5):
             data = _request("GET", "/task/" + task_id)
             stage = data.get("stage")
             if stage == "STAGE_SUCCESS":
-                return _summary(data, words)
+                return _summary(data, words, len(text))
             if stage == "STAGE_FAILED":
                 raise DetectorError("text_rejected")
             if time.monotonic() + poll > deadline:

@@ -176,8 +176,20 @@ def test_detect_polls_and_summarises(pangram):
     assert summary["status"] == "done" and summary["fraction_ai"] == 42.0 and summary["fraction_ai_assisted"] == 13.0
     assert summary["verdict"] == "mixed" and summary["segments"] == 2 and summary["segments_flagged"] == 1
     assert summary["humanized_segments"] == 1 and summary["billed_units"] == 2 and summary["version"] == "4.1"
-    assert flagged == [{"label": "ai", "score": 0.97, "confidence": "High", "humanized": True, "words": 6,
-                        "text": "The rapid growth of remittance inflows"}]
+    assert flagged == [{"start": 0, "end": 38, "label": "ai", "score": 0.97, "confidence": "High", "humanized": True,
+                        "words": 6, "text": "The rapid growth of remittance inflows"}]
+
+
+def test_ai_report_highlights_the_document_page_only(pangram):
+    data = TestClient(web.app).post("/api/check", data={"mode": "ai", "language": "en", "ai_consent": "true"},
+                                    files={"submission": ("m.txt", EN.encode())}).json()
+    assert data["ai_highlight_html"].startswith('<mark class="ai-a">The rapid growth of remittance inflows</mark>')
+    assert "<script" not in data["ai_highlight_html"]
+    cached = repr(web.results[data["report_id"]])
+    assert "ai_highlight_html" not in cached and "ai-a" not in cached                 # never cached or stored
+    assert aidetect._label("Moderately AI-Assisted") == "assisted" and aidetect._label("AI-Generated") == "ai"
+    assert web.ai_highlight("a <b> c", [{"start": 2, "end": 5, "label": "assisted"}]) == 'a <mark class="ai-s">&lt;b&gt;</mark> c'
+    assert web.ai_highlight("abc", [{"start": 2, "end": 9, "label": "ai"}]) == "abc"      # bad offsets ignored
     key, body = pangram["posts"][0]
     assert key == "pg-key" and body == {"text": EN, "model": "pangram-4", "public_dashboard_link": False}
 
