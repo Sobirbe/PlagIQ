@@ -18,7 +18,7 @@ for name, body in zip(arts[1::2], arts[2::2]):
         p = re.sub(r"^[A-Z‘’ ]+\n", "", p)                               # section heading on the first line
         paras.append(clean(p)); owner.append(name)
 owner = np.array(owner)
-for regime in ("E1", "E2"):
+for regime in ("E1", "E2", "E3"):
     s, g = fit_folds(REGIMES[regime], paras)
     hs = s[cat == "human"]
     print(f"\n{regime} ({len(paras)} paragraphs):")

@@ -1,11 +1,12 @@
-"""Uzbek AI-text detection with Claude + two independent ChatGPT runs.
+"""Uzbek AI-text detection with Claude, ChatGPT (three runs) and Gemini.
 
 Every text belongs to a topic group (a human abstract, the AI abstracts written from its title, the AI polishes of it);
 5-fold cross-validation splits by group, so a test text's topic is never seen in training. Thresholds come from the
 held-out human abstracts, so the false-alarm rates are measured. Three training regimes:
   E1  human + Claude-written                      (what we had)
-  E2  E1 + ChatGPT-written (both runs)
-  E3  E2 + AI-polished (Claude and ChatGPT)
+  E2  E1 + ChatGPT-written (all runs)
+  E3  E2 + Gemini-written
+  E4  E3 + AI-polished (Claude, ChatGPT and Gemini)
 Human originals of the polished texts are never trained on; they are scored as extra human test texts."""
 import json, zlib, numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -25,7 +26,7 @@ for i, h in enumerate(H):
         add(h["text"], 0, "human (polished originals)" if i in polish_orig else "human", f"h{i}")
 for n, t in enumerate(json.load(open("ai_batch1.json"))): add(t, 1, "Claude written", f"c{n}")
 for k, t in json.load(open("ai_polished1.json")).items(): add(t, 1, "Claude polished", f"h{sp['polish'][int(k)]}")
-for run, f in (("ChatGPT run 1", "chatgpt.json"), ("ChatGPT run 2", "chatgpt2.json"), ("ChatGPT run 3", "chatgpt3.json")):
+for run, f in (("ChatGPT run 1", "chatgpt.json"), ("ChatGPT run 2", "chatgpt2.json"), ("ChatGPT run 3", "chatgpt3.json"), ("Gemini", "gemini.json")):
     for blk, texts in json.load(open(f)).items():
         b = int(blk[1:]) - 1
         for n, t in enumerate(texts):
@@ -36,10 +37,11 @@ X = [t for t, *_ in items]; y = np.array([l for _, l, *_ in items]); cat = np.ar
 fold = np.array([zlib.crc32(g.encode()) % 5 for *_, g in items])
 REGIMES = {"E1": {"Claude written"},
            "E2": {"Claude written", "ChatGPT run 1 written", "ChatGPT run 2 written", "ChatGPT run 3 written"},
-           "E3": {"Claude written", "ChatGPT run 1 written", "ChatGPT run 2 written", "ChatGPT run 3 written",
-                  "Claude polished", "ChatGPT run 1 polished", "ChatGPT run 2 polished"}}
-ORDER = ["Claude written", "ChatGPT run 1 written", "ChatGPT run 2 written", "ChatGPT run 3 written",
-         "Claude polished", "ChatGPT run 1 polished", "ChatGPT run 2 polished", "human (polished originals)"]
+           "E3": {"Claude written", "ChatGPT run 1 written", "ChatGPT run 2 written", "ChatGPT run 3 written", "Gemini written"},
+           "E4": {"Claude written", "ChatGPT run 1 written", "ChatGPT run 2 written", "ChatGPT run 3 written", "Gemini written",
+                  "Claude polished", "ChatGPT run 1 polished", "ChatGPT run 2 polished", "Gemini polished"}}
+ORDER = ["Claude written", "ChatGPT run 1 written", "ChatGPT run 2 written", "ChatGPT run 3 written", "Gemini written",
+         "Claude polished", "ChatGPT run 1 polished", "ChatGPT run 2 polished", "Gemini polished", "human (polished originals)"]
 def fit_folds(ai_train, extra=()):
     """5 group folds; returns held-out scores for all items and the fold-averaged scores of `extra` texts."""
     trainable = (cat == "human") | np.isin(cat, list(ai_train))
