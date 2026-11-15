@@ -131,3 +131,27 @@ def test_probe_connection_refused(monkeypatch):
     monkeypatch.setenv("ENGINE_API_KEY", "k" * 32)
     monkeypatch.setenv("ENGINE_URL", "http://127.0.0.1:9")
     assert "connection refused" in asyncio.run(engine_client.probe())
+
+
+def test_admin_form_posts_with_null_origin_from_the_same_site(monkeypatch, tmp_path):
+    """Referrer-Policy: no-referrer makes browsers send "Origin: null" for form posts; accepted only when the browser
+    marks the request same-origin (Sec-Fetch-Site), refused from other sites or without that header."""
+    import mailer
+    from fastapi.testclient import TestClient
+    import app as web
+    from test_auth_ai import TOKEN, sign_in
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", TOKEN)
+    monkeypatch.setenv("USERS_DB", str(tmp_path / "users.sqlite3"))
+    monkeypatch.setenv("OWNER_TELEGRAM_IDS", "42")
+    monkeypatch.setenv("MAIL_BACKEND", "dev")
+    mailer.OUTBOX.clear()
+    client = TestClient(web.app)
+    sign_in(client)
+    same = client.post("/admin/test-email", data={"email": "owner@example.uz"},
+                       headers={"Origin": "null", "Sec-Fetch-Site": "same-origin"})
+    assert same.status_code == 200 and "Sent" in same.text and mailer.OUTBOX[-1]["to"] == "owner@example.uz"
+    for headers in ({"Origin": "null", "Sec-Fetch-Site": "cross-site"}, {"Origin": "null"},
+                    {"Origin": "https://evil.example", "Sec-Fetch-Site": "same-origin"}):
+        refused = client.post("/admin/test-email", data={"email": "x@example.uz"}, headers=headers)
+        assert refused.status_code == 403 and refused.json()["code"] == "origin_rejected", headers
+    assert len(mailer.OUTBOX) == 1

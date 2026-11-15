@@ -31,9 +31,15 @@ class SecurityMiddleware:
             origin = headers.get(b'origin')
             host = headers.get(b'host', b'')
             allowed = os.environ.get('PUBLIC_ORIGIN', '').encode()
+            fetch_site = headers.get(b'sec-fetch-site')
+            # With Referrer-Policy: no-referrer, browsers send "Origin: null" for ordinary form posts (the /admin forms).
+            # That is accepted only when the browser itself says the request comes from this site (Sec-Fetch-Site is
+            # set by the browser and cannot be set by a page); a null origin from anywhere else is refused.
+            if origin == b'null' and fetch_site == b'same-origin':
+                origin = None
             if origin and origin not in (allowed, b'http://' + host, b'https://' + host):
                 return await JSONResponse({'detail': 'Foreign origin rejected', 'code': 'origin_rejected'}, 403)(scope, receive, send)
-            if headers.get(b'sec-fetch-site') == b'cross-site':
+            if fetch_site == b'cross-site':
                 return await JSONResponse({'detail': 'Cross-site request rejected', 'code': 'origin_rejected'}, 403)(scope, receive, send)
         # Buffer only the bounded raw body, before FastAPI parses files/fields.
         if scope['method'] == 'POST':
