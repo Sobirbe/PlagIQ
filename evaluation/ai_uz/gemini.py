@@ -1,12 +1,12 @@
-"""Score Gemini-written Uzbek articles (gemini1.txt, never seen in training) paragraph by paragraph.
+"""Score Gemini-written Uzbek articles (gemini1.txt, or the file given, never seen in training) paragraph by paragraph.
 Only prose paragraphs are scored: headings, display formulas and reference lists are dropped and inline $...$ removed.
 Thresholds come from held-out human abstracts (combined.py folds), so a paragraph is flagged only if it scores above
 what 1 % / 5 % of human abstracts score. Note the genre gap: training has abstracts, these are article sections."""
-import re, numpy as np
+import re, sys, numpy as np
 from combined import fit_folds, cat, REGIMES
 from baseline import clean
 
-arts = re.split(r"(?m)^===== ARTICLE \d+: (.+?) =====\s*$", open("gemini1.txt").read())
+arts = re.split(r"(?m)^===== ARTICLE \d+: (.+?) =====\s*$", open(sys.argv[1] if len(sys.argv) > 1 else "gemini1.txt").read())
 paras, owner = [], []
 for name, body in zip(arts[1::2], arts[2::2]):
     for p in re.split(r"\n\s*\n", body.split("ADABIYOTLAR VA QISQARTMALAR")[0]):
