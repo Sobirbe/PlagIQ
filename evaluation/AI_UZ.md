@@ -101,3 +101,17 @@ will be checked (dissertation chapters, articles, essays), not only abstracts.
 rather than "AI"; human OpenAlex abstracts carry their own quirks (typos, run-on sentences) that student documents may
 not; abstracts are one short, formulaic genre. Polished text is the hard case and the most common student use. A detector good on written-from-scratch text could still be detecting "clean recent text" vs older, untidier human abstracts; it must be tested on recent human-written student work before any use. No figure here may be used to
 describe a product.
+
+## Russian (`ru_study.py`, started November 2026)
+The site checks Russian as well as Uzbek (Russian is currently sent to Pangram). Same method: 780 Russian abstracts
+2010–2021 by authors at Uzbek institutions (`fetch_human_ru.py`, not kept in the repository) against chatbot answers to
+`prompts-ru.txt` (60 titles to write for, 15 abstracts to polish; `ru_plan.json`), saved as `ru_<chatbot>.json`.
+LaTeX, Markdown, quote/dash variants and ё are removed first.
+
+| Trained on human + … | Gemini written (60) | Gemini polished (15) | Polished originals flagged (15) |
+|---|---|---|---|
+| Gemini written — 1 % false alarms | 65 % | 7 % | 0 % |
+| Gemini written — 5 % false alarms | 82 % | 40 % | 7 % |
+
+Even with Gemini in training, its Russian abstracts are caught less often than its Uzbek ones (65 % vs 92 % at 1 %):
+Russian academic prose is formulaic in humans too, so the styles overlap more. ChatGPT and Claude answers are pending.
