@@ -273,6 +273,13 @@ def remember(user, phone=None):
                    (user["id"], user["name"], user.get("username", ""), _now(), _now(), phone))
 
 
+def account(user_id):
+    """The user dict of an account (for checks the server runs later), from the account store."""
+    with _lock, _connect() as db:
+        row = db.execute("SELECT id, name, username FROM users WHERE id=?", (int(user_id),)).fetchone()
+    return {"id": row[0], "name": row[1], "username": row[2] or ""} if row else {"id": int(user_id), "name": "", "username": ""}
+
+
 def log_check(user, result, report_id):
     ai = (result.get("ai") or {}).get("fraction_ai")
     remember(user)                     # the account row may be missing (e.g. signed in before the volume existed)

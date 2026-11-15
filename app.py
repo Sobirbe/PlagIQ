@@ -29,6 +29,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 import pricing
 import payments
 import entitlements
+import pending_checks
 import telegram_bot
 import verify
 import timefmt
@@ -69,6 +70,11 @@ async def lifespan(app):
             await asyncio.sleep(30)
             purge_reports()
             rounds += 1
+            try:
+                await run_in_threadpool(pending_checks.purge)
+                await run_paid_checks()                  # checks whose payment the provider has confirmed
+            except sqlite3.Error as exc:
+                logging.getLogger("plagiq.check").error("paid checks not started: %s", type(exc).__name__)
             if rounds % 10 == 0:                   # every 5 minutes: delete reports older than REPORT_HOURS
                 try:
                     await run_in_threadpool(reports_store.purge)
@@ -97,6 +103,7 @@ def recover_interrupted():
     try:
         for user_id, charge_id, price in reports_store.interrupted():
             payments.refund({"id": user_id}, charge_id, price, "check interrupted by a restart")
+        pending_checks.interrupted()           # paid checks cut off by the restart run again (their charge was returned)
         reports_store.purge()
     except sqlite3.Error as exc:
         logging.getLogger("plagiq.check").error("report store unavailable at start-up: %s", type(exc).__name__)
@@ -684,6 +691,7 @@ async def delete_me(request: Request):
     await run_in_threadpool(entitlements.forget, user, identities)   # a used free trial stays used (hashed marker)
     await run_in_threadpool(auth.forget, user)
     await run_in_threadpool(reports_store.forget_user, user["id"])
+    await run_in_threadpool(pending_checks.forget_user, user["id"])
     response = JSONResponse({"deleted": True})
     response.delete_cookie(auth.COOKIE)
     return response
@@ -1051,7 +1059,7 @@ def payments_receipt_html(row, user):
             f'.test{{background:#fff3cd;color:#7a4a00;padding:10px;border-radius:8px;font-weight:700}}small{{color:#51676a}}'
             f'@media print{{button{{display:none}}}}</style></head><body><main><h1>{esc(seller)} — receipt</h1>'
             + (f"<p>TIN / STIR / ИНН: {esc(tin)}</p>" if tin else "") + banner +
-            f'<table>{table}</table><p><small>Balance top-up for PlagIQ checks. This page is a payment confirmation, '
+            f'<table>{table}</table><p><small>{"Payment for one PlagIQ check" if row.get("purpose") == "check" else "Balance top-up for PlagIQ checks"}. This page is a payment confirmation, '
             f'not a fiscal receipt; the fiscal receipt, when issued, comes from the payment provider.</small></p>'
             f'<button onclick="print()">Print / Chop etish / Печать</button></main></body></html>')
 
@@ -1119,22 +1127,9 @@ def home():
     return HTMLResponse(Path(__file__).with_name("index.html").read_text("utf-8"), headers={"Cache-Control":"no-store, max-age=0"})
 
 
-@app.post("/api/check")
-async def check(request:Request, submission:UploadFile=File(...),
-                reference:UploadFile|None=File(None),reference_text:str=Form(""),
-                language:str=Form("uz"),mode:str=Form("reference"),consent:bool=Form(False),
-                exclude_quotes:bool=Form(False),exclude_bibliography:bool=Form(False),min_words:int=Form(7),
-                web_search:bool=Form(False),ai_check:bool=Form(False),ai_consent:bool=Form(False),
-                archive:bool=Form(False),archive_consent:bool=Form(False),archive_title:str=Form("",max_length=300),
-                archive_author:str=Form("",max_length=300),institution:str=Form("",max_length=80),
-                progress_token:str=Form("",alias="progress",max_length=40),
-                expected_price:int|None=Form(None,ge=0,le=10_000_000)):
-    global active_scans
-    purge_reports()
-    user = auth.read(request.cookies.get(auth.COOKIE))
-    anonymous = False
-    if auth.required() and not user:          # the free trial and paid checks belong to an account
-        raise ApiError(401, "login_required", "Sign in to run this check.")
+def validate_check(user, language, mode, consent, exclude_quotes, exclude_bibliography, min_words, ai_check, ai_consent,
+                   archive, archive_consent, archive_title, archive_author, institution):
+    """The check's options from the form, or ApiError. Shared by /api/check and /api/check/pay."""
     if language not in ("uz","ru","en"):
         raise ApiError(400, "invalid_language", "Invalid language")
     if mode not in ("reference","academic","corpus","ai"):
@@ -1168,6 +1163,28 @@ async def check(request:Request, submission:UploadFile=File(...),
             raise ApiError(503, "engine_not_configured", "Private PlagIQ corpus engine is not configured.")
         if not consent:
             raise ApiError(400, "consent_required", "Explicit consent is required for private corpus processing.")
+    return options, ai_check, deposit
+
+
+@app.post("/api/check")
+async def check(request:Request, submission:UploadFile=File(...),
+                reference:UploadFile|None=File(None),reference_text:str=Form(""),
+                language:str=Form("uz"),mode:str=Form("reference"),consent:bool=Form(False),
+                exclude_quotes:bool=Form(False),exclude_bibliography:bool=Form(False),min_words:int=Form(7),
+                web_search:bool=Form(False),ai_check:bool=Form(False),ai_consent:bool=Form(False),
+                archive:bool=Form(False),archive_consent:bool=Form(False),archive_title:str=Form("",max_length=300),
+                archive_author:str=Form("",max_length=300),institution:str=Form("",max_length=80),
+                progress_token:str=Form("",alias="progress",max_length=40),
+                expected_price:int|None=Form(None,ge=0,le=10_000_000)):
+    global active_scans
+    purge_reports()
+    user = auth.read(request.cookies.get(auth.COOKIE))
+    anonymous = False
+    if auth.required() and not user:          # the free trial and paid checks belong to an account
+        raise ApiError(401, "login_required", "Sign in to run this check.")
+    options, ai_check, deposit = validate_check(user, language, mode, consent, exclude_quotes, exclude_bibliography,
+                                                min_words, ai_check, ai_consent, archive, archive_consent, archive_title,
+                                                archive_author, institution)
     if active_scans >= scan_capacity():
         raise ApiError(503, "server_busy", "PlagIQ is processing other documents. Try again in a minute.")
     rate_limit(request, user)
@@ -1208,6 +1225,162 @@ async def check(request:Request, submission:UploadFile=File(...),
         active_scans -= 1
         progress.finish()
 
+# ------------------------------------------------------------- one document, one payment (TEST mode only)
+
+class _StoredDocument:
+    """Stands in for the uploaded file when the server runs a paid check later (its text was read at payment)."""
+    def __init__(self, filename, ocr_info=None):
+        self.filename, self.ocr_info = filename, ocr_info or {}
+
+
+PAY_REQUEST = re.compile(r"[0-9a-f]{32}")
+
+
+@app.post("/api/check/pay")
+async def check_pay(request: Request, submission: UploadFile = File(...), reference: UploadFile | None = File(None),
+                    reference_text: str = Form(""), language: str = Form("uz"), mode: str = Form("reference"),
+                    consent: bool = Form(False), exclude_quotes: bool = Form(False), exclude_bibliography: bool = Form(False),
+                    min_words: int = Form(7), web_search: bool = Form(False), ai_check: bool = Form(False),
+                    ai_consent: bool = Form(False), archive: bool = Form(False), archive_consent: bool = Form(False),
+                    archive_title: str = Form("", max_length=300), archive_author: str = Form("", max_length=300),
+                    institution: str = Form("", max_length=80), expected_price: int = Form(..., ge=1, le=10_000_000),
+                    provider: str = Form(..., max_length=10), request_id: str = Form(..., max_length=32)):
+    """Pay for exactly this check with Payme, Click or Uzum Bank (test mode). The price is worked out here and must
+    equal the price the page showed; the check runs on the server once the provider has confirmed the payment
+    (pending_checks.py). The same request_id returns the same order."""
+    user = auth.read(request.cookies.get(auth.COOKIE))
+    if not user:
+        raise ApiError(401, "login_required", "Sign in to run this check.")
+    if not payments.enabled():
+        raise ApiError(409, "payments_off", "Payments are not open yet.")
+    if not PAY_REQUEST.fullmatch(request_id):
+        raise ApiError(400, "invalid_request", "Invalid request.")
+    known = await run_in_threadpool(pending_checks.by_request, user["id"], request_id)
+    if known:                                        # a double click or a retried request: the same order
+        row = await run_in_threadpool(payments.order, user, known["order_id"])
+        return {"pending_id": known["id"], "order_id": known["order_id"], "pay_uzs": known["price"],
+                "provider": row["provider"] if row else provider,
+                "pay_url": payments.checkout_url(row["provider"], row["id"], row["pay_uzs"]) if row and row["state"] == "pending" else None,
+                "state": known["state"], "repeated": True}
+    options, ai_check, deposit = validate_check(user, language, mode, consent, exclude_quotes, exclude_bibliography,
+                                                min_words, ai_check, ai_consent, archive, archive_consent, archive_title,
+                                                archive_author, institution)
+    rate_limit(request, user, purpose="pay")
+    original = await read_file(submission)
+    if mode == "reference":
+        reference_text = await read_file(reference, "reference") if reference and reference.filename else reference_text
+        if not reference_text.strip():
+            raise ApiError(400, "reference_missing", "Provide a reference document or text, or choose academic discovery")
+    decision, _ = await check_decision(user, original, mode, ai_check, deposit is not None)
+    if decision["kind"] not in ("paid", "recheck") or not decision.get("total_uzs"):
+        raise ApiError(409, "no_payment_needed", "This check needs no payment. Start it with the Check button.")
+    if expected_price != decision["total_uzs"]:
+        raise ApiError(409, "price_changed", f"The price of this check is {decision['total_uzs']} so'm. Check the price and confirm again.")
+    try:
+        order = await run_in_threadpool(payments.create_order, user, provider, decision["total_uzs"], None, "check")
+    except payments.PaymentError as exc:
+        raise ApiError(400 if exc.code == "invalid_amount" else 503, exc.code, str(exc))
+    session = request.cookies.get("plagiq_session") or secrets.token_urlsafe(32)
+    params = {"language": language, "mode": mode, "options": options, "web_search": web_search, "ai_check": ai_check,
+              "deposit": deposit, "reference_text": reference_text if mode == "reference" else "",
+              "ocr_info": {k: v for k, v in (getattr(submission, "ocr_info", None) or {}).items()
+                           if isinstance(v, (str, int, float)) and not callable(v)}}
+    try:
+        ident = await run_in_threadpool(pending_checks.create, user["id"], session, request_id, order["id"],
+                                        decision["total_uzs"], clean_filename(submission.filename, "Document"), params, original)
+    except sqlite3.IntegrityError:                   # the same request arrived twice at the same moment
+        known = await run_in_threadpool(pending_checks.by_request, user["id"], request_id)
+        return {"pending_id": known["id"], "order_id": known["order_id"], "pay_uzs": known["price"], "repeated": True,
+                "state": known["state"], "provider": provider, "pay_url": None}
+    response = JSONResponse({"pending_id": ident, "order_id": order["id"], "pay_uzs": order["pay_uzs"],
+                             "provider": order["provider"], "pay_url": order["pay_url"],
+                             "service_name": order.get("service_name"), "state": "awaiting",
+                             "keep_hours": pending_checks.hours()})
+    if not request.cookies.get("plagiq_session"):
+        response.set_cookie("plagiq_session", session, max_age=reports_store.ttl(), httponly=True,
+                            secure=_secure(request), samesite="strict")
+    return response
+
+
+@app.get("/api/check/pending")
+async def check_pending(request: Request):
+    """The signed-in account's paid checks and their state: awaiting (payment not confirmed by the provider yet),
+    running, done (with the report), failed (the payment stays on the balance) or expired. Asking also starts any
+    check whose payment has just been confirmed."""
+    user = auth.read(request.cookies.get(auth.COOKIE))
+    if not user:
+        raise ApiError(401, "login_required", "Sign in first.")
+    await run_paid_checks(user["id"])
+    rows = await run_in_threadpool(pending_checks.listing, user["id"])
+    out = []
+    for row in rows:
+        order = await run_in_threadpool(payments.order, user, row["order_id"])
+        out.append({"id": row["id"], "state": row["state"], "filename": row["filename"], "price_uzs": row["price"],
+                    "order_id": row["order_id"], "order_state": order["state"] if order else None,
+                    "report_id": row["job"] if row["state"] == "done" else None, "error": row["error"],
+                    "created": datetime.fromtimestamp(row["created"], timezone.utc).isoformat(timespec="seconds"),
+                    "expires": datetime.fromtimestamp(row["expires"], timezone.utc).isoformat(timespec="seconds")})
+    return JSONResponse({"checks": out, "keep_hours": pending_checks.hours()}, headers={"Cache-Control": "no-store"})
+
+
+_PAID_RUNNING = set()
+
+
+async def run_paid_checks(user_id=None, wait=False):
+    """Start every awaiting check whose order the provider has confirmed (state 'paid' in the orders table, which
+    only the providers' signed server-to-server calls set). Each check is claimed once and runs in the background."""
+    if not payments.enabled():
+        return 0
+    started = []
+    for row in await run_in_threadpool(pending_checks.awaiting):
+        if user_id is not None and row["user"] != user_id:
+            continue
+        order = await run_in_threadpool(payments.order, {"id": row["user"]}, row["order_id"])
+        if not order or order["state"] != "paid" or row["id"] in _PAID_RUNNING:
+            continue
+        claimed = await run_in_threadpool(pending_checks.claim, row["id"])
+        if claimed:
+            _PAID_RUNNING.add(row["id"])
+            started.append(asyncio.create_task(_run_paid(claimed)))
+    if wait and started:                             # tests and start-up: wait for them
+        await asyncio.gather(*started)
+    return len(started)
+
+
+async def _run_paid(row):
+    global active_scans
+    try:
+        if active_scans >= scan_capacity():
+            await run_in_threadpool(pending_checks.release, row["id"])     # busy: the next round runs it
+            return
+        active_scans += 1
+        user = await run_in_threadpool(auth.account, row["user"])
+        params = row["params"]
+        job, started = uuid.uuid4().hex, time.monotonic()
+        mode = params.get("mode", "reference")
+        try:
+            await run_in_threadpool(reports_store.start, job, row["session"], user["id"], row["filename"], mode)
+            await _run_entitled_check(None, user, _StoredDocument(row["filename"], params.get("ocr_info")), None,
+                                      params.get("reference_text", ""), params.get("language", "uz"), mode,
+                                      params.get("options") or {}, params.get("web_search", False),
+                                      params.get("ai_check", False), params.get("deposit"), job, row["session"], started,
+                                      row["price"], original=row["text"])
+            await run_in_threadpool(pending_checks.finish, row["id"], job)
+        except ApiError as exc:
+            status = checkstatus.error_status(exc.code, exc.status_code)
+            await run_in_threadpool(reports_store.fail, job, exc.code)
+            await run_in_threadpool(metrics.record_failure, mode, status, exc.code, time.monotonic() - started)
+            await run_in_threadpool(pending_checks.finish, row["id"], None, exc.code)   # the payment stays on the balance
+        except Exception:
+            logging.getLogger("plagiq.check").exception("paid check failed")
+            await run_in_threadpool(reports_store.fail, job, "internal_error")
+            await run_in_threadpool(pending_checks.finish, row["id"], None, "internal_error")
+        finally:
+            active_scans -= 1
+    finally:
+        _PAID_RUNNING.discard(row["id"])
+
+
 TRIAL_T = {
     "trial_used": "Your free check has already been used. Paid checks open when payments launch; prices are shown on the page.",
     "trial_too_long": "The free check covers documents of up to {n} words. This document needs a paid plan.",
@@ -1246,11 +1419,12 @@ def _succeeded(result, mode):
 
 
 async def _run_entitled_check(request, user, submission, reference, reference_text, language, mode, options,
-                              web_search, ai_check, deposit, job, session, started, expected_price):
+                              web_search, ai_check, deposit, job, session, started, expected_price, original=None):
     """A signed-in check: free trial, paid check, discounted recheck or pilot allowance, decided and reserved on
     the server before the check runs. The reservation is used only when the check produced a result; any failure
     releases it (and gives back a balance charge)."""
-    original = await read_file(submission)
+    if original is None:
+        original = await read_file(submission)
     decision, identities = await check_decision(user, original, mode, ai_check, deposit is not None)
     if decision["kind"] == "blocked":
         reason = decision.get("reason") or "payment_required"
@@ -1676,7 +1850,7 @@ def finish(request, result, identifier=None, session=None):
     identifier = identifier or uuid.uuid4().hex
     while len(results) >= MAX_REPORTS:
         results.pop(next(iter(results)))
-    owner = session or request.cookies.get("plagiq_session") or secrets.token_urlsafe(32)
+    owner = session or (request.cookies.get("plagiq_session") if request is not None else None) or secrets.token_urlsafe(32)
     response = JSONResponse({"report_id": identifier, **{k: v for k, v in result.items() if not k.startswith("_")}},
                             headers={"x-report-id": identifier})
     cached = {k:v for k,v in result.items() if k not in PRIVATE_FIELDS}
@@ -1688,8 +1862,9 @@ def finish(request, result, identifier=None, session=None):
         reports_store.finish(identifier, cached)          # kept for REPORT_HOURS (24 h), then deleted
     except sqlite3.Error as exc:
         logging.getLogger("plagiq.check").error("report not stored: %s", type(exc).__name__)
-    response.set_cookie("plagiq_session", owner, max_age=reports_store.ttl(),
-                        httponly=True, secure=_secure(request), samesite="strict")
+    if request is not None:                 # None: run by the server after a payment (pending_checks.py)
+        response.set_cookie("plagiq_session", owner, max_age=reports_store.ttl(),
+                            httponly=True, secure=_secure(request), samesite="strict")
     return response
 
 
