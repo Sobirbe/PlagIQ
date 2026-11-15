@@ -27,6 +27,18 @@ test data.
 AI-written abstracts use stock phrases far more (e.g. "…tahlil qilinadi" in 90 % vs 18 % of human abstracts,
 "…ko‘rib chiqilgan" 85 % vs 11 %) and shorter, more uniform sentences.
 
+## Second check: does it recognise another chatbot? (`crossmodel.py`)
+ChatGPT's answers to block A1 (10 abstracts, unedited, `chatgpt.json`) were scored by a classifier trained only on human
+and Claude-written abstracts, with thresholds set on held-out human abstracts:
+
+| Threshold set for false alarms on human abstracts | Claude-written (held out) caught | ChatGPT-written (never seen) caught |
+|---|---|---|
+| 1 % | 45 % | **0 %** |
+| 5 % | 100 % | **20 %** |
+
+A detector trained on one model's Uzbek does **not** recognise another model's: ChatGPT uses other stock openings and
+verbs ("Maqolada …", "bayon etiladi", "tavsiflanadi"). Every chatbot students use must be in the training data.
+
 **What this does not show:** 36 AI texts from one model are far too few; a classifier may learn one model's habits
 rather than "AI"; human OpenAlex abstracts carry their own quirks (typos, run-on sentences) that student documents may
 not; abstracts are one short, formulaic genre. Polished text is clearly the hard case. No figure here may be used to
