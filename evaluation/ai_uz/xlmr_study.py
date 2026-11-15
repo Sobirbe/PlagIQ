@@ -16,7 +16,7 @@ from combined import X, y, cat, fold, REGIMES, ORDER
 from baseline import clean
 
 MODEL = os.environ.get("XLMR_DIR", "xlmr"); MAXLEN = int(os.environ.get("MAXLEN", "192"))
-FREEZE = int(os.environ.get("FREEZE", "8"))   # lower encoder layers kept fixed when fine-tuning (CPU budget)
+FREEZE = int(os.environ.get("FREEZE", "6"))   # lower encoder layers kept fixed when fine-tuning (CPU budget)
 torch.manual_seed(0); torch.set_num_threads(int(os.environ.get("THREADS", "4")))
 tok = AutoTokenizer.from_pretrained(MODEL)
 
@@ -53,7 +53,7 @@ def frozen(regime):
         if EX is not None: exs.append(clf.predict_proba(EX)[:, 1])
     return s, names, ex, (np.mean(exs, 0) if exs else None)
 
-def finetune(regime, folds=range(5), epochs=3, bs=8, lr=3e-5):
+def finetune(regime, folds=range(5), epochs=int(os.environ.get("EPOCHS", "5")), bs=8, lr=float(os.environ.get("LR", "1e-4"))):
     """Fine-tunes one model per fold; each fold's scores are saved to xlmr_fold_<regime>_<f>.json (resumable)."""
     ex = extra_sets(); names = list(ex); allx = [t for n in names for t in ex[n]]
     trainable = (cat == "human") | np.isin(cat, list(REGIMES[regime]))
