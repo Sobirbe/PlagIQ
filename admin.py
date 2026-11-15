@@ -200,6 +200,34 @@ def details(inv):
 CONFIRM_WORDS = "DELETE WIKIPEDIA"
 
 
+def compact_form(result=None, error=""):
+    """Owner form: give the space left by removed texts back to the disk (preview first)."""
+    esc = html.escape
+    out = []
+    if error:
+        out.append(f'<p class="warn">{esc(error)}</p>')
+    if result:
+        if result.get("compacted"):
+            out.append(f'<p class="note"><b>Done.</b> Library file {_size(result["db_bytes"])} → {_size(result["db_bytes_after"])} '
+                       f'({result["texts"]:,} texts, {result["seconds"]} s); free on the volume now {_size(result["free_bytes_after"])}.</p>')
+        else:
+            out.append(f'<p class="note">Library file {_size(result["db_bytes"])}, of which {_size(result["unused_bytes"])} is unused '
+                       f'(left by removed texts) and can be given back. Free on the volume: {_size(result["free_bytes"])}; '
+                       f'compacting needs about {_size(result["needed_bytes"])}.</p>')
+            if not result.get("possible"):
+                out.append('<p class="warn">Not enough free space to compact: enlarge the engine volume in Railway first.</p>')
+    out.append('<p class="note">Removing texts (for example Wikipedia above) frees space inside the library file but does '
+               'not shrink it. Compacting writes a compacted copy, checks it (integrity and number of texts) and only then '
+               'replaces the file. Checks and imports wait until it is done (usually a minute or two).</p>'
+               '<form method="post" action="/admin/compact" class="diag"><button name="confirm" value="0">Show sizes</button> '
+               f'<label>Type {esc(COMPACT_WORDS)} to compact <input name="confirm_text" maxlength="40"></label>'
+               '<button name="confirm" value="1">Compact the library file</button></form>')
+    return "".join(out)
+
+
+COMPACT_WORDS = "COMPACT"
+
+
 def prune_form(inv=None, result=None, error="", keep=100):
     """Owner form: keep the longest N Wikipedia articles per language, preview first, then confirm."""
     esc = html.escape
@@ -372,7 +400,7 @@ def pilot_section(message=""):
             '<button>Send test e-mail</button></form>')
 
 
-def page(library, probe="", inventory=None, diagnostic="", pruning=None, pilot=None, notice=""):
+def page(library, probe="", inventory=None, diagnostic="", pruning=None, pilot=None, notice="", compacting=None):
     esc = html.escape
     mark = lambda ok: "✅" if ok else "➖" if ok is None else "❌"          # None = optional, not set
     rows = "".join(f'<tr><td>{mark(ok)}</td><th>{esc(a)}</th><td>{esc(d)}</td><td class="h">{"" if ok else esc(h)}</td></tr>'
@@ -438,6 +466,7 @@ def page(library, probe="", inventory=None, diagnostic="", pruning=None, pilot=N
             f'<section><h2>Library</h2>{lib}</section>'
             f'<section><h2>Library details</h2>{details(inventory) if library and library.get("available") else "<p>The engine is not connected.</p>"}</section>'
             f'<section id="source-check"><h2>Source check (DOI or title)</h2>{diagnostic or diagnostic_form()}</section>'
+            f'<section id="compact"><h2>Library file size</h2>{compacting if compacting is not None else compact_form()}</section>'
             f'<section id="wikipedia-share"><h2>Wikipedia share</h2>{pruning if pruning is not None else (prune_form(inventory) if inventory else "<p>The engine is not connected.</p>")}</section>'
             f'<section id="monitoring"><h2>Monitoring</h2>{monitoring()}</section>'
             f'<section id="pilot"><h2>Pilot testers and e-mail</h2>{pilot if pilot is not None else pilot_section()}</section>'
