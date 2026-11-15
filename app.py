@@ -28,6 +28,7 @@ import admin
 from fastapi.responses import FileResponse, StreamingResponse
 import pricing
 import payments
+import entitlements
 import telegram_bot
 import verify
 import timefmt
@@ -71,9 +72,14 @@ async def lifespan(app):
             if rounds % 10 == 0:                   # every 5 minutes: delete reports older than REPORT_HOURS
                 try:
                     await run_in_threadpool(reports_store.purge)
+                    await run_in_threadpool(entitlements.purge)      # fingerprints after the 30-day recheck window
                 except sqlite3.Error as exc:
                     logging.getLogger("plagiq.check").error("report purge failed: %s", type(exc).__name__)
     await run_in_threadpool(recover_interrupted)
+    try:
+        await run_in_threadpool(entitlements.release_interrupted)   # free trials / rechecks of cut-off checks
+    except sqlite3.Error as exc:
+        logging.getLogger("plagiq.check").error("entitlements unavailable at start-up: %s", type(exc).__name__)
     task = asyncio.create_task(cleanup())
     if telegram_bot.enabled():                 # let the bot answer /start (TELEGRAM_BOT_REPLIES=1), in the background
         asyncio.get_running_loop().run_in_executor(None, telegram_bot.register)
@@ -410,6 +416,16 @@ async def telegram_login(request: Request):
     user = auth.check_telegram(data)
     if not user:
         raise ApiError(401, "login_failed", "Telegram sign-in could not be verified.")
+    current = auth.read(request.cookies.get(auth.COOKIE))
+    if data.get("link") is True and current:            # add Telegram to the signed-in account
+        try:
+            await run_in_threadpool(auth.link_identity, current, user["id"])
+        except auth.AccountError as exc:
+            raise ApiError(exc.status, exc.code, str(exc))
+        return {"user": current, "linked": "telegram"}
+    account = await run_in_threadpool(auth.resolve, user["id"])
+    if account != user["id"]:                           # Telegram was linked to an e-mail account
+        user = {**user, "id": account}
     await run_in_threadpool(auth.remember, user)
     return signed_in_response(request, JSONResponse({"user": user}), user)
 
@@ -430,24 +446,65 @@ async def _account_form(request):
     return data
 
 
-@app.post("/auth/register")
-async def email_register(request: Request):
-    """Email + password account. Nothing is sent to the address and it is not verified."""
+@app.post("/auth/email/start")
+async def email_start(request: Request):
+    """Send a one-time sign-in code (and link) to an address. The answer is the same whether or not the address
+    has an account. Signed in, {"link": true} adds the address to the current account instead."""
     data = await _account_form(request)
-    rate_limit(request, purpose="register")    # also caps account creation
+    current = auth.read(request.cookies.get(auth.COOKIE)) if data.get("link") is True else None
+    if data.get("link") is True and not current:
+        raise ApiError(401, "login_required", "Sign in first.")
     try:
-        user = await run_in_threadpool(auth.register_email, data.get("email"), data.get("password"), data.get("name", ""))
+        sent = await run_in_threadpool(auth.start_email_signin, data.get("email"), _origin(request), client_key(request),
+                                       current["id"] if current else None)
     except auth.AccountError as exc:
         raise ApiError(exc.status, exc.code, str(exc))
-    sent = mailer.configured() and await run_in_threadpool(auth.request_verification, user, _origin(request), client_key(request))
-    response = JSONResponse({"user": user, "verification": "sent" if sent else "off"})
-    if auth.verification_required():
-        return response                               # signs in once the address is confirmed
-    return signed_in_response(request, response, user)
+    if not sent:
+        logging.getLogger("plagiq.auth").error("sign-in e-mail could not be sent")
+    return {"sent": True, "minutes": auth.CODE_MINUTES}
+
+
+@app.post("/auth/email/verify")
+async def email_verify(request: Request):
+    data = await _account_form(request)
+    try:
+        user = await run_in_threadpool(auth.verify_email_code, data.get("email"), data.get("code"), client_key(request))
+    except auth.AccountError as exc:
+        raise ApiError(exc.status, exc.code, str(exc))
+    if user.get("linked"):
+        return {"linked": "email"}
+    return signed_in_response(request, JSONResponse({"user": user}), user)
+
+
+@app.get("/auth/email/link", response_class=HTMLResponse)
+async def email_link(request: Request, t: str = ""):
+    """The one-time link from the sign-in e-mail (the same request as the code)."""
+    try:
+        user = await run_in_threadpool(auth.use_email_link, t)
+    except auth.AccountError as exc:
+        return _account_page(request, lambda tx, lang: f'<p>{html.escape(str(exc))}</p>')
+    if not user:
+        return HTMLResponse('<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width">'
+                            '<p style="font-family:system-ui;padding:20px">This sign-in link has expired or was already used. '
+                            'Ask for a new code. · Havola eskirgan yoki ishlatilgan: yangi kod so‘rang. · '
+                            'Ссылка устарела или уже использована: запросите новый код.</p>', 410)
+    page = HTMLResponse('<!doctype html><meta charset="utf-8"><meta http-equiv="refresh" content="0;url=/">'
+                        '<p style="font-family:system-ui;padding:20px"><a href="/">PlagIQ</a></p>')
+    if user.get("linked"):
+        return page
+    return signed_in_response(request, page, user)
+
+
+@app.post("/auth/register")
+async def email_register(request: Request):
+    """Closed: accounts are created by "Continue with Email" (a one-time code) or Telegram, never with a password.
+    Kept so older pages get a clear answer."""
+    raise ApiError(410, "password_signup_closed", "Use “Continue with Email”: we send a one-time code, no password needed.")
 
 
 @app.post("/auth/login")
 async def email_login(request: Request):
+    """Password sign-in for accounts created before e-mail codes (no new password accounts are made)."""
     data = await _account_form(request)
     try:
         user = await run_in_threadpool(auth.login_email, data.get("email"), data.get("password"), client_key(request))
@@ -494,6 +551,7 @@ async def me(request: Request):
     user = auth.read(request.cookies.get(auth.COOKIE))
     return {"auth": auth.public_config(), "user": user,
             "email": await run_in_threadpool(auth.email_status, user) if user else None,
+            "methods": await run_in_threadpool(auth.methods, user) if user else {},
             "history": await run_in_threadpool(auth.history, user) if user else []}
 
 
@@ -622,6 +680,8 @@ async def delete_me(request: Request):
             await run_in_threadpool(payments.forget, user)
         except payments.PaymentError as exc:
             raise ApiError(409, exc.code, str(exc))
+    identities = await run_in_threadpool(auth.identities, user)
+    await run_in_threadpool(entitlements.forget, user, identities)   # a used free trial stays used (hashed marker)
     await run_in_threadpool(auth.forget, user)
     await run_in_threadpool(reports_store.forget_user, user["id"])
     response = JSONResponse({"deleted": True})
@@ -796,6 +856,49 @@ async def admin_page(request: Request):
                         headers={"Cache-Control": "no-store"})
 
 
+async def _admin_page_with(pilot):
+    data = await engine_library() if corpus_configured() else None
+    inventory = await engine_client.inventory() if data is not None else None
+    return HTMLResponse(admin.page({"available": data is not None, **(data or {})}, "", inventory, pilot=pilot),
+                        headers={"Cache-Control": "no-store"})
+
+
+@app.post("/admin/grants", response_class=HTMLResponse)
+async def admin_grant(request: Request, user_id: int = Form(...), checks: int = Form(3), max_words: int = Form(40000),
+                      days: int = Form(14), note: str = Form("", max_length=200)):
+    """Owner-only: a limited number of pilot test checks for one account."""
+    owner(request)
+    try:
+        gid = await run_in_threadpool(entitlements.grant, auth.resolve(user_id), checks, max_words, days, note)
+        message = f"Granted: allowance #{gid}, {checks} check(s) up to {max_words:,} words for {days} day(s)."
+    except entitlements.EntitlementError as exc:
+        message = str(exc)
+    return await _admin_page_with(admin.pilot_section(message))
+
+
+@app.post("/admin/grants/revoke", response_class=HTMLResponse)
+async def admin_revoke(request: Request, grant_id: int = Form(...)):
+    owner(request)
+    done = await run_in_threadpool(entitlements.revoke, grant_id)
+    return await _admin_page_with(admin.pilot_section(f"Allowance #{grant_id} revoked." if done else "Nothing changed."))
+
+
+@app.post("/admin/test-email", response_class=HTMLResponse)
+async def admin_test_email(request: Request, email: str = Form(..., max_length=254)):
+    """Owner-only: check SMTP delivery before e-mail sign-in codes are switched on."""
+    owner(request)
+    if not (mailer.configured() or mailer.dev()):
+        message = "SMTP is not set up (SMTP_HOST, SMTP_FROM …), so nothing was sent."
+    else:
+        try:
+            await run_in_threadpool(mailer.send, email.strip(), "PlagIQ test e-mail",
+                                    "This is a test message from the PlagIQ owner dashboard. If it arrived, e-mail delivery works.")
+            message = "Sent. If it arrives (check spam too), set EMAIL_SIGNIN=1 on the website to turn on sign-in codes."
+        except mailer.MailError as exc:
+            message = f"Sending failed ({exc}). Check the SMTP settings."
+    return await _admin_page_with(admin.pilot_section(message))
+
+
 @app.post("/admin/prune", response_class=HTMLResponse)
 async def admin_prune(request: Request, keep: int = Form(100, ge=0, le=100000), confirm_text: str = Form("", max_length=40)):
     """Owner-only: preview, or with the typed confirmation remove, Wikipedia articles beyond `keep` per language."""
@@ -866,6 +969,7 @@ def admin_backup_accounts(request: Request):
 @app.get("/api/pricing")
 def pricing_config():
     config = pricing.public_config()
+    config["trial_exports"] = False
     if payments.enabled():
         config.update(payments_enabled=True, status=payments.mode())
     return config
@@ -977,8 +1081,11 @@ async def click_endpoint(stage: str, request: Request):
 
 
 @app.post("/api/quote")
-async def price_quote(request: Request, submission: UploadFile = File(...)):
-    """Word count and planned price for a file. Nothing is stored; no check is run."""
+async def price_quote(request: Request, submission: UploadFile = File(...), mode: str = Form("academic"),
+                      ai_check: bool = Form(False), archive: bool = Form(False)):
+    """Word count, the cheapest plan and, for a signed-in user, what this check would be (free trial, recheck,
+    paid or pilot) and its total. Prices come from the server's configuration only. Nothing is stored or reserved;
+    no check is run."""
     key, now = client_key(request), time.monotonic()
     history = [t for t in QUOTES.get(key, []) if now - t < 3600]
     if len(history) >= QUOTE_LIMIT:
@@ -986,10 +1093,25 @@ async def price_quote(request: Request, submission: UploadFile = File(...)):
     QUOTES[key] = history + [now]
     if len(QUOTES) > 3000:
         QUOTES.clear()
+    if mode not in ("reference", "academic", "corpus", "ai"):
+        raise ApiError(400, "invalid_mode", "Invalid mode")
     text = await read_file(submission)
     words = pricing.count_words(text)
-    return {**pricing.quote(words), "ai_price_uzs": pricing.ai_price(words), "characters": len(text),
-            "currency": "UZS", "payments_enabled": False}
+    out = {**pricing.quote(words), "ai_price_uzs": pricing.ai_price(words), "characters": len(text),
+           "currency": "UZS", "payments_enabled": payments.enabled(), "paid": pricing.paid_quote(words),
+           "trial_max_words": pricing.trial_max_words(), "trial_fits": 0 < words <= pricing.trial_max_words()}
+    user = auth.read(request.cookies.get(auth.COOKIE)) if auth.required() else None
+    if user:
+        decision, _ = await check_decision(user, text, mode, ai_check or mode == "ai", archive)
+        if decision.get("recheck"):
+            decision["recheck"] = {k: decision["recheck"][k] for k in ("original_tier", "original_words", "days_left",
+                                                                       "remaining")}
+        if decision.get("recheck_upgrade"):
+            decision["recheck_upgrade"] = {k: decision["recheck_upgrade"][k] for k in ("original_tier", "new_tier",
+                                                                                       "days_left", "remaining")}
+        decision.pop("grant", None)
+        out["decision"] = decision
+    return out
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -1005,12 +1127,13 @@ async def check(request:Request, submission:UploadFile=File(...),
                 web_search:bool=Form(False),ai_check:bool=Form(False),ai_consent:bool=Form(False),
                 archive:bool=Form(False),archive_consent:bool=Form(False),archive_title:str=Form("",max_length=300),
                 archive_author:str=Form("",max_length=300),institution:str=Form("",max_length=80),
-                progress_token:str=Form("",alias="progress",max_length=40)):
+                progress_token:str=Form("",alias="progress",max_length=40),
+                expected_price:int|None=Form(None,ge=0,le=10_000_000)):
     global active_scans
     purge_reports()
     user = auth.read(request.cookies.get(auth.COOKIE))
-    anonymous = auth.required() and not user
-    if anonymous and (not auth.anon_max_words() or mode == "ai" or ai_check or archive):
+    anonymous = False
+    if auth.required() and not user:          # the free trial and paid checks belong to an account
         raise ApiError(401, "login_required", "Sign in to run this check.")
     if language not in ("uz","ru","en"):
         raise ApiError(400, "invalid_language", "Invalid language")
@@ -1057,6 +1180,9 @@ async def check(request:Request, submission:UploadFile=File(...),
     try:
         await run_in_threadpool(reports_store.start, job, session, user["id"] if user else None,
                                 clean_filename(submission.filename, "Document"), mode)
+        if user and auth.required():
+            return await _run_entitled_check(request, user, submission, reference, reference_text, language, mode,
+                                             options, web_search, ai_check, deposit, job, session, started, expected_price)
         return await _run_check(request, user, anonymous, submission, reference, reference_text, language, mode,
                                 options, web_search, ai_check, deposit, job, session, started)
     except ApiError as exc:
@@ -1081,6 +1207,118 @@ async def check(request:Request, submission:UploadFile=File(...),
     finally:
         active_scans -= 1
         progress.finish()
+
+TRIAL_T = {
+    "trial_used": "Your free check has already been used. Paid checks open when payments launch; prices are shown on the page.",
+    "trial_too_long": "The free check covers documents of up to {n} words. This document needs a paid plan.",
+    "trial_no_extras": "The free check is a plagiarism check without the AI detector or the archive.",
+    "payments_off": "Payments are not open yet (pilot). This check will be available when payments launch.",
+    "too_long_for_plans": "The document is larger than the biggest plan. Contact us.",
+}
+
+
+async def check_decision(user, text, mode, ai_check, archive):
+    """What a check of `text` would be for this user and what it costs in total (entitlements.decide + AI price)."""
+    words = pricing.count_words(text)
+    identities = await run_in_threadpool(auth.identities, user)
+    decision = await run_in_threadpool(entitlements.decide, user, words, text, mode == "ai", bool(ai_check or archive),
+                                       payments.enabled(), identities)
+    if mode == "ai" and decision["kind"] != "blocked":
+        price = pricing.ai_price(words)
+        decision.update(tier="ai", full_price_uzs=price, recheck=None)
+        decision["price_uzs"] = price if decision["kind"] == "paid" else 0
+        if decision["kind"] == "pilot":
+            decision["future_price_uzs"] = price
+    ai_extra = pricing.ai_price(words) if ai_check and mode != "ai" else 0
+    decision["ai_price_uzs"] = ai_extra
+    decision["total_uzs"] = (decision.get("price_uzs") or 0) + (ai_extra if decision["kind"] in ("paid", "recheck") and
+                                                                 decision.get("payments_enabled") else 0)
+    if decision.get("future_price_uzs") is not None:
+        decision["future_total_uzs"] = decision["future_price_uzs"] + ai_extra
+    return decision, identities
+
+
+def _succeeded(result, mode):
+    """A check that produced what was asked for: a percentage (plagiarism) or an AI estimate (AI-only)."""
+    if mode == "ai":
+        return (result.get("ai") or {}).get("status") == "done"
+    return result.get("percent") is not None
+
+
+async def _run_entitled_check(request, user, submission, reference, reference_text, language, mode, options,
+                              web_search, ai_check, deposit, job, session, started, expected_price):
+    """A signed-in check: free trial, paid check, discounted recheck or pilot allowance, decided and reserved on
+    the server before the check runs. The reservation is used only when the check produced a result; any failure
+    releases it (and gives back a balance charge)."""
+    original = await read_file(submission)
+    decision, identities = await check_decision(user, original, mode, ai_check, deposit is not None)
+    if decision["kind"] == "blocked":
+        reason = decision.get("reason") or "payment_required"
+        raise ApiError(413 if reason == "too_long_for_plans" else 402, reason,
+                       TRIAL_T.get(reason, "This check is not available.").format(n=num_words(pricing.trial_max_words())))
+    total = decision["total_uzs"]
+    if decision["kind"] in ("paid", "recheck") and decision.get("payments_enabled") and total and expected_price != total:
+        # the user saw a different price (for example the revision grew into a larger tier): never charge silently
+        raise ApiError(409, "price_changed", f"The price of this check is {total} so'm. Check the price and confirm again.")
+    try:
+        await run_in_threadpool(entitlements.reserve, user, job, decision, identities)
+    except entitlements.EntitlementError as exc:
+        raise ApiError(exc.status, exc.code, str(exc))
+    charge_id = None
+    try:
+        if total and decision.get("payments_enabled"):
+            try:
+                charge_id = await run_in_threadpool(payments.charge, user, total, f"{decision['kind']} check, "
+                                                    f"{decision['words']} words" + (", AI detector" if ai_check else ""))
+            except payments.PaymentError as exc:
+                raise ApiError(402, exc.code, str(exc))
+            if charge_id:
+                await run_in_threadpool(reports_store.charged, job, charge_id, total)
+        result = await analyse(submission, reference, reference_text, language, mode, options, web_search, ai_check,
+                               auth.owner_id(user), deposit, original)
+    except BaseException:
+        await run_in_threadpool(entitlements.release, job)
+        if charge_id:
+            await run_in_threadpool(payments.refund, user, charge_id, total, "check failed")
+        raise
+    charged = total
+    if charge_id:
+        unused = unused_ai_price(result, decision["words"], ai_check) if mode != "ai" else 0
+        nothing = (total - decision["ai_price_uzs"]) if mode != "ai" and result.get("percent") is None else 0
+        if mode == "ai" and not _succeeded(result, mode):
+            nothing = total
+        back = min(total, unused + nothing)
+        if back:
+            await run_in_threadpool(payments.refund, user, charge_id, back, "part of the check did not run")
+        charged = total - back
+    if _succeeded(result, mode):
+        decision["charged_uzs"] = charged if charge_id else 0
+        await run_in_threadpool(entitlements.consume, job, user, decision, original, identities, mode != "ai")
+    else:
+        await run_in_threadpool(entitlements.release, job)       # nothing was compared: the trial/recheck stays
+    exports = decision["kind"] != "trial"
+    result["entitlement"] = {"kind": decision["kind"], "tier": decision["tier"], "exports": exports,
+                             "consumed": _succeeded(result, mode), "price_uzs": charged if charge_id else 0,
+                             "future_price_uzs": decision.get("future_total_uzs"),
+                             "recheck_of": (decision.get("recheck") or {}).get("root")}
+    if mode != "ai":
+        tier = pricing.tier(decision["tier"]) or {}
+        result["plan"] = {"id": decision["tier"], "words": decision["words"], "max_words": tier.get("max_words"),
+                          "price_uzs": tier.get("price_uzs"), "fits": True}
+    if charge_id:
+        result["charged_uzs"] = charged
+    response = finish(request, result, job, session)
+    await run_in_threadpool(metrics.record_check, result, time.monotonic() - (started or time.monotonic()),
+                            result.get("charged_uzs"))
+    report_id = response.headers.get("x-report-id", "")
+    await run_in_threadpool(auth.log_check, user, result, report_id)
+    if charge_id:
+        await run_in_threadpool(payments.attach_report, charge_id, report_id)
+    return response
+
+
+def num_words(n):
+    return f"{n:,}"
 
 
 async def _run_check(request, user, anonymous, submission, reference, reference_text, language, mode, options,
@@ -1472,6 +1710,14 @@ def owned(identifier, request):
             "result": stored["result"]}
 
 
+def no_exports(result):
+    """The free trial shows its result on screen only: no PDF, no QR certificate, no CSV (checked here, on the
+    server, not only by hiding buttons)."""
+    if (result.get("entitlement") or {}).get("exports") is False:
+        raise ApiError(403, "trial_no_exports", "The free check shows its result on screen only. A paid check includes "
+                                                "the PDF report and the certificate.")
+
+
 def _stored_seconds_left(identifier, fallback):
     try:
         stored = reports_store.get(identifier)
@@ -1485,6 +1731,7 @@ def report(identifier:str, request:Request, lang:str="en", full:int=0):
     """Short report by default (certificate + one page of matches); full=1 for all evidence and the
     whole document with matches highlighted."""
     entry = owned(identifier, request)
+    no_exports(entry["result"])
     remaining = max(0, int((entry["expires"] - time.monotonic()) // 60))
     base = os.getenv("PUBLIC_ORIGIN", "").strip() or str(request.base_url)
     lang = lang if lang in ("uz", "uzc", "ru", "en") else "en"
@@ -1595,6 +1842,7 @@ async def exclude_report_sources(identifier: str, request: Request):
 def report_sources_csv(identifier: str, request: Request):
     """The source list as a spreadsheet (UTF-8 with BOM, so Excel shows Cyrillic and Uzbek letters)."""
     result = owned(identifier, request)["result"]
+    no_exports(result)
     words = result.get("total_tokens") or 0
     out = io.StringIO()
     writer = csv.writer(out)
@@ -1620,6 +1868,49 @@ def check_progress(token: str):
     if state is None:
         raise ApiError(404, "report_unavailable", "Not found")
     return JSONResponse(state, headers={"Cache-Control": "no-store"})
+
+
+@app.get("/api/my-checks")
+async def my_checks(request: Request):
+    """The signed-in account's checks: type, words, date, result, which reports can still be opened or downloaded,
+    recheck eligibility and expiry, rechecks left and payment status; plus the free-trial state and retention rules.
+    Only the account's own records (by its ID on the server)."""
+    user = auth.read(request.cookies.get(auth.COOKIE))
+    if not user:
+        raise ApiError(401, "login_required", "Sign in first.")
+    identities = await run_in_threadpool(auth.identities, user)
+    summary = await run_in_threadpool(entitlements.summary, user, identities)
+    log = await run_in_threadpool(auth.history, user, 100)
+    stored = {r["id"]: r for r in await run_in_threadpool(reports_store.listing, "", user["id"])}
+    paid = {c["job"]: c for c in summary["paid_checks"]}
+    now = time.time()
+    rows = []
+    for entry in log:
+        job = entry.get("job") or ""
+        report = stored.get(job)
+        open_report = bool(report and report["state"] == "done")
+        kind = entry.get("kind") or "legacy"
+        pc = paid.get(job) or {}
+        root = paid.get(entry.get("recheck_of") or "") or {}
+        rows.append({**{k: entry.get(k) for k in ("date", "mode", "words", "percent", "status", "tier", "recheck_of")},
+                     "kind": kind, "report_id": job if open_report else None,
+                     "reports": ({"screen": True, "pdf": kind != "trial", "certificate": kind != "trial",
+                                  "csv": kind != "trial"} if open_report else {}),
+                     "report_expires": datetime.fromtimestamp(report["expires"], timezone.utc).isoformat(timespec="seconds")
+                     if open_report else None,
+                     "recheck_until": datetime.fromtimestamp(pc["recheck_until"], timezone.utc).isoformat(timespec="seconds")
+                     if pc.get("recheck_until") and pc["recheck_until"] > now else None,
+                     "rechecks_left": pc.get("rechecks_left") if pc.get("recheck_until") else None,
+                     "recheck_root_until": datetime.fromtimestamp(root["recheck_until"], timezone.utc).isoformat(timespec="seconds")
+                     if root.get("recheck_until") else None,
+                     "payment": {"trial": "free", "pilot": "pilot", "paid": "paid", "recheck": "paid" if entry.get("amount")
+                                 else "pilot"}.get(kind, "none"), "amount_uzs": entry.get("amount")})
+    return JSONResponse({"trial": summary["trial"], "trial_max_words": summary["trial_max_words"],
+                         "pilot_checks_left": sum(g["remaining"] for g in summary["grants"]),
+                         "payments_enabled": payments.enabled(), "checks": rows,
+                         "retention": {"report_hours": reports_store.hours(), "recheck_days": pricing.recheck_days(),
+                                       "recheck_limit": pricing.recheck_limit()}},
+                        headers={"Cache-Control": "no-store"})
 
 
 @app.get("/api/reports")

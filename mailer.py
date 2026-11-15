@@ -3,14 +3,26 @@
 Off until the owner sets, on the website service:
   SMTP_HOST, SMTP_PORT (587), SMTP_USER, SMTP_PASSWORD (secret), SMTP_FROM (e.g. "PlagIQ <no-reply@example.org>"),
   SMTP_SECURITY = starttls (default) | ssl | none
+MAIL_BACKEND=dev is for development and tests only: nothing is e-mailed; messages are kept in memory (OUTBOX) and
+written to the server log, so the sign-in code can be read there. Never set it on the public site.
+
 Nothing is sent while these are missing; the site then says that recovery by e-mail is not available and points to
 support. Messages contain only the link and plain instructions, never the user's documents.
 """
+import logging
 import os
 import smtplib
 import ssl
 from email.message import EmailMessage
 from email.utils import parseaddr
+
+
+OUTBOX = []                     # development backend: the last messages, newest last
+log = logging.getLogger("plagiq.mail")
+
+
+def dev():
+    return os.environ.get("MAIL_BACKEND", "").strip().lower() == "dev"
 
 
 def configured():
@@ -22,6 +34,11 @@ class MailError(Exception):
 
 
 def send(to, subject, text):
+    if dev():
+        OUTBOX.append({"to": to, "subject": subject, "text": text})
+        del OUTBOX[:-50]
+        log.warning("development e-mail backend (MAIL_BACKEND=dev), not sent: to=%s subject=%s\n%s", to, subject, text)
+        return
     if not configured():
         raise MailError("mail_not_configured")
     message = EmailMessage()

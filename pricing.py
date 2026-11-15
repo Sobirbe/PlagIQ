@@ -4,10 +4,14 @@ Tiers come from the PRICING_TIERS environment variable (JSON list) so the owner
 can change them in Railway without code changes, e.g.
 
   [{"id": "free", "max_words": 1000, "price_uzs": 0},
-   {"id": "researcher", "max_words": 3500, "price_uzs": 15000},
-   {"id": "extended", "max_words": 15000, "price_uzs": 25000},
-   {"id": "thesis", "max_words": 40000, "price_uzs": 35000},
-   {"id": "phd", "max_words": 150000, "price_uzs": 39000}]
+   {"id": "student", "max_words": 3500, "price_uzs": 15000},
+   ...]
+
+The "free" tier is the one-time free trial (entitlements.py): one check per account, on-screen results only.
+Every other tier is one paid check of one document: on-screen results, source matching, highlights, the PDF report
+and the QR certificate. A recheck of the same manuscript within RECHECK_DAYS (30) of the original paid check costs
+RECHECK_PERCENT (80) per cent of the tier price, at most RECHECK_LIMIT (2) times. Prices are always taken from here
+on the server; the browser only displays them.
 
 Other services (also display only):
   AI_PRICE_PER_WORD=3      AI detector, so'm per word
@@ -28,12 +32,15 @@ import os
 import re
 
 DEFAULT_TIERS = [
-    {"id": "free", "max_words": 1000, "price_uzs": 0},
-    {"id": "researcher", "max_words": 3500, "price_uzs": 15000},
-    {"id": "extended", "max_words": 15000, "price_uzs": 25000},
-    {"id": "thesis", "max_words": 40000, "price_uzs": 35000},
-    {"id": "phd", "max_words": 150000, "price_uzs": 39000},         # PhD/DSc dissertations
+    {"id": "free", "max_words": 1000, "price_uzs": 0},              # the one-time free trial
+    {"id": "student", "max_words": 3500, "price_uzs": 15000},
+    {"id": "researcher", "max_words": 10000, "price_uzs": 25000},   # "Recommended for journal articles"
+    {"id": "extended", "max_words": 25000, "price_uzs": 39000},
+    {"id": "masters", "max_words": 40000, "price_uzs": 49000},      # Master's thesis
+    {"id": "phd", "max_words": 150000, "price_uzs": 79000},         # PhD/DSc dissertations
 ]
+RECOMMENDED = "researcher"
+# Packages of several checks are no longer offered on the main pages; kept for the test-mode balance code only.
 DEFAULT_PACKAGES = [{"checks": 10, "bonus": 2}, {"checks": 20, "bonus": 5}]
 # A word: letters/digits, with apostrophes inside (Uzbek ta'lim, o‘qish; English don't).
 WORD = re.compile(r"[^\W_]+(?:['’ʼʻ‘`][^\W_]+)*")
@@ -72,6 +79,41 @@ def quote(words):
     return {"id": "contact", "max_words": None, "price_uzs": None, "words": words, "fits": False}
 
 
+def paid_quote(words):
+    """The cheapest *paid* tier that fits (the free trial is a separate, one-time entitlement)."""
+    for tier in tiers():
+        if tier["price_uzs"] > 0 and words <= tier["max_words"]:
+            return {**tier, "words": words, "fits": True}
+    return {"id": "contact", "max_words": None, "price_uzs": None, "words": words, "fits": False}
+
+
+def tier(tier_id):
+    return next((t for t in tiers() if t["id"] == tier_id), None)
+
+
+def trial_max_words():
+    """Size limit of the free trial: the 0-so'm tier (0 when there is none, i.e. no free trial)."""
+    free = [t["max_words"] for t in tiers() if t["price_uzs"] == 0]
+    return max(free) if free else 0
+
+
+def recheck_percent():
+    return min(max(_int_env("RECHECK_PERCENT", 80), 0), 100)
+
+
+def recheck_days():
+    return min(max(_int_env("RECHECK_DAYS", 30), 1), 365)
+
+
+def recheck_limit():
+    return min(_int_env("RECHECK_LIMIT", 2), 10)
+
+
+def recheck_price(price_uzs):
+    """Discounted price of a recheck (80 % of the tier price by default), rounded to whole so'm."""
+    return (price_uzs * recheck_percent() + 50) // 100
+
+
 def _int_env(name, default):
     try:
         value = int(os.environ.get(name, default))
@@ -99,6 +141,9 @@ def packages():
 
 
 def public_config():
-    return {"currency": "UZS", "payments_enabled": False, "status": "planned", "tiers": tiers(),
+    return {"currency": "UZS", "payments_enabled": False, "status": "planned",
+            "tiers": [{**t, "recheck_uzs": recheck_price(t["price_uzs"]) if t["price_uzs"] else None} for t in tiers()],
+            "recommended": RECOMMENDED, "trial_max_words": trial_max_words(),
+            "recheck": {"percent": recheck_percent(), "days": recheck_days(), "limit": recheck_limit()},
             "ai": {"per_word": _int_env("AI_PRICE_PER_WORD", 3), "minimum": _int_env("AI_MIN_PRICE", 6000)},
-            "certificate": 0, "packages": packages()}
+            "certificate": 0}

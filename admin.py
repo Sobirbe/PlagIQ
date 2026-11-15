@@ -9,6 +9,9 @@ import os
 
 import aidetect
 import auth
+import entitlements
+import mailer
+import pricing
 import checkstatus
 import institutions
 import metrics
@@ -56,11 +59,14 @@ def checklist(library, probe=""):
     rows = [
         ("Telegram sign-in", auth.enabled(), "on, @" + auth.public_config()["bot_username"] if auth.enabled() else "off",
          "TELEGRAM_BOT_TOKEN and TELEGRAM_BOT_USERNAME on the website (Part 3i)"),
-        ("Email + password sign-in", auth.email_enabled() or None, "on (no email is sent; addresses are not verified)"
-         if auth.email_enabled() else "off", "on by default; EMAIL_LOGIN=0 turns it off (Part 3i)"),
-        ("Checks without an account", True if auth.anon_max_words() else None,
-         f"up to {auth.anon_max_words():,} words (plagiarism only)" if auth.anon_max_words() else "off: every check needs sign-in",
-         "ANON_MAX_WORDS on the website (Part 3i)"),
+        ("Sign-in by e-mail code", auth.email_codes() or None,
+         ("DEVELOPMENT backend: codes go to the server log, not by e-mail — never use this on the public site"
+          if auth.public_config()["email_dev"] else "on (one-time codes by e-mail)") if auth.email_codes() else
+         "off: only existing password accounts can use e-mail" + (" (SMTP is set: send a test e-mail below, then set "
+                                                                    "EMAIL_SIGNIN=1)" if mailer.configured() else ""),
+         "SMTP_* on the website, a test e-mail from this page, then EMAIL_SIGNIN=1 (Part 3w)"),
+        ("Free trial", True, f"one check per account, up to {pricing.trial_max_words():,} words, results on screen only; "
+         "every check needs sign-in", "pricing.py"),
         ("Bot answers /start", telegram_bot.STATUS["ok"] if telegram_bot.enabled() else None,
          ("on" if telegram_bot.STATUS["ok"] else "being registered with Telegram" if telegram_bot.STATUS["ok"] is None
           else "Telegram refused the webhook: " + telegram_bot.STATUS["detail"])
@@ -337,7 +343,36 @@ def monitoring():
               f'Kept for {metrics.days()} days (METRICS_DAYS).</p>')
 
 
-def page(library, probe="", inventory=None, diagnostic="", pruning=None):
+def pilot_section(message=""):
+    """Owner-granted test checks for pilot testers (no unlimited free checks: a number, a word limit, an expiry)."""
+    esc = html.escape
+    rows = "".join(
+        f"<tr><td>{g['id']}</td><td>{g['user']}</td><td>{g['used']} of {g['checks']}</td><td>{g['max_words']:,}</td>"
+        f"<td>{esc(timefmt.show(g['expires'], with_label=False) or '')}</td><td>{esc(g['note'] or '')}</td>"
+        f"<td>{'active' if g['active'] else 'revoked' if g['revoked'] else 'expired'}"
+        + (f'<form method="post" action="/admin/grants/revoke"><input type="hidden" name="grant_id" value="{g["id"]}">'
+           f'<button>Revoke</button></form>' if g["active"] else "") + "</td></tr>"
+        for g in entitlements.all_grants())
+    table = (f"<table><tr><th>#</th><th>Account ID</th><th>Used</th><th>Max words</th><th>Expires</th><th>Note</th><th></th></tr>"
+             f"{rows}</table>") if rows else "<p>No test allowances yet.</p>"
+    return ((f'<p class="warn">{esc(message)}</p>' if message else "") +
+            "<p>While payments are off (pilot), each account has one free check (up to "
+            f"{pricing.trial_max_words():,} words, on screen only). Other checks need a test allowance granted here. "
+            "Pilot checks are recorded as “pilot”, never as payments. The account ID is shown in the tester's account "
+            "menu (Telegram ID, or a negative number for e-mail accounts).</p>"
+            '<form class="diag" method="post" action="/admin/grants"><label>Account ID <input name="user_id" required '
+            'pattern="-?[0-9]{1,15}"></label><label>Number of checks (1–50) <input name="checks" type="number" min="1" '
+            'max="50" value="3"></label><label>Maximum words per check <input name="max_words" type="number" min="1" '
+            'max="150000" value="40000"></label><label>Valid for days (1–90) <input name="days" type="number" min="1" '
+            'max="90" value="14"></label><label>Note (who and why) <input name="note" maxlength="200"></label>'
+            '<button>Grant test checks</button></form>' + table +
+            '<h3>Test e-mail</h3><p>Before turning on sign-in by e-mail code (EMAIL_SIGNIN=1), send a test message and '
+            'confirm that it arrives (also check the spam folder).</p><form class="diag" method="post" '
+            'action="/admin/test-email"><label>Address <input name="email" type="email" required maxlength="254"></label>'
+            '<button>Send test e-mail</button></form>')
+
+
+def page(library, probe="", inventory=None, diagnostic="", pruning=None, pilot=None):
     esc = html.escape
     mark = lambda ok: "✅" if ok else "➖" if ok is None else "❌"          # None = optional, not set
     rows = "".join(f'<tr><td>{mark(ok)}</td><th>{esc(a)}</th><td>{esc(d)}</td><td class="h">{"" if ok else esc(h)}</td></tr>'
@@ -403,5 +438,6 @@ def page(library, probe="", inventory=None, diagnostic="", pruning=None):
             f'<section id="source-check"><h2>Source check (DOI or title)</h2>{diagnostic or diagnostic_form()}</section>'
             f'<section id="wikipedia-share"><h2>Wikipedia share</h2>{pruning if pruning is not None else (prune_form(inventory) if inventory else "<p>The engine is not connected.</p>")}</section>'
             f'<section id="monitoring"><h2>Monitoring</h2>{monitoring()}</section>'
+            f'<section id="pilot"><h2>Pilot testers and e-mail</h2>{pilot if pilot is not None else pilot_section()}</section>'
             f'<section><h2>Usage</h2>{use}</section><section><h2>Payments</h2>{pay}</section>'
             f'<section><h2>Backups</h2>{backup}</section></main></body></html>')

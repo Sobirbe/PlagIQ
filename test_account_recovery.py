@@ -1,5 +1,6 @@
-"""Email confirmation and password recovery: single-use, expiring, hashed links; no account enumeration; rate
-limits; a reset ends earlier sessions. Mail is captured, never sent. Off until SMTP is configured."""
+"""Older e-mail + password accounts: e-mail confirmation and password recovery (single-use, expiring, hashed links;
+no account enumeration; rate limits; a reset ends earlier sessions). New accounts are passwordless (see
+test_trial_pricing.py). Mail is captured, never sent. Off until SMTP is configured."""
 import re
 import sqlite3
 import time
@@ -31,14 +32,16 @@ def link(box, kind):
 
 
 def register(client, email="ali@example.org", password="first-password"):
-    return client.post("/auth/register", json={"email": email, "password": password, "name": "Ali"})
+    """An account created earlier with a password (no longer possible on the site), then signed in."""
+    auth.register_email(email, password, "Ali")
+    return client.post("/auth/login", json={"email": email, "password": password})
 
 
-def test_registration_sends_a_confirmation_link_that_works_once(mail):
+def test_older_account_gets_a_confirmation_link_that_works_once(mail):
     client, box = mail
-    response = register(client)
-    assert response.json()["verification"] == "sent" and box[-1][0] == "ali@example.org"
+    register(client)
     assert client.get("/api/me").json()["email"] == {"email": "ali@example.org", "verified": False}
+    assert client.post("/auth/verify/resend").json() == {"sent": True} and box[-1][0] == "ali@example.org"
     url = link(box, "verify")
     assert "confirmed" in client.get(url + "&ui=en").text
     assert client.get("/api/me").json()["email"]["verified"] is True
@@ -96,10 +99,13 @@ def test_links_expire_and_requests_are_limited(mail, monkeypatch):
 def test_verification_can_be_required(mail, monkeypatch):
     client, box = mail
     monkeypatch.setenv("EMAIL_VERIFY_REQUIRED", "1")
-    response = register(client, "vali@example.org")
-    assert response.status_code == 200 and client.get("/api/me").json()["user"] is None      # not signed in yet
-    refused = client.post("/auth/login", json={"email": "vali@example.org", "password": "first-password"})
+    refused = register(client, "vali@example.org")
     assert refused.status_code == 403 and refused.json()["code"] == "email_unverified"
+    account = auth._connect().execute("SELECT id FROM email_accounts WHERE email=?",
+                                                                 ("vali@example.org",)).fetchone()[0]
+    monkeypatch.setenv("EMAIL_VERIFY_REQUIRED", "0")
+    auth.request_verification({"id": -account}, "http://testserver")
+    monkeypatch.setenv("EMAIL_VERIFY_REQUIRED", "1")
     client.get(link(box, "verify"))
     assert client.post("/auth/login", json={"email": "vali@example.org", "password": "first-password"}).status_code == 200
 
@@ -108,7 +114,7 @@ def test_everything_is_off_without_smtp(login, monkeypatch):
     monkeypatch.delenv("SMTP_HOST", raising=False)
     monkeypatch.delenv("SMTP_FROM", raising=False)
     monkeypatch.setenv("EMAIL_VERIFY_REQUIRED", "1")                     # cannot lock people out without mail
-    assert register(login, "sami@example.org").json()["verification"] == "off"
+    assert register(login, "sami@example.org").status_code == 200
     assert login.get("/api/me").json()["user"]["id"] < 0                  # signed in as before
     config = login.get("/api/me").json()["auth"]
     assert config["email_recovery"] is False and config["email_verify_required"] is False
@@ -121,9 +127,10 @@ def test_telegram_sign_in_is_unchanged(mail):
     assert sign_in(client).status_code == 200 and client.get("/api/me").json()["email"] is None
 
 
-def test_one_network_is_not_limited_like_one_address(mail):
-    """Students behind one university address each get their own e-mails."""
+def test_one_network_is_not_limited_like_one_address(mail, monkeypatch):
+    """Students behind one university address each get their own sign-in codes."""
     client, box = mail
+    monkeypatch.setenv("EMAIL_SIGNIN", "1")
     for n in range(6):
-        TestClient(web.app).post("/auth/register", json={"email": f"s{n}@example.org", "password": "first-password"})
-    assert len(box) == 6                                              # 6 confirmation e-mails from one network
+        assert TestClient(web.app).post("/auth/email/start", json={"email": f"s{n}@example.org"}).status_code == 200
+    assert len(box) == 6                                              # 6 sign-in e-mails from one network

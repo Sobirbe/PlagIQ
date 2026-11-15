@@ -41,7 +41,6 @@ def site(monkeypatch, tmp_path):
     monkeypatch.setenv("ENGINE_URL", "http://engine")
     monkeypatch.setenv("CORPUS_DB", str(tmp_path / "index.db"))
     monkeypatch.setenv("TELEGRAM_BOT_TOKEN", TOKEN)
-    monkeypatch.setenv("LOGIN_REQUIRED", "0")
     monkeypatch.setenv("USERS_DB", str(tmp_path / "users.db"))
     monkeypatch.setenv("INSTITUTIONS", CONFIG)
     real = httpx.AsyncClient
@@ -56,6 +55,8 @@ def signed_in(user_id):
     check = "\n".join(f"{k}={data[k]}" for k in sorted(data))
     data["hash"] = hmac.new(hashlib.sha256(TOKEN.encode()).digest(), check.encode(), hashlib.sha256).hexdigest()
     client.post("/auth/telegram", json=data)
+    from test_auth_ai import grant_tester
+    grant_tester(user_id)
     return client
 
 
@@ -68,7 +69,7 @@ def test_admin_deposits_and_students_copy_is_found(site):
     done = admin.post("/api/institution/deposit", data={"institution": "TDIU", "year": "2023"},
                       files={"file": ("Rahimov A. - Kichik biznes kreditlari.txt", THESIS.encode())}).json()
     assert done["authors"] == "Rahimov A." and done["title"] == "Kichik biznes kreditlari" and done["language"] == "uz"
-    result = TestClient(web.app).post("/api/check", data={"mode": "corpus", "language": "uz", "consent": "true"},
+    result = signed_in(79).post("/api/check", data={"mode": "corpus", "language": "uz", "consent": "true"},
                                       files={"submission": ("c.txt", COPY.encode())}).json()
     src = result["sources"][0]
     assert result["percent"] > 50 and src["coverage"] == "archive" and src["rights_basis"] == "institution_deposit"

@@ -1,4 +1,5 @@
-"""Sign-in by email + password, by phone number through the Telegram bot, and short checks without an account."""
+"""Older e-mail + password accounts keep working; the phone-number links from the Telegram bot still work; no check
+runs without an account."""
 import json
 
 import pytest
@@ -28,45 +29,25 @@ def check(client, text, **extra):
                        files={"submission": ("m.txt", text.encode())})
 
 
-# ------------------------------------------------------------- no account for short texts
+# ------------------------------------------------------------- no check without an account
 
-def test_short_text_needs_no_account(site):
-    r = check(site, EN)                                   # 168 words
-    assert r.status_code == 200 and r.json()["percent"] is not None
-    assert check(site, EN * 7).json()["code"] == "login_required_long"          # 1,176 words
-    assert site.post("/api/check", data={"mode": "ai", "language": "en", "ai_consent": "true"},
-                     files={"submission": ("m.txt", EN.encode())}).json()["code"] in ("login_required", "ai_not_configured")
-
-
-def test_anonymous_limit_configurable(site, monkeypatch):
-    monkeypatch.setenv("ANON_MAX_WORDS", "0")
+def test_no_check_without_account(site, monkeypatch):
+    assert check(site, EN).json()["code"] == "login_required"               # 168 words: still needs sign-in
+    monkeypatch.setenv("ANON_MAX_WORDS", "2000")                           # older settings are no longer read
+    monkeypatch.setenv("LOGIN_REQUIRED", "0")
     assert check(site, EN).json()["code"] == "login_required"
-    monkeypatch.setenv("ANON_MAX_WORDS", "2000")
-    assert check(site, EN * 7).status_code == 200
 
 
-def test_anonymous_never_pays_with_payments_on(site, monkeypatch):
-    monkeypatch.setenv("PAYMENTS_ENABLED", "1"); monkeypatch.setenv("PAYMENTS_MODE", "test")
-    monkeypatch.setenv("PAYME_MERCHANT_ID", "x"); monkeypatch.setenv("PAYME_TEST_KEY", "y")
-    monkeypatch.setenv("LOGIN_REQUIRED", "0")              # even with sign-in optional, paid checks need an account
-    assert check(site, EN).status_code == 200
-    assert check(site, EN * 7).json()["code"] == "login_required_long"
+# ------------------------------------------------------------- older e-mail + password accounts
 
-
-# ------------------------------------------------------------- email + password
-
-def test_register_login_and_wrong_password(site):
-    r = site.post("/auth/register", json={"email": " Dilnoza@Example.UZ ", "password": "short"})
-    assert r.status_code == 400 and r.json()["code"] == "weak_password"
-    assert site.post("/auth/register", json={"email": "not-an-email", "password": "long enough"}).json()["code"] == "invalid_email"
+def test_register_closed_but_older_password_accounts_sign_in(site):
     r = site.post("/auth/register", json={"email": " Dilnoza@Example.UZ ", "password": "correct horse 1", "name": "Dilnoza"})
-    assert r.status_code == 200 and r.json()["user"]["id"] < 0 and r.json()["user"]["name"] == "Dilnoza"
-    assert "httponly" in r.headers["set-cookie"].lower()
-    assert site.get("/api/me").json()["user"]["name"] == "Dilnoza"
-    assert check(site, EN * 7).status_code == 200                               # signed in: long texts allowed
-    again = site.post("/auth/register", json={"email": "dilnoza@example.uz", "password": "another pass"})
-    assert again.status_code == 409 and again.json()["code"] == "email_taken"
-    site.post("/auth/logout")
+    assert r.status_code == 410 and r.json()["code"] == "password_signup_closed"
+    with pytest.raises(auth.AccountError):
+        auth.register_email("dilnoza@example.uz", "short")
+    auth.register_email(" Dilnoza@Example.UZ ", "correct horse 1", "Dilnoza")       # an account made earlier
+    with pytest.raises(auth.AccountError):
+        auth.register_email("dilnoza@example.uz", "another pass")
     assert site.post("/auth/login", json={"email": "dilnoza@example.uz", "password": "wrong pass"}).json()["code"] == "login_failed_email"
     assert site.post("/auth/login", json={"email": "nobody@example.uz", "password": "wrong pass"}).json()["code"] == "login_failed_email"
     ok = site.post("/auth/login", json={"email": "DILNOZA@example.uz", "password": "correct horse 1"})
@@ -74,7 +55,7 @@ def test_register_login_and_wrong_password(site):
 
 
 def test_password_stored_only_as_hash(site):
-    site.post("/auth/register", json={"email": "a@b.uz", "password": "secret password 9"})
+    auth.register_email("a@b.uz", "secret password 9")
     import sqlite3
     with sqlite3.connect(auth.db_file()) as db:
         stored = db.execute("SELECT password FROM email_accounts").fetchone()[0]
@@ -82,7 +63,7 @@ def test_password_stored_only_as_hash(site):
 
 
 def test_too_many_failed_logins(site):
-    site.post("/auth/register", json={"email": "a@b.uz", "password": "secret password 9"})
+    auth.register_email("a@b.uz", "secret password 9")
     for _ in range(auth.FAIL_LIMIT):
         site.post("/auth/login", json={"email": "a@b.uz", "password": "nope nope"})
     r = site.post("/auth/login", json={"email": "a@b.uz", "password": "secret password 9"})
@@ -90,10 +71,10 @@ def test_too_many_failed_logins(site):
 
 
 def test_email_account_deleted_completely(site):
-    site.post("/auth/register", json={"email": "a@b.uz", "password": "secret password 9"})
+    auth.register_email("a@b.uz", "secret password 9")
+    assert site.post("/auth/login", json={"email": "a@b.uz", "password": "secret password 9"}).status_code == 200
     assert site.delete("/api/me").status_code == 200
     assert site.post("/auth/login", json={"email": "a@b.uz", "password": "secret password 9"}).status_code == 401
-    assert site.post("/auth/register", json={"email": "a@b.uz", "password": "secret password 9"}).status_code == 200
 
 
 def test_email_only_site_with_session_secret(monkeypatch, tmp_path):
@@ -106,9 +87,10 @@ def test_email_only_site_with_session_secret(monkeypatch, tmp_path):
 
 
 def test_email_user_is_never_owner(site, monkeypatch):
-    r = site.post("/auth/register", json={"email": "a@b.uz", "password": "secret password 9"})
-    monkeypatch.setenv("OWNER_TELEGRAM_IDS", str(-r.json()["user"]["id"]) + "," + str(r.json()["user"]["id"]))
-    assert not auth.is_owner(r.json()["user"])
+    auth.register_email("a@b.uz", "secret password 9")
+    user = site.post("/auth/login", json={"email": "a@b.uz", "password": "secret password 9"}).json()["user"]
+    monkeypatch.setenv("OWNER_TELEGRAM_IDS", str(-user["id"]) + "," + str(user["id"]))
+    assert not auth.is_owner(user)
     assert site.get("/admin").status_code in (401, 403, 404)
 
 

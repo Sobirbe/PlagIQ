@@ -153,8 +153,8 @@ def test_payme_cannot_cancel_spent_top_up(pay):
     params = {"amount": 1500000, "account": {"order_id": order["id"]}, "id": "e" * 24, "time": 5}
     rpc(pay, "CreateTransaction", params)
     rpc(pay, "PerformTransaction", {"id": "e" * 24})
-    pay.post("/api/check", data={"language": "en", "mode": "reference", "reference_text": EN},
-             files={"submission": ("a.txt", (EN * 7).encode(), "text/plain")})      # spends 15,000 (Researcher)
+    pay.post("/api/check", data={"language": "en", "mode": "reference", "reference_text": EN, "expected_price": "15000"},
+             files={"submission": ("a.txt", (EN * 7).encode(), "text/plain")})      # spends 15,000 (Student)
     assert balance(pay) == 0
     assert rpc(pay, "CancelTransaction", {"id": "e" * 24, "reason": 5})["error"]["code"] == -31007
 
@@ -247,8 +247,16 @@ def top_up(client, amount):
     rpc(client, "PerformTransaction", {"id": tx})
 
 
+def shown_price(client, text, mode="reference", **form):
+    """What the page shows before a paid check: the server's total for this file (the user confirms it)."""
+    decision = client.post("/api/quote", data={"mode": mode, **form},
+                           files={"submission": ("a.txt", text.encode(), "text/plain")}).json().get("decision") or {}
+    return str(decision.get("total_uzs") or 0)
+
+
 def run_check(client, text, mode="reference"):
-    return client.post("/api/check", data={"language": "en", "mode": mode, "reference_text": EN},
+    return client.post("/api/check", data={"language": "en", "mode": mode, "reference_text": EN,
+                                           "expected_price": shown_price(client, text, mode)},
                        files={"submission": ("a.txt", text.encode(), "text/plain")})
 
 
@@ -260,7 +268,7 @@ def test_free_check_needs_no_balance(pay):
 
 def test_paid_check_charges_and_low_balance_refused(pay):
     sign_in(pay)
-    long_text = EN * 7                             # over 1,000 words: Researcher plan, 15,000 so'm
+    long_text = EN * 7                             # over 1,000 words: Student plan, 15,000 so'm
     refused = run_check(pay, long_text)
     assert refused.status_code == 402 and refused.json()["code"] == "insufficient_balance"
     top_up(pay, 20000)
@@ -274,7 +282,7 @@ def test_paid_check_charges_and_low_balance_refused(pay):
 def test_failed_check_is_refunded(pay):
     sign_in(pay)
     top_up(pay, 20000)
-    r = pay.post("/api/check", data={"language": "en", "mode": "reference"},                 # no reference: fails
+    r = pay.post("/api/check", data={"language": "en", "mode": "reference", "expected_price": "15000"},  # no reference: fails
                  files={"submission": ("a.txt", (EN * 7).encode(), "text/plain")})
     assert r.status_code == 400
     assert balance(pay) == 20000
@@ -288,7 +296,7 @@ def test_check_that_compared_nothing_is_refunded(pay, monkeypatch):
     sign_in(pay)
     top_up(pay, 40000)
     monkeypatch.setattr(web, "discover", lambda text, *a: {"status": "unavailable", "sources": [], "queries": 3, "message": ""})
-    data = pay.post("/api/check", data={"language": "en", "mode": "academic", "consent": "true"},
+    data = pay.post("/api/check", data={"language": "en", "mode": "academic", "consent": "true", "expected_price": "15000"},
                     files={"submission": ("a.txt", (EN * 7).encode(), "text/plain")}).json()
     assert data["status"] == "failed_search" and data["percent"] is None and data["charged_uzs"] == 0
     assert balance(pay) == 40000
@@ -297,17 +305,23 @@ def test_check_that_compared_nothing_is_refunded(pay, monkeypatch):
     record = {"title": "W", "url": "https://doi.org/10.1/w", "year": 2024, "coverage": "abstract", "abstract": EN}
     monkeypatch.setattr(web, "discover", lambda text, *a: {"status": "partial", "failed_queries": 1, "sources": [record],
                                                            "queries": 3, "message": ""})
-    data = pay.post("/api/check", data={"language": "en", "mode": "academic", "consent": "true"},
+    data = pay.post("/api/check", data={"language": "en", "mode": "academic", "consent": "true", "expected_price": "15000"},
                     files={"submission": ("a.txt", (EN * 7).encode(), "text/plain")}).json()
     assert data["status"] == "incomplete_coverage" and data["charged_uzs"] == 15000
     assert balance(pay) == 25000
 
 
-def test_payments_off_keeps_checks_free(pay, monkeypatch):
+def test_payments_off_charges_nothing(pay, monkeypatch):
+    """Pilot (payments off): the one free check, then only owner-granted test checks; nothing is ever charged."""
     monkeypatch.setenv("PAYMENTS_ENABLED", "0")
     sign_in(pay)
+    refused = run_check(pay, EN * 7)
+    assert refused.status_code == 402 and refused.json()["code"] == "trial_too_long"
+    import entitlements
+    entitlements.grant(42, 1, 5000, 7)
     r = run_check(pay, EN * 7)
-    assert r.status_code == 200 and "charged_uzs" not in r.json()
+    assert r.status_code == 200 and "charged_uzs" not in r.json() and r.json()["entitlement"]["kind"] == "pilot"
+    assert pay.get("/api/payments").json()["enabled"] is False
 
 
 def test_callbacks_bypass_pilot_password_but_site_does_not(pay, monkeypatch):
@@ -331,7 +345,7 @@ def test_receipt_only_for_owner(pay):
 def test_packages_credit_bonus(pay):
     sign_in(pay)
     options = pay.get("/api/payments").json()["packages"]
-    first = next(p for p in options if p["tier"] == "researcher" and p["checks"] == 10)
+    first = next(p for p in options if p["tier"] == "student" and p["checks"] == 10)
     assert first["pay_uzs"] == 150000 and first["credit_uzs"] == 180000
     order = new_order(pay, package=first["id"], amount=None)
     assert order["pay_uzs"] == 150000 and order["credit_uzs"] == 180000

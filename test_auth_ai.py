@@ -41,6 +41,25 @@ def sign_in(client, user_id=42, first="Dilnoza", last="Karimova"):
     return client.post("/auth/telegram", json=data)
 
 
+def pilot_tester(client, user_id=42, checks=200, **names):
+    """Sign in as a pilot tester whose free trial is already used and who holds an owner-granted allowance, so
+    a test can run several full checks (PDF, certificate) without payments, as on the pilot site."""
+    response = sign_in(client, user_id, **names)
+    grant_tester(user_id, checks)
+    return response
+
+
+def grant_tester(user_id, checks=200):
+    """An owner-granted pilot allowance for `user_id`, with the free trial already used."""
+    import entitlements
+    entitlements.grant(user_id, min(checks, 50), 150000, 30, "test")
+    for _ in range(max(0, checks - 50) // 50):
+        entitlements.grant(user_id, 50, 150000, 30, "test")
+    with entitlements.closing(entitlements._connect()) as db:
+        db.execute("INSERT OR IGNORE INTO reservations (job, user, kind, state, created) VALUES (?, ?, 'trial', 'used', 0)",
+                   (f"trial-{user_id}", user_id))
+
+
 def test_telegram_signature_checks():
     good = signed({"id": 1, "first_name": "A", "auth_date": int(time.time())})
     import os
@@ -66,13 +85,14 @@ def test_session_cookie_cannot_be_forged(login):
 
 
 def test_login_required_for_checks_and_history_recorded(login):
-    files = {"submission": ("m.txt", (EN * 7).encode())}                     # over 1,000 words: sign-in needed
+    files = {"submission": ("m.txt", EN.encode())}                           # every check needs sign-in
     blocked = login.post("/api/check", data={"mode": "reference", "language": "en", "reference_text": EN}, files=files)
-    assert blocked.status_code == 401 and blocked.json()["code"] == "login_required_long"
+    assert blocked.status_code == 401 and blocked.json()["code"] == "login_required"
     config = login.get("/api/me").json()["auth"]
-    assert {k: config[k] for k in ("enabled", "required", "bot_id", "bot_username", "telegram", "email", "anon_max_words")} == {
+    assert {k: config[k] for k in ("enabled", "required", "bot_id", "bot_username", "telegram", "email")} == {
         "enabled": True, "required": True, "bot_id": "123456789", "bot_username": "plagiq_bot", "telegram": True,
-        "email": True, "anon_max_words": 1000}
+        "email": True}
+    assert "anon_max_words" not in config and "phone_bot" not in config
     response = sign_in(login)
     assert response.status_code == 200 and response.json()["user"]["name"] == "Dilnoza Karimova"
     assert "httponly" in response.headers["set-cookie"].lower() and "samesite=strict" in response.headers["set-cookie"].lower()
@@ -98,11 +118,11 @@ def test_bad_login_and_account_deletion(login):
     assert sqlite3.connect(auth._db_path()).execute("SELECT COUNT(*) FROM users").fetchone() == (0,)
 
 
-def test_login_optional_and_off(login, monkeypatch):
-    monkeypatch.setenv("LOGIN_REQUIRED", "0")
-    ok = login.post("/api/check", data={"mode": "reference", "language": "en", "reference_text": EN},
-                    files={"submission": ("m.txt", EN.encode())})
-    assert ok.status_code == 200
+def test_login_no_longer_optional_and_off(login, monkeypatch):
+    monkeypatch.setenv("LOGIN_REQUIRED", "0")                  # older setting: no longer makes sign-in optional
+    blocked = login.post("/api/check", data={"mode": "reference", "language": "en", "reference_text": EN},
+                         files={"submission": ("m.txt", EN.encode())})
+    assert blocked.status_code == 401
     monkeypatch.delenv("TELEGRAM_BOT_TOKEN")
     assert login.get("/health").json()["login"]["enabled"] is False
     assert login.post("/auth/telegram", json={}).json()["code"] == "login_not_configured"

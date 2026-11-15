@@ -1,17 +1,23 @@
-"""Sign-in (Telegram, phone number through the Telegram bot, or email and password),
-signed session cookies and a small account store.
+"""Sign-in (Telegram or e-mail), signed session cookies and a small account store.
 
-Three ways in:
-  * Telegram login on the website (below);
-  * phone number through the bot: the user shares their own number with the bot, which
-    replies with a one-time sign-in link (telegram_bot.py, login_link / use_login_link);
-  * email + password: no email is ever sent and the address is not verified; the password is
-    stored only as a scrypt hash. Email accounts have negative user IDs, so they never collide
-    with Telegram IDs (always positive).
-Short checks (up to ANON_MAX_WORDS words, default 1000) need no sign-in at all (app.check).
+Two ways in, one interface ("Continue with Telegram" / "Continue with Email"); signing in and creating an account
+are the same step:
+  * Telegram login on the website. Telegram's signature is checked on the server (below).
+  * E-mail without a password: PlagIQ sends a six-digit code and a one-time link (EMAIL_CODE_MINUTES, 15 minutes).
+    Only hashes are stored; a code works once, at most CODE_ATTEMPTS (5) wrong guesses end it, and at most 3 e-mails
+    per address and 20 per network address are sent an hour. The answer is the same whether or not the address has
+    an account (no account enumeration). The first successful code creates the account.
+    Codes go out only when the owner has turned e-mail sign-in on after testing delivery (EMAIL_SIGNIN=1 with SMTP
+    set, see mailer.py) or, for development, MAIL_BACKEND=dev (codes are written to the server log, never e-mailed).
+  * Accounts created earlier with an e-mail and a password keep working: they sign in with the same address by
+    code, or (until e-mail codes are on) with their password. New password accounts are no longer created.
+  * The phone-number sign-in through the Telegram bot (login_link) still works for links already sent, but is no
+    longer offered on the website.
+A signed-in user can link the other method (auth.link_identity); both then open the same account and share its
+free trial and checks. Every check needs sign-in when sign-in is set up (the free trial is per account).
 
 Flow (no Telegram script is loaded into PlagIQ's pages, so the CSP stays strict):
-  1. "Sign in with Telegram" sends the browser to oauth.telegram.org with the bot ID
+  1. "Continue with Telegram" sends the browser to oauth.telegram.org with the bot ID
      and this site as origin/return address.
   2. Telegram returns to /login with #tgAuthResult=<base64 JSON> in the URL fragment.
   3. The page posts that JSON to /auth/telegram; the server checks Telegram's signature
@@ -21,17 +27,15 @@ Flow (no Telegram script is loaded into PlagIQ's pages, so the CSP stays strict)
 Settings (website service):
   TELEGRAM_BOT_TOKEN     token from @BotFather (secret). Turns sign-in on.
   TELEGRAM_BOT_USERNAME  the bot's username, without @ (shown on the button; not secret).
-  LOGIN_REQUIRED=1       longer checks need a signed-in user (default when sign-in is on; 0 = optional).
-  EMAIL_LOGIN=0          turn off email + password accounts (on by default when sign-in is on).
-  ANON_MAX_WORDS=1000    plagiarism checks up to this many words need no sign-in (0 = always sign in).
+  EMAIL_LOGIN=0          turn off e-mail sign-in.
+  EMAIL_SIGNIN=1         send sign-in codes by e-mail (needs SMTP_*; turn on only after a test e-mail arrived).
   SESSION_SECRET         optional, 32+ characters; otherwise derived from the bot token.
   USERS_DB               SQLite file for accounts (default /data/plagiq-users.sqlite3 when a
                          Railway volume is mounted at /data, else ./plagiq-users.sqlite3).
 
-Stored per user: Telegram ID (or email account number), display name, username, phone number
-(only if shared through the bot), email and password hash (email accounts), first/last sign-in and a log of
-checks (date, mode, word count, result, AI estimate, report ID). Never manuscript text
-or file names.
+Stored per user: Telegram ID (or e-mail account number), display name, username, phone number
+(only if shared through the bot), e-mail (and the password hash of older accounts), first/last sign-in and a log of
+checks (date, mode, word count, result, AI estimate, report ID). Never manuscript text or file names.
 """
 import base64
 import re
@@ -61,7 +65,7 @@ def telegram_enabled():
 
 
 def email_enabled():
-    """Email + password accounts: on by default, but only when sessions can be signed."""
+    """E-mail accounts: on by default, but only when sessions can be signed."""
     has_key = telegram_enabled() or len(os.environ.get("SESSION_SECRET", "")) >= 32
     return has_key and os.environ.get("EMAIL_LOGIN", "1") != "0"
 
@@ -71,15 +75,17 @@ def enabled():
 
 
 def required():
-    return enabled() and os.environ.get("LOGIN_REQUIRED", "1") != "0"
+    """Every check needs an account whenever sign-in is set up: the free trial and paid checks belong to accounts.
+    (LOGIN_REQUIRED and ANON_MAX_WORDS of earlier versions are no longer read.)"""
+    return enabled()
 
 
-def anon_max_words():
-    """Plagiarism checks up to this many words need no sign-in (0 = always sign in)."""
-    try:
-        return max(0, int(os.environ.get("ANON_MAX_WORDS", "1000")))
-    except ValueError:
-        return 1000
+def email_codes():
+    """Passwordless e-mail sign-in is offered: SMTP tested and switched on by the owner, or the development backend."""
+    import mailer
+    if not email_enabled():
+        return False
+    return mailer.dev() or (mailer.configured() and os.environ.get("EMAIL_SIGNIN") == "1")
 
 
 def bot_id():
@@ -89,10 +95,12 @@ def bot_id():
 def public_config():
     import telegram_bot
     import mailer
+    del telegram_bot                       # the phone sign-in through the bot is no longer offered on the site
     return {"enabled": enabled(), "required": required(), "bot_id": bot_id(), "telegram": telegram_enabled(),
-            "email": email_enabled(), "email_recovery": email_enabled() and mailer.configured(),
+            "email": email_enabled(), "email_codes": email_codes(), "email_dev": email_codes() and mailer.dev(),
+            "email_password": email_enabled() and not email_codes(),     # older password accounts only
+            "email_recovery": email_enabled() and mailer.configured(),
             "email_verify_required": verification_required(),
-            "phone_bot": telegram_bot.enabled(), "anon_max_words": anon_max_words(),
             "bot_username": os.environ.get("TELEGRAM_BOT_USERNAME", "").lstrip("@")[:64]}
 
 
@@ -156,7 +164,7 @@ def read(cookie, now=None):
         return None
     if int(data["id"]) < 0 and _password_changed(-int(data["id"])) > int(data.get("iat", 0)):
         return None                                   # signed in before the password was reset
-    return {"id": int(data["id"]), "name": str(data.get("name", "")), "username": str(data.get("username", ""))}
+    return {"id": resolve(int(data["id"])), "name": str(data.get("name", "")), "username": str(data.get("username", ""))}
 
 
 def _password_changed(account):
@@ -166,6 +174,11 @@ def _password_changed(account):
     except sqlite3.Error:
         return 0
     return int(row[0] or 0) if row else 0
+
+
+def marker_key():
+    """Key for the hashed identity markers that keep a used free trial used (entitlements.trial_markers)."""
+    return hmac.new(_key(), b"plagiq-trial-marker", hashlib.sha256).digest()
 
 
 def is_owner(user):
@@ -220,6 +233,12 @@ def _connect():
     db.execute("CREATE TABLE IF NOT EXISTS email_accounts (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT NOT NULL UNIQUE, "
                "password TEXT NOT NULL, created TEXT NOT NULL)")
     db.execute("CREATE TABLE IF NOT EXISTS login_links (nonce TEXT PRIMARY KEY, user INTEGER NOT NULL, expires INTEGER NOT NULL)")
+    check_columns = {row[1] for row in db.execute("PRAGMA table_info(checks)")}
+    for column in ("kind", "tier", "status", "job", "recheck_of"):          # "My checks" (added, nothing removed)
+        if column not in check_columns:
+            db.execute(f"ALTER TABLE checks ADD COLUMN {column} TEXT")
+    if "amount" not in check_columns:
+        db.execute("ALTER TABLE checks ADD COLUMN amount INTEGER")
     columns = {row[1] for row in db.execute("PRAGMA table_info(users)")}
     if "phone" not in columns:
         db.execute("ALTER TABLE users ADD COLUMN phone TEXT")
@@ -231,6 +250,14 @@ def _connect():
     # Single-use links for e-mail confirmation and password recovery: only a hash of the token is stored.
     db.execute("CREATE TABLE IF NOT EXISTS email_tokens (hash TEXT PRIMARY KEY, account INTEGER NOT NULL, kind TEXT NOT NULL, "
                "expires INTEGER NOT NULL, used INTEGER NOT NULL DEFAULT 0)")
+    # Passwordless sign-in: a code and a link per request, both stored as hashes.
+    db.execute("CREATE TABLE IF NOT EXISTS email_codes (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT NOT NULL, "
+               "code_hash TEXT NOT NULL, link_hash TEXT NOT NULL UNIQUE, expires INTEGER NOT NULL, attempts INTEGER NOT NULL "
+               "DEFAULT 0, used INTEGER NOT NULL DEFAULT 0, link_to INTEGER)")
+    db.execute("CREATE INDEX IF NOT EXISTS email_codes_email ON email_codes (email, used)")
+    # Linked sign-in methods: the alias account (another Telegram ID or e-mail account) opens `account`.
+    db.execute("CREATE TABLE IF NOT EXISTS account_links (alias INTEGER PRIMARY KEY, account INTEGER NOT NULL, "
+               "created TEXT NOT NULL)")
     return db
 
 
@@ -249,28 +276,116 @@ def remember(user, phone=None):
 def log_check(user, result, report_id):
     ai = (result.get("ai") or {}).get("fraction_ai")
     remember(user)                     # the account row may be missing (e.g. signed in before the volume existed)
+    ent = result.get("entitlement") or {}
     with _lock, _connect() as db:
-        db.execute("INSERT INTO checks (user, date, mode, words, percent, ai, report) VALUES (?, ?, ?, ?, ?, ?, ?)",
+        db.execute("INSERT INTO checks (user, date, mode, words, percent, ai, report, kind, tier, status, job, recheck_of, "
+                   "amount) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                    (user["id"], _now(), result.get("mode", ""), int(result.get("total_tokens") or 0),
-                    result.get("percent"), ai, report_id[:12]))
+                    result.get("percent"), ai, report_id[:12], ent.get("kind"), ent.get("tier"), result.get("status"),
+                    report_id or None, ent.get("recheck_of"), ent.get("price_uzs")))
+
+
+HISTORY_FIELDS = ("date", "mode", "words", "percent", "ai", "report", "kind", "tier", "status", "job", "recheck_of", "amount")
 
 
 def history(user, limit=20):
     with _lock, _connect() as db:
-        rows = db.execute("SELECT date, mode, words, percent, ai, report FROM checks WHERE user=? "
+        rows = db.execute(f"SELECT {', '.join(HISTORY_FIELDS)} FROM checks WHERE user=? "
                           "ORDER BY date DESC LIMIT ?", (user["id"], limit)).fetchall()
-    return [dict(zip(("date", "mode", "words", "percent", "ai", "report"), row)) for row in rows]
+    return [dict(zip(HISTORY_FIELDS, row)) for row in rows]
 
 
 def forget(user):
-    """Delete the account and its check log (the user's right to erasure). Archive deposits
-    are removed separately through the engine (see app.delete_me)."""
+    """Delete the account, its linked sign-in methods and its check log (the user's right to erasure). Archive
+    deposits are removed separately through the engine (see app.delete_me)."""
     with _lock, _connect() as db:
-        db.execute("DELETE FROM checks WHERE user=?", (user["id"],))
-        db.execute("DELETE FROM users WHERE id=?", (user["id"],))
-        db.execute("DELETE FROM login_links WHERE user=?", (user["id"],))
-        if user["id"] < 0:
-            db.execute("DELETE FROM email_accounts WHERE id=?", (-user["id"],))
+        ids = [user["id"]] + [r[0] for r in db.execute("SELECT alias FROM account_links WHERE account=?", (user["id"],))]
+        for uid in ids:
+            db.execute("DELETE FROM checks WHERE user=?", (uid,))
+            db.execute("DELETE FROM users WHERE id=?", (uid,))
+            db.execute("DELETE FROM login_links WHERE user=?", (uid,))
+            if uid < 0:
+                row = db.execute("SELECT email FROM email_accounts WHERE id=?", (-uid,)).fetchone()
+                db.execute("DELETE FROM email_accounts WHERE id=?", (-uid,))
+                db.execute("DELETE FROM email_tokens WHERE account=?", (-uid,))
+                if row:
+                    db.execute("DELETE FROM email_codes WHERE email=?", (row[0],))
+        db.execute("DELETE FROM account_links WHERE account=? OR alias=?", (user["id"], user["id"]))
+
+
+# ------------------------------------------------------------- linked sign-in methods
+
+def resolve(user_id):
+    """The account a sign-in identity opens (itself unless it was linked to another account)."""
+    try:
+        with _lock, _connect() as db:
+            row = db.execute("SELECT account FROM account_links WHERE alias=?", (int(user_id),)).fetchone()
+    except sqlite3.Error:
+        return int(user_id)
+    return row[0] if row else int(user_id)
+
+
+def identities(user):
+    """Every sign-in identity of the account, as "telegram:<id>" / "email:<address>" (for trial markers)."""
+    if not user:
+        return []
+    with _lock, _connect() as db:
+        ids = [user["id"]] + [r[0] for r in db.execute("SELECT alias FROM account_links WHERE account=?", (user["id"],))]
+        out = []
+        for uid in ids:
+            if uid >= 0:
+                out.append(f"telegram:{uid}")
+            else:
+                row = db.execute("SELECT email FROM email_accounts WHERE id=?", (-uid,)).fetchone()
+                if row:
+                    out.append("email:" + row[0])
+    return out
+
+
+def methods(user):
+    """{"telegram": bool, "email": address or None} for the account menu."""
+    if not user:
+        return {}
+    found = identities(user)
+    email = next((i[6:] for i in found if i.startswith("email:")), None)
+    return {"telegram": any(i.startswith("telegram:") for i in found), "email": email}
+
+
+def _has_history(db, uid):
+    if db.execute("SELECT 1 FROM checks WHERE user=? LIMIT 1", (uid,)).fetchone():
+        return True
+    for table in ("ledger", "reservations", "paid_checks", "orders"):
+        try:
+            if db.execute(f"SELECT 1 FROM {table} WHERE user=? LIMIT 1", (uid,)).fetchone():
+                return True
+        except sqlite3.OperationalError:          # table not created yet
+            pass
+    return False
+
+
+def link_identity(user, alias_id):
+    """Make the sign-in identity `alias_id` open `user`'s account. Refused when that identity already is, or has,
+    a separate account with checks or payments (accounts are never merged automatically)."""
+    alias_id = int(alias_id)
+    if alias_id == user["id"]:
+        return True
+    with _lock, _connect() as db:
+        current = db.execute("SELECT account FROM account_links WHERE alias=?", (alias_id,)).fetchone()
+        if current:
+            if current[0] == user["id"]:
+                return True
+            raise AccountError("identity_in_use", "This sign-in method already belongs to another PlagIQ account.", 409)
+        if db.execute("SELECT 1 FROM account_links WHERE account=?", (alias_id,)).fetchone() or _has_history(db, alias_id):
+            raise AccountError("identity_in_use", "This sign-in method already belongs to another PlagIQ account.", 409)
+        kind = "telegram" if alias_id >= 0 else "email"
+        for other in db.execute("SELECT alias FROM account_links WHERE account=?", (user["id"],)).fetchall():
+            if (other[0] >= 0) == (kind == "telegram"):
+                raise AccountError("method_already_linked", f"This account already has a {kind} sign-in.", 409)
+        if (user["id"] >= 0) == (kind == "telegram"):
+            raise AccountError("method_already_linked", f"This account already has a {kind} sign-in.", 409)
+        db.execute("INSERT INTO account_links (alias, account, created) VALUES (?, ?, ?)", (alias_id, user["id"], _now()))
+        db.execute("DELETE FROM users WHERE id=?", (alias_id,))
+    return True
 
 
 # ------------------------------------------------------------- email + password
@@ -499,6 +614,112 @@ def reset_password(raw, password):
                    (_hash(password), int(time.time() * 1000), _now(), account))
         db.execute("UPDATE email_tokens SET used=1 WHERE account=? AND kind='reset'", (account,))
     return True
+
+
+# ------------------------------------------------------- passwordless e-mail sign-in (code or link)
+CODE_MINUTES = 15
+CODE_ATTEMPTS = 5
+
+SIGNIN_MAIL = (
+    "Your PlagIQ sign-in code: {code}",
+    "Hello,\n\nyour PlagIQ sign-in code is {code}\n\nEnter it on the page where you asked for it, or open this link in the "
+    "same browser:\n{link}\n\nThe code and the link work once, for {minutes} minutes. If you did not ask for them, ignore "
+    "this message: nobody can sign in without them.\n\n"
+    "PlagIQ kirish kodi: {code} (bir marta, {minutes} daqiqa). Havola: {link}\n"
+    "Код входа в PlagIQ: {code} (один раз, {minutes} минут). Ссылка: {link}\n")
+
+
+def _code_hash(email, code):
+    return hmac.new(_key(), f"signin-code|{email}|{code}".encode(), hashlib.sha256).hexdigest()
+
+
+def start_email_signin(email, origin, client="", link_to=None):
+    """Send a sign-in code and link to `email`. The caller always answers the same way, whether the address has an
+    account or not, and whether or not this request was rate-limited silently (see app.email_start)."""
+    import mailer
+    if not email_codes():
+        raise AccountError("login_not_configured", "Sign-in by e-mail is not available yet.", 503)
+    email = _clean_email(email)
+    if not _may_send(["signin:" + email] + (["signin-ip:" + client] if client else [])):
+        raise AccountError("too_many_emails", "Too many codes requested. Try again in an hour.", 429)
+    code = f"{secrets.randbelow(10 ** 6):06d}"
+    raw = secrets.token_urlsafe(32)
+    now = int(time.time())
+    with _lock, _connect() as db:
+        db.execute("DELETE FROM email_codes WHERE expires < ?", (now - 86400,))
+        db.execute("UPDATE email_codes SET used=1 WHERE email=? AND used=0", (email,))     # only the newest code works
+        db.execute("INSERT INTO email_codes (email, code_hash, link_hash, expires, link_to) VALUES (?, ?, ?, ?, ?)",
+                   (email, _code_hash(email, code), hashlib.sha256(raw.encode()).hexdigest(), now + CODE_MINUTES * 60,
+                    link_to))
+    subject, body = SIGNIN_MAIL
+    link = origin.rstrip("/") + "/auth/email/link?t=" + raw
+    try:
+        mailer.send(email, subject.format(code=code), body.format(code=code, link=link, minutes=CODE_MINUTES))
+    except mailer.MailError:
+        return False
+    return True
+
+
+def _account_for_email(db, email):
+    """The user dict for this address, creating a passwordless account the first time."""
+    row = db.execute("SELECT id FROM email_accounts WHERE email=?", (email,)).fetchone()
+    if row:
+        account = row[0]
+        db.execute("UPDATE email_accounts SET verified=COALESCE(verified, ?) WHERE id=?", (_now(), account))
+    else:
+        account = db.execute("INSERT INTO email_accounts (email, password, created, verified) VALUES (?, '!', ?, ?)",
+                             (email, _now(), _now())).lastrowid       # '!' = no password (never matches a scrypt hash)
+    return -account
+
+
+def _finish_signin(email, row_id, link_to):
+    with _lock, _connect() as db:
+        db.execute("UPDATE email_codes SET used=1 WHERE id=?", (row_id,))
+        alias = _account_for_email(db, email)
+        primary = db.execute("SELECT account FROM account_links WHERE alias=?", (alias,)).fetchone()
+        name = db.execute("SELECT name FROM users WHERE id=?", (primary[0] if primary else alias,)).fetchone()
+    if link_to is not None:
+        link_identity({"id": int(link_to)}, alias)
+        return {"id": int(link_to), "linked": "email"}
+    user_id = primary[0] if primary else alias
+    user = {"id": user_id, "name": (name[0] if name else "") or email.split("@")[0][:60], "username": ""}
+    remember(user)
+    return user
+
+
+def verify_email_code(email, code, client=""):
+    """The signed-in user for a correct, unexpired, unused code. Wrong codes count; after CODE_ATTEMPTS the code
+    is void. One message for every failure, so it says nothing about the address."""
+    try:
+        email = _clean_email(email)
+    except AccountError:
+        raise AccountError("code_invalid", "This code is wrong or has expired. Ask for a new one.", 400)
+    keys = ["code:" + email] + (["code-ip:" + client] if client else [])
+    _throttle(keys)
+    code = str(code or "").strip().replace(" ", "")
+    with _lock, _connect() as db:
+        row = db.execute("SELECT id, code_hash, attempts, link_to FROM email_codes WHERE email=? AND used=0 AND expires>=? "
+                         "ORDER BY id DESC LIMIT 1", (email, int(time.time()))).fetchone()
+        ok = bool(row) and re.fullmatch(r"\d{6}", code) is not None and hmac.compare_digest(row[1], _code_hash(email, code))
+        if row and not ok:
+            db.execute("UPDATE email_codes SET attempts=attempts+1, used=CASE WHEN attempts+1>=? THEN 1 ELSE used END "
+                       "WHERE id=?", (CODE_ATTEMPTS, row[0]))
+    if not ok:
+        _failed(keys)
+        raise AccountError("code_invalid", "This code is wrong or has expired. Ask for a new one.", 400)
+    return _finish_signin(email, row[0], row[3])
+
+
+def use_email_link(raw):
+    """The user for a valid sign-in link from the e-mail (single use), or None."""
+    if not isinstance(raw, str) or not 20 <= len(raw) <= 100:
+        return None
+    with _lock, _connect() as db:
+        row = db.execute("SELECT id, email, link_to FROM email_codes WHERE link_hash=? AND used=0 AND expires>=?",
+                         (hashlib.sha256(raw.encode()).hexdigest(), int(time.time()))).fetchone()
+    if not row:
+        return None
+    return _finish_signin(row[1], row[0], row[2])
 
 
 # ------------------------------------------------------------- one-time links from the bot
