@@ -12,10 +12,19 @@ signal points to concrete places a person can check:
   markdown            leftover chat formatting (## headings, **bold**, ``` fences)
   doi_not_found       DOIs in the reference list that do not exist (doi.org)
   doi_mismatch        DOIs that exist but belong to a different work than the one cited
+  reference_not_found English journal-style references WITHOUT a DOI whose title OpenAlex cannot find (at least 2).
+                      Invented references are the most common trace of chatbot-written theses, but a reference can
+                      also be missing from OpenAlex for honest reasons, so this asks the reader to check, nothing more.
+                      Uzbek and Russian references are not looked up this way: OpenAlex covers much of the local
+                      literature poorly, and "not found" would wrongly suggest invention.
 
-The DOI check sends only the DOIs to OpenAlex (free single-work lookups) and, for
-DOIs OpenAlex does not know, to doi.org. It runs only with the user's consent.
-Settings: INTEGRITY_DOI_CHECK=0 turns the DOI check off.
+Chatbot phrases are written once in Uzbek Latin (UZ_CHATBOT); the Uzbek Cyrillic forms are generated from them by
+uzcyr.py, so both scripts are always covered alike.
+
+The reference checks send only DOIs and reference titles (never the manuscript) to OpenAlex (single-work lookups are
+free; a title search costs about $0.001, at most MAX_TITLES per check) and, for DOIs OpenAlex does not know, to
+doi.org. They run only with the user's consent (academic mode).
+Settings: INTEGRITY_DOI_CHECK=0 turns both reference checks off; INTEGRITY_TITLE_CHECK=0 only the title check.
 """
 import json
 import os
@@ -28,7 +37,7 @@ from urllib.parse import quote
 
 import citations
 
-_A = r"[ʼʻ'’`]"
+_A = r"[ʼʻ'’‘`´]"
 CHATBOT = [re.compile(p, re.IGNORECASE) for p in (
     # English
     r"\bas an ai(?: language model| assistant| model)?\b", r"\bas a (?:large )?language model\b",
@@ -48,7 +57,52 @@ CHATBOT = [re.compile(p, re.IGNORECASE) for p in (
     r"\bumid qilamanki,? bu (?:sizga )?(?:yordam beradi|foydali bo)",
     r"\bmana (?:qayta ishlangan|tahrirlangan|yaxshilangan|qayta yozilgan) (?:variant|matn|versiya)\b",
     r"\bсунъий интеллект(?: модели)? сифатида\b", r"\bалбатта[!,.] мана\b", r"\bумид қиламанки,? бу (?:сизга )?ёрдам беради\b",
+    # more English and Russian assistant phrases (the assistant talking to its user)
+    r"\bgreat question\b", r"\bif you have any (?:other |further |more )?questions\b", r"\bfeel free to ask\b",
+    r"\bi(?:'d| would) be happy to help\b", r"\bi don't have (?:real-time|access to real-time)\b",
+    r"\bесли у вас (?:есть|возникнут|появятся) (?:ещё |еще |другие |дополнительные )?вопросы\b",
+    r"\bчем (?:ещё|еще) (?:я )?могу (?:вам )?помочь\b", r"\bотличный вопрос\b",
+    r"\bя\s*(?:—|-)?\s*(?:языковая модель|ии-ассистент|виртуальный ассистент)\b",
+    r"\bу меня нет доступа к (?:интернету|актуальн)", r"\bконечно[!,.] (?:ниже|давайте)\b",
+    r"\bниже представлен\w* (?:переработанн|улучшенн|исправленн|отредактированн)",
 )]
+# Uzbek assistant phrases, written once in Latin with ʻ/ʼ; the Cyrillic forms come from uzcyr.py. Only phrases in
+# which the assistant speaks to its user, so that human academic prose does not match them.
+UZ_CHATBOT = (
+    "men sunʼiy intellektman", "men sunʼiy intellekt modeliman", "men til modeliman", "men sunʼiy intellekt yordamchisiman",
+    "albatta, quyida", "albatta! quyida", "albatta, bu mavzu boʻyicha",
+    "soʻrovingiz boʻyicha tayyorlangan", "mana sizning soʻrovingiz boʻyicha", "siz soʻragan matn", "quyida siz soʻragan",
+    "agar qoʻshimcha savollaringiz boʻlsa", "agar yana savollaringiz boʻlsa", "savollaringiz boʻlsa, bemalol soʻrang",
+    "sizga yana qanday yordam bera olaman", "yana nima bilan yordam bera olaman", "yana qanday yordam kerak boʻlsa",
+    "ajoyib savol", "matnni qayta yozib berdim", "matnni tahrirlab berdim",
+    "internetga kirish imkoniyatim yoʻq", "real vaqt rejimidagi maʼlumotlarga ega emasman",
+)
+
+
+def _uz_pattern(phrase):
+    """A regex for a Latin phrase: any apostrophe form (or none), any whitespace between words."""
+    out = []
+    for ch in phrase:
+        if ch in "ʻʼ'’‘`":
+            out.append(_A + "?")
+        elif ch.isspace():
+            out.append(r"\s+")
+        else:
+            out.append(re.escape(ch))
+    return re.compile(r"(?<!\w)" + "".join(out) + r"(?!\w)", re.IGNORECASE)
+
+
+def _uz_patterns():
+    import uzcyr
+    pats = []
+    for phrase in UZ_CHATBOT:
+        pats.append(_uz_pattern(phrase))
+        cyr = uzcyr.to_cyrillic(phrase)
+        pats.append(re.compile(r"(?<!\w)" + r"\s+".join(re.escape(w) for w in cyr.split()) + r"(?!\w)", re.IGNORECASE))
+    return pats
+
+
+CHATBOT += _uz_patterns()
 PLACEHOLDER = re.compile(
     r"\[(?:insert|your|author|citation needed|add |source|reference|name|date|вставьте|ваше|укажите|автор|источник"
     r"|muallif|manba|ism|kiriting)[^\]\n]{0,50}\]"
@@ -67,6 +121,9 @@ LAT_LOOKALIKE = set("aeopcyxijsdqwlABEKMHOPCTXIJSQW")
 # characters and keyboard-layout slips occur in genuine text, disguise tools insert many.
 THRESHOLDS = {"chatbot_phrases": 1, "placeholders": 1, "hidden_characters": 10, "mixed_script": 5, "markdown": 3}
 MAX_DOIS = 25
+MAX_TITLES = 12                 # English references without a DOI looked up by title, per check
+TITLE_SIGNAL_MIN = 2
+OPENALEX_SEARCH = "https://api.openalex.org/works"
 MAX_EXAMPLES = 5
 OPENALEX = "https://api.openalex.org/works/doi:"
 HANDLE = "https://doi.org/api/handles/"
@@ -148,6 +205,81 @@ def reference_dois(text):
     return out
 
 
+NUMBERED = re.compile(r"^\s*(?:\[\d{1,3}\]|\d{1,3}[.)])\s+")
+YEAR = re.compile(r"\b(?:19|20)\d{2}\b")
+JOURNAL_LIKE = re.compile(r"\b\d{1,4}\s*\(\d{1,4}\)|\bvol(?:ume)?\.?\s*\d|\bpp?\.\s*\d|\b\d{1,5}\s*[–-]\s*\d{1,5}\b", re.I)
+APA_TITLE = re.compile(r"\((?:19|20)\d{2}[a-z]?\)\.?\s*(.+?)[.?!](?:\s|$)")
+YEAR_TITLE = re.compile(r"\b(?:19|20)\d{2}[a-z]?\.\s+(.+?)[.?!](?:\s|$)")
+INITIALS = re.compile(r"\b[A-Z]\.")
+
+
+def reference_entries(text):
+    """Entries of the reference list: numbered items (joined across wrapped lines), else one per line."""
+    span = citations.bibliography_span(text)
+    if not span:
+        return []
+    lines = [l.strip() for l in text[span[0]:span[1]].splitlines()[1:] if l.strip()]
+    numbered = sum(1 for l in lines if NUMBERED.match(l))
+    entries = []
+    for line in lines:
+        if numbered >= 2 and not NUMBERED.match(line) and entries:
+            entries[-1] += " " + line                      # a wrapped line of the previous item
+        else:
+            entries.append(line)
+    return [NUMBERED.sub("", e) for e in entries if 20 <= len(e) <= 800]
+
+
+UZ_ENDINGS = ("ning", "lari", "larni", "larning", "dagi", "ligi", "lik", "chi", "ganligi", "moqda")
+
+
+def _english_reference(entry):
+    """A short reference written in English: Latin script, English function words, and no Uzbek letters (oʻ, gʻ),
+    Uzbek function words or typical Uzbek endings (corpus.detect_language needs far longer texts)."""
+    import corpus
+    cyrillic, latin = corpus.script_shares(entry)
+    if latin < 0.9 or re.search(r"[og][ʻ‘'`’]", entry.lower()):
+        return False
+    words = re.findall(r"[a-z]+", entry.lower())
+    en = sum(w in corpus.EN_WORDS for w in words)
+    uz = sum(w in corpus.UZ_WORDS for w in words) + sum(len(w) > 6 and w.endswith(UZ_ENDINGS) for w in words)
+    return en >= 2 and uz == 0
+
+
+def english_title(entry):
+    """The title of an English journal-style reference without a DOI, or None (not such a reference, or the title
+    cannot be told apart from the authors and journal)."""
+    if DOI.search(entry) or not YEAR.search(entry) or not JOURNAL_LIKE.search(entry):
+        return None
+    if not _english_reference(entry):
+        return None
+    m = APA_TITLE.search(entry) or YEAR_TITLE.search(entry)
+    title = m.group(1).strip() if m else None
+    if not title:
+        parts = [p.strip() for p in re.split(r"(?<=[a-z0-9])\.\s+", entry) if p.strip()]
+        title = next((p for p in parts[1:] if len(p.split()) >= 4 and len(INITIALS.findall(p)) <= 1), None)
+    if not title or not 4 <= len(title.split()) <= 40:
+        return None
+    return title
+
+
+def check_title(title, entry):
+    """'ok' when OpenAlex has a work whose title matches the reference, 'not_found', or 'unchecked'."""
+    words = [w for w in re.findall(r"[^\W\d_]{3,}", unicodedata.normalize("NFKC", title).lower()) if w not in STOP][:10]
+    if len(words) < 3:
+        return "unchecked"
+    key = os.environ.get("OPENALEX_API_KEY")
+    url = (os.environ.get("INTEGRITY_OPENALEX_SEARCH", OPENALEX_SEARCH) + "?filter=title.search:"
+           + quote(" ".join(words)) + "&per_page=5&select=display_name")
+    try:
+        found = _get(url, {"Authorization": "Bearer " + key} if key else None)
+    except (urllib.error.URLError, OSError, ValueError):
+        return "unchecked"
+    for work in (found.get("results") or [])[:5]:
+        if title_matches(str(work.get("display_name") or ""), entry):
+            return "ok"
+    return "not_found"
+
+
 def _words(text):
     folded = unicodedata.normalize("NFKC", text).lower()
     return {w for w in re.findall(r"[^\W\d_]{4,}", folded) if w not in STOP}
@@ -200,13 +332,31 @@ def check_doi(doi, entry):
 
 def check_references(text, seconds=12):
     dois = reference_dois(text)
-    report = {"dois": len(dois), "checked": 0, "unchecked": 0, "not_found": [], "mismatch": []}
-    if not dois:
+    titled = []
+    if os.environ.get("INTEGRITY_TITLE_CHECK", "1") != "0":
+        for entry in reference_entries(text):
+            title = english_title(entry)
+            if title:
+                titled.append((title, entry))
+            if len(titled) >= MAX_TITLES:
+                break
+    report = {"dois": len(dois), "checked": 0, "unchecked": 0, "not_found": [], "mismatch": [],
+              "titles": len(titled), "titles_checked": 0, "titles_not_found": []}
+    if not dois and not titled:
         return report
     pool = ThreadPoolExecutor(max_workers=4)
     futures = {pool.submit(check_doi, doi, entry): doi for doi, entry in dois}
-    done, pending = wait(futures, timeout=seconds)
+    by_title = {pool.submit(check_title, title, entry): entry for title, entry in titled}
+    done, pending = wait(list(futures) + list(by_title), timeout=seconds)
+    for future in by_title:
+        if future in done and future.result() != "unchecked":
+            report["titles_checked"] += 1
+            if future.result() == "not_found":
+                entry = by_title[future]
+                report["titles_not_found"].append(entry[:240] + ("…" if len(entry) > 240 else ""))
     for future in done:
+        if future not in futures:
+            continue
         doi = futures[future]
         status, title = future.result()
         if status == "unchecked":
@@ -217,7 +367,7 @@ def check_references(text, seconds=12):
             report["not_found"].append(doi)
         elif status == "mismatch":
             report["mismatch"].append({"doi": doi, "title": title})
-    report["unchecked"] += len(pending)
+    report["unchecked"] += sum(1 for f in pending if f in futures)
     pool.shutdown(wait=False, cancel_futures=True)
     report["not_found"].sort()
     report["mismatch"].sort(key=lambda m: m["doi"])
@@ -244,4 +394,8 @@ def assess(text, check_dois=False):
             signals.append({"id": "doi_not_found", "count": len(references["not_found"])})
         if references["mismatch"]:
             signals.append({"id": "doi_mismatch", "count": len(references["mismatch"])})
+        if len(references["titles_not_found"]) >= TITLE_SIGNAL_MIN:
+            signals.append({"id": "reference_not_found", "count": len(references["titles_not_found"])})
+        else:                                   # one missing reference is too common for honest reasons to list
+            references["titles_not_found"] = []
     return {"status": "review" if signals else "none", "signals": signals, "references": references}, examples
