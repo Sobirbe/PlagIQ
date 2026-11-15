@@ -108,10 +108,14 @@ The site checks Russian as well as Uzbek (Russian is currently sent to Pangram).
 `prompts-ru.txt` (60 titles to write for, 15 abstracts to polish; `ru_plan.json`), saved as `ru_<chatbot>.json`.
 LaTeX, Markdown, quote/dash variants and ё are removed first.
 
-| Trained on human + … | Gemini written (60) | Gemini polished (15) | Polished originals flagged (15) |
-|---|---|---|---|
-| Gemini written — 1 % false alarms | 65 % | 7 % | 0 % |
-| Gemini written — 5 % false alarms | 82 % | 40 % | 7 % |
+Percentages: AI texts caught at the threshold where 1 % (5 %) of held-out human abstracts are flagged.
 
-Even with Gemini in training, its Russian abstracts are caught less often than its Uzbek ones (65 % vs 92 % at 1 %):
-Russian academic prose is formulaic in humans too, so the styles overlap more. ChatGPT and Claude answers are pending.
+| Trained on human + … | Claude written (60) | Gemini written (60) | Claude polished (15) | Gemini polished (15) | Polished originals flagged (15) |
+|---|---|---|---|---|---|
+| Gemini | 15 % (40 %) — unseen | 65 % (82 %) | 0 % (7 %) | 7 % (40 %) | 0 % (7 %) |
+| Claude | 57 % (80 %) | 33 % (52 %) — unseen | 0 % (13 %) | 13 % (20 %) | 0 % (0 %) |
+| Claude + Gemini | 50 % (73 %) | 63 % (80 %) | 0 % (13 %) | 13 % (33 %) | 0 % (7 %) |
+
+Russian is harder than Uzbek even for a chatbot in training (50–65 % at 1 % false alarms, against 92–100 % in Uzbek):
+Russian academic prose is formulaic in humans too, so the styles overlap more. An unseen chatbot is mostly missed
+(15–33 %), and polished text is not caught (0–13 %). ChatGPT answers are pending.
