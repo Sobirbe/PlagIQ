@@ -26,6 +26,9 @@ C = {
                                    reference="Comparison with one reference document supplied by the user",
                                    corpus="PlagIQ private corpus of authorized texts"),
         scope_web=" and the web ({p})", scope_library=", and the PlagIQ library", src_library=" · PlagIQ library: {lib}",
+        web_row="General web pages", web_notes=dict(
+            not_set_up="Not searched: web search is not set up on this server", not_chosen="Not searched: web search was not selected for this check",
+            not_in_mode="Not searched: not part of this check type", not_searched="Not searched"),
         verify="Verify this certificate", verify_v="Scan the QR code, or open the link, to confirm that PlagIQ issued it with these figures.",
         verify_off="Online verification is not enabled on this server.",
         issued="Issued electronically by PlagIQ", details="Full evidence (every matched passage and source) on the following pages.",
@@ -46,6 +49,9 @@ C = {
                                    reference="Сравнение с одним документом, предоставленным пользователем",
                                    corpus="Внутренний корпус PlagIQ с разрешёнными текстами"),
         scope_web=" и интернет ({p})",
+        web_row="Веб-страницы", web_notes=dict(
+            not_set_up="Не проверялись: поиск в интернете на этом сервере не настроен", not_chosen="Не проверялись: поиск в интернете не был выбран для этой проверки",
+            not_in_mode="Не проверялись: не входит в этот вид проверки", not_searched="Не проверялись"),
         scope_library=", а также библиотека PlagIQ", src_library=" · библиотека PlagIQ: {lib}",
         verify="Проверить сертификат", verify_v="Отсканируйте QR-код или откройте ссылку, чтобы убедиться, что PlagIQ выдал его с этими данными.",
         verify_off="Онлайн-проверка на этом сервере не настроена.",
@@ -67,6 +73,9 @@ C = {
                                    reference="Foydalanuvchi bergan bitta hujjat bilan solishtirish",
                                    corpus="PlagIQ ichki korpusidagi ruxsat berilgan matnlar"),
         scope_web=" va internet ({p})",
+        web_row="Veb-sahifalar", web_notes=dict(
+            not_set_up="Qidirilmadi: bu serverda internet qidiruvi sozlanmagan", not_chosen="Qidirilmadi: bu tekshiruv uchun internet qidiruvi tanlanmagan",
+            not_in_mode="Qidirilmadi: bu tekshiruv turiga kirmaydi", not_searched="Qidirilmadi"),
         scope_library=" hamda PlagIQ kutubxonasi", src_library=" · PlagIQ kutubxonasi: {lib}",
         verify="Sertifikatni tekshirish", verify_v="PlagIQ uni aynan shu ma’lumotlar bilan berganini tasdiqlash uchun QR kodni skanerlang yoki havolani oching.",
         verify_off="Bu serverda onlayn tekshirish sozlanmagan.",
@@ -155,6 +164,9 @@ def facts(result, lang):
     elif ai.get("status") in ("unsupported_language", "error", "too_long"):
         rows.append((t["ai_row"], t["ai_unsupported"] if ai["status"] == "unsupported_language" else
                      t["ai_too_long"].format(n=ai.get("max_words", "")) if ai["status"] == "too_long" else t["ai_error"]))
+    note = checkstatus.web_note(result)
+    if note:                                       # said next to the result: a low figure is not "nothing from the web"
+        rows.append((t["web_row"], t["web_notes"][note]))
     return rows + [
             (t["integrity"], t["ind_review"].format(n=signals) if integrity.get("status") == "review" else t["ind_none"]),
             (t["scope"], scope)]
