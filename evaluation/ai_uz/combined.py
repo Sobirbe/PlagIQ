@@ -25,7 +25,7 @@ for i, h in enumerate(H):
         add(h["text"], 0, "human (polished originals)" if i in polish_orig else "human", f"h{i}")
 for n, t in enumerate(json.load(open("ai_batch1.json"))): add(t, 1, "Claude written", f"c{n}")
 for k, t in json.load(open("ai_polished1.json")).items(): add(t, 1, "Claude polished", f"h{sp['polish'][int(k)]}")
-for run, f in (("ChatGPT run 1", "chatgpt.json"), ("ChatGPT run 2", "chatgpt2.json")):
+for run, f in (("ChatGPT run 1", "chatgpt.json"), ("ChatGPT run 2", "chatgpt2.json"), ("ChatGPT run 3", "chatgpt3.json")):
     for blk, texts in json.load(open(f)).items():
         b = int(blk[1:]) - 1
         for n, t in enumerate(texts):
@@ -35,10 +35,10 @@ for run, f in (("ChatGPT run 1", "chatgpt.json"), ("ChatGPT run 2", "chatgpt2.js
 X = [t for t, *_ in items]; y = np.array([l for _, l, *_ in items]); cat = np.array([c for _, _, c, _ in items])
 fold = np.array([zlib.crc32(g.encode()) % 5 for *_, g in items])
 REGIMES = {"E1": {"Claude written"},
-           "E2": {"Claude written", "ChatGPT run 1 written", "ChatGPT run 2 written"},
-           "E3": {"Claude written", "ChatGPT run 1 written", "ChatGPT run 2 written",
+           "E2": {"Claude written", "ChatGPT run 1 written", "ChatGPT run 2 written", "ChatGPT run 3 written"},
+           "E3": {"Claude written", "ChatGPT run 1 written", "ChatGPT run 2 written", "ChatGPT run 3 written",
                   "Claude polished", "ChatGPT run 1 polished", "ChatGPT run 2 polished"}}
-ORDER = ["Claude written", "ChatGPT run 1 written", "ChatGPT run 2 written",
+ORDER = ["Claude written", "ChatGPT run 1 written", "ChatGPT run 2 written", "ChatGPT run 3 written",
          "Claude polished", "ChatGPT run 1 polished", "ChatGPT run 2 polished", "human (polished originals)"]
 def fit_folds(ai_train, extra=()):
     """5 group folds; returns held-out scores for all items and the fold-averaged scores of `extra` texts."""
