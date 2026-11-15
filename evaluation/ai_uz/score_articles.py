@@ -1,4 +1,4 @@
-"""Score Gemini-written Uzbek articles (gemini1.txt, or the file given, never seen in training) paragraph by paragraph.
+"""Score chatbot-written Uzbek articles (gemini1.txt, or the file given) paragraph by paragraph, with detectors trained on abstracts.
 Only prose paragraphs are scored: headings, display formulas and reference lists are dropped and inline $...$ removed.
 Thresholds come from held-out human abstracts (combined.py folds), so a paragraph is flagged only if it scores above
 what 1 % / 5 % of human abstracts score. Note the genre gap: training has abstracts, these are article sections."""
@@ -21,10 +21,10 @@ owner = np.array(owner)
 for regime in ("E1", "E2"):
     s, g = fit_folds(REGIMES[regime], paras)
     hs = s[cat == "human"]
-    print(f"\n{regime} ({len(paras)} Gemini paragraphs, trained without Gemini):")
+    print(f"\n{regime} ({len(paras)} paragraphs):")
     for fp in (0.01, 0.05):
         thr = np.quantile(hs, 1 - fp)
         per = " | ".join(f"{n.split(' &')[0].split()[0].title()} {int((g[owner == n] > thr).sum())}/{int((owner == n).sum())}"
                          for n in dict.fromkeys(owner))
         print(f"  {fp:.0%} false alarms on human -> {np.mean(g > thr):.0%} of paragraphs flagged ({per})")
-    print("  median score: Gemini paragraphs %.2f, human abstracts %.2f" % (np.median(g), np.median(hs)))
+    print("  median score: these paragraphs %.2f, human abstracts %.2f" % (np.median(g), np.median(hs)))
