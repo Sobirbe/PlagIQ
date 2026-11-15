@@ -1,6 +1,11 @@
 """Outgoing e-mail (sign-in codes, test e-mails, confirmation and recovery links of older accounts).
 
 Two ways to send, set by the owner on the website service:
+  * Resend's web API (HTTPS; works where the hosting blocks outgoing mail ports, as on Railway's smaller plans):
+      RESEND_API_KEY (secret; a sending-only key is enough) and SMTP_FROM = a sender on a domain verified in
+      Resend, e.g. "PlagIQ <codes@mail.example.uz>". Used whenever RESEND_API_KEY is set. Each message carries an
+      idempotency key, and network errors, 429 and 5xx answers are retried with backoff (Retry-After respected);
+      other refusals are not retried.
   * Brevo's web API (HTTPS; works where the hosting blocks outgoing mail ports, as on Railway's smaller plans):
       BREVO_API_KEY (secret) and SMTP_FROM = the sender verified in Brevo, e.g. "PlagIQ <no-reply@example.org>".
       Used whenever BREVO_API_KEY is set. Request: POST https://api.brevo.com/v3/smtp/email with header "api-key".
@@ -17,8 +22,10 @@ import logging
 import os
 import smtplib
 import ssl
+import time
 import urllib.error
 import urllib.request
+import uuid
 from email.message import EmailMessage
 from email.utils import parseaddr
 
@@ -31,6 +38,14 @@ def dev():
     return os.environ.get("MAIL_BACKEND", "").strip().lower() == "dev"
 
 
+RESEND_URL = "https://api.resend.com/emails"
+RESEND_TRIES = 3
+
+
+def resend():
+    return bool(os.environ.get("RESEND_API_KEY", "").strip())
+
+
 BREVO_URL = "https://api.brevo.com/v3/smtp/email"
 
 
@@ -40,12 +55,16 @@ def brevo():
 
 def configured():
     sender = parseaddr(os.environ.get("SMTP_FROM", ""))[1]
-    return bool(sender and (brevo() or os.environ.get("SMTP_HOST")))
+    return bool(sender and (resend() or brevo() or os.environ.get("SMTP_HOST")))
 
 
 def backend():
-    """"brevo", "smtp", "dev" or "" (for the owner dashboard)."""
-    return "dev" if dev() else "brevo" if brevo() and configured() else "smtp" if configured() else ""
+    """"resend", "brevo", "smtp", "dev" or "" (for the owner dashboard). Resend is used first, then Brevo, then SMTP."""
+    if dev():
+        return "dev"
+    if not configured():
+        return ""
+    return "resend" if resend() else "brevo" if brevo() else "smtp"
 
 
 class MailError(Exception):
@@ -60,6 +79,8 @@ def send(to, subject, text):
         return
     if not configured():
         raise MailError("mail_not_configured")
+    if resend():
+        return _send_resend(to, subject, text)
     if brevo():
         return _send_brevo(to, subject, text)
     message = EmailMessage()
@@ -87,6 +108,41 @@ def send(to, subject, text):
         detail = f"{type(exc).__name__}: {str(exc)[:200]}".rstrip(": ")
         log.warning("e-mail not sent via %s:%s (%s): %s", host, port, security, detail)
         raise MailError(detail) from None
+
+
+def _send_resend(to, subject, text, sleep=time.sleep):
+    """POST /emails (resend.com/docs/api-reference/emails/send-email). One idempotency key for all retries of this
+    message, so a retry after a lost answer never sends it twice."""
+    body = json.dumps({"from": os.environ["SMTP_FROM"].strip(), "to": [to], "subject": subject, "text": text}).encode()
+    headers = {"Authorization": "Bearer " + os.environ["RESEND_API_KEY"].strip(), "Content-Type": "application/json",
+               "Accept": "application/json", "User-Agent": "PlagIQ", "Idempotency-Key": "plagiq-" + uuid.uuid4().hex}
+    detail = ""
+    for attempt in range(RESEND_TRIES):
+        wait = 2 ** attempt
+        try:
+            with urllib.request.urlopen(urllib.request.Request(RESEND_URL, body, headers, method="POST"), timeout=20) as reply:
+                answer = json.loads(reply.read() or b"{}")
+            log.info("e-mail sent via Resend (id %s)", answer.get("id", "?"))
+            return answer.get("id")
+        except urllib.error.HTTPError as exc:
+            try:                                 # Resend explains refusals: {"statusCode", "name", "message"}
+                info = json.loads(exc.read() or b"{}")
+                reason = f"{info.get('name', '')}: {info.get('message', '')}".strip(": ")[:200]
+            except (ValueError, OSError):
+                reason = ""
+            detail = f"Resend HTTP {exc.code}" + (f" ({reason})" if reason else "")
+            if exc.code != 429 and exc.code < 500:
+                break                            # wrong key, unverified sender ...: retrying cannot help
+            try:
+                wait = max(wait, min(int(exc.headers.get("retry-after", "0")), 30))
+            except (TypeError, ValueError):
+                pass
+        except (OSError, ValueError) as exc:
+            detail = f"Resend unreachable: {type(exc).__name__}: {str(exc)[:200]}"
+        if attempt < RESEND_TRIES - 1:
+            sleep(wait)
+    log.warning("e-mail not sent via Resend: %s", detail)
+    raise MailError(detail)
 
 
 def _send_brevo(to, subject, text):

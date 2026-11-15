@@ -64,7 +64,7 @@ def checklist(library, probe=""):
           if auth.public_config()["email_dev"] else "on (one-time codes by e-mail)") if auth.email_codes() else
          "off: only existing password accounts can use e-mail" + (f" (e-mail is set up via {mailer.backend()}: send a test "
                                                                     "e-mail below, then set EMAIL_SIGNIN=1)" if mailer.configured() else ""),
-         "BREVO_API_KEY (or SMTP_*) and SMTP_FROM on the website, a test e-mail from this page, then EMAIL_SIGNIN=1 (Part 3i)"),
+         "RESEND_API_KEY (or BREVO_API_KEY or SMTP_*) and SMTP_FROM on the website, a test e-mail from this page, then EMAIL_SIGNIN=1 (Part 3i)"),
         ("Free trial", True, f"one check per account, up to {pricing.trial_max_words():,} words, results on screen only; "
          "every check needs sign-in", "pricing.py"),
         ("Bot answers /start", telegram_bot.STATUS["ok"] if telegram_bot.enabled() else None,
