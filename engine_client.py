@@ -220,9 +220,40 @@ def summarize(report: dict, max_sources=25) -> dict:
                 "language_counts": counts,
                 "collection_counts": _collections(report.get("collection_counts")),
                 "matched_source_count": len(raw_sources),
-                "sources_truncated": len(raw_sources) > max_sources}
+                "sources_truncated": len(raw_sources) > max_sources,
+                **({"translated": _translated(report["translated"], document_length)} if "translated" in report else {})}
     except (ValueError, TypeError, KeyError, AttributeError) as exc:
         raise EngineError("Invalid corpus evidence response.") from exc
+
+def _translated(items, document_length):
+    """Possible translated reuse from the engine (crosslang.py), rebuilt from an allowlist like the sources."""
+    if not isinstance(items, list):
+        raise ValueError()
+    out = []
+    for item in items[:10]:
+        if not isinstance(item, dict) or not isinstance(item.get("pairs"), list):
+            raise ValueError()
+        pairs = []
+        for p in item["pairs"][:8]:
+            sim = p.get("similarity") if isinstance(p, dict) else None
+            if (not isinstance(p, dict) or any(type(p.get(k)) is not int for k in ("query_start", "query_end"))
+                    or not 0 <= p["query_start"] < p["query_end"] <= document_length
+                    or type(sim) not in (int, float) or not 0 < sim <= 1):
+                raise ValueError()
+            pairs.append({"query_start": p["query_start"], "query_end": p["query_end"], "similarity": round(float(sim), 2),
+                          "source_excerpt": str(p.get("source_excerpt") or "")[:501]})
+        deposit = item.get("rights_basis") in DEPOSITS
+        url = str(item.get("url") or "")[:500]
+        year = item.get("year")
+        out.append({"title": str(item.get("title") or "Indexed document")[:250], "authors": str(item.get("authors") or "")[:300],
+                    "year": year if type(year) is int and 1000 <= year <= 2200 else None,
+                    "url": "" if deposit or urlsplit(url).scheme != "https" else url,
+                    "language": item.get("language") if item.get("language") in LANGUAGES else None,
+                    "archive": deposit, "owner": str(item.get("owner") or "")[:40] if deposit else "",
+                    "sentences": _int(item.get("sentences", len(pairs)), 0, 100000),
+                    "pairs": [p | {"source_excerpt": ""} for p in pairs] if deposit else pairs})
+    return out
+
 
 def highlight_html(text: str, intervals) -> str:
     out=[]

@@ -348,6 +348,47 @@ def ai_section(data, lang, st, table):
     return [Paragraph(html.escape(t["title"]), st["h"]), table(rows), Paragraph(html.escape(t["note"]), st["small"])]
 
 
+TRANSLATED_T = {
+    "en": dict(title="Possible translated reuse (review)", note="Sentences of the document that closely match sentences of a "
+               "text in another language in the PlagIQ library (a translation, possibly edited), found by sentence similarity "
+               "(LaBSE, at least 2 sentences of one text at similarity 0.80 or more). This is a separate signal for review and "
+               "is NOT included in the percentage; a match can also be common phrasing. Compare the sentences before drawing "
+               "conclusions.", source="Source", sentences="{n} sentence(s) · {l}", pair="Document ↔ source ({s})",
+               hidden="unpublished work in the PlagIQ archive (text not shown)", langs=dict(uz="Uzbek", ru="Russian", en="English")),
+    "ru": dict(title="Возможное заимствование через перевод (проверьте)", note="Предложения документа, очень близкие к "
+               "предложениям текста на другом языке из библиотеки PlagIQ (перевод, возможно отредактированный), найденные по "
+               "сходству предложений (LaBSE, не менее 2 предложений одного текста со сходством от 0,80). Это отдельный сигнал "
+               "для проверки, он НЕ входит в процент; совпадение может быть и общей формулировкой. Сравните предложения, "
+               "прежде чем делать выводы.", source="Источник", sentences="предложений: {n} · {l}",
+               pair="Документ ↔ источник ({s})", hidden="неопубликованная работа из архива PlagIQ (текст не показывается)",
+               langs=dict(uz="узбекский", ru="русский", en="английский")),
+    "uz": dict(title="Ehtimoliy tarjima orqali o‘zlashtirish (tekshiring)", note="Hujjatdagi gaplar PlagIQ kutubxonasidagi "
+               "boshqa tildagi matn gaplariga juda yaqin (tarjima, ehtimol tahrirlangan); gaplar o‘xshashligi bo‘yicha topildi "
+               "(LaBSE, bitta matnning kamida 2 ta gapi, o‘xshashlik 0,80 va undan yuqori). Bu tekshirish uchun alohida belgi, "
+               "foizga KIRMAYDI; moslik keng tarqalgan ibora ham bo‘lishi mumkin. Xulosa qilishdan oldin gaplarni "
+               "solishtiring.", source="Manba", sentences="{n} ta gap · {l}", pair="Hujjat ↔ manba ({s})",
+               hidden="PlagIQ arxividagi nashr etilmagan ish (matni ko‘rsatilmaydi)", langs=dict(uz="o‘zbek", ru="rus", en="ingliz")),
+}
+
+
+def translated_section(result, lang, st, table, pairs=3):
+    items = result.get("translated") or []
+    if not items:
+        return []
+    t = TRANSLATED_T.get(lang, TRANSLATED_T["en"])
+    text = result.get("_text") or ""
+    rows = []
+    for item in items:
+        language = t["langs"].get(item.get("language"), item.get("language") or "")
+        rows.append((t["source"], f"{item.get('title', '')}" + (f" ({item['year']})" if item.get("year") else "")
+                     + " · " + t["sentences"].format(n=item.get("sentences", 0), l=language)))
+        for p in (item.get("pairs") or [])[:pairs]:
+            mine = text[p["query_start"]:p["query_end"]][:300] if text else ""
+            theirs = t["hidden"] if item.get("archive") else (p.get("source_excerpt") or "")[:300]
+            rows.append((t["pair"].format(s=p.get("similarity")), f"{mine}  ↔  {theirs}"))
+    return [Paragraph(html.escape(t["title"]), st["h"]), table(rows), Paragraph(html.escape(t["note"]), st["small"])]
+
+
 def integrity_section(data, lang, st, table):
     if not data:
         return []
@@ -431,6 +472,7 @@ def _plagiarism_sections(result, mode, t, st, table, esc, headline, basis, lang)
 
     story += integrity_section(result.get("integrity"), lang, st, table)
     story += ai_section(result.get("ai"), lang, st, table)
+    story += translated_section(result, lang, st, table)
 
     story.append(Paragraph(t["s_sources"], st["h"]))
     sources = result.get("sources") or []
@@ -819,5 +861,5 @@ def build_pdf(result, identifier, lang="en", minutes_left=15, verify_url=None):
 
 
 import uzcyr  # noqa: E402  (Uzbek Cyrillic texts, generated from the Uzbek Latin ones)
-for _table in (T, VIEW_T, INTEGRITY_T, AI_T, EDITED_T, EXCLUDED_T):
+for _table in (T, VIEW_T, INTEGRITY_T, AI_T, EDITED_T, EXCLUDED_T, TRANSLATED_T):
     uzcyr.add_to(_table)
