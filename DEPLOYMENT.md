@@ -711,6 +711,13 @@ The library file does not shrink after pruning, because SQLite reuses the freed 
 |---|---|---|---|
 | engine | `WIKIPEDIA_MAX_SHARE` | 10 | Wikipedia's ceiling, in percent of the library, for new imports (100 = off) |
 
+## Part 5f — Library file size: compacting after removing texts
+
+Removing texts (for example Wikipedia on /admin) frees space *inside* the engine's library file but does not make the file smaller, so Railway's volume meter does not go down. **/admin → Library file size**:
+1. **Show sizes**: how big the file is, how much of it is unused (left by removed texts), how much is free on the volume, and how much compacting needs (about the size of the remaining texts, plus a margin).
+2. Type **COMPACT** and press **Compact the library file**. The engine writes a compacted copy next to the file, checks it (database integrity and the same number of texts) and only then replaces the file; if the check fails, nothing changes. Checks and imports wait meanwhile, usually a minute or two.
+If there is not enough free space, it refuses and says so: enlarge the engine volume in Railway first. Never delete the engine volume to free space; it holds the library and the protected archive.
+
 ## Part 4 — Checks before you approve the pull request
 
 Use only harmless sample text. Tick each item:

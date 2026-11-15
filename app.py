@@ -938,6 +938,25 @@ async def admin_test_email(request: Request, email: str = Form(..., max_length=2
     return await _admin_page_with(admin.pilot_section(message), message)
 
 
+@app.post("/admin/compact", response_class=HTMLResponse)
+async def admin_compact(request: Request, confirm: int = Form(0), confirm_text: str = Form("", max_length=40)):
+    """Owner-only: show the library file's sizes, or (with the typed confirmation) compact it."""
+    owner(request)
+    do = bool(confirm) and confirm_text.strip().upper() == admin.COMPACT_WORDS
+    result, error = None, ""
+    if confirm and not do:
+        error = f"Type {admin.COMPACT_WORDS} to compact. Nothing was changed; the sizes are shown below."
+    try:
+        result = await engine_client.compact(do)
+    except EngineError as exc:
+        error = str(exc)
+    data = await engine_library() if corpus_configured() else None
+    inventory = await engine_client.inventory() if data is not None else None
+    notice = ("Library compacted." if result and result.get("compacted") else error)
+    return HTMLResponse(admin.page({"available": data is not None, **(data or {})}, "", inventory, notice=notice,
+                                   compacting=admin.compact_form(result, error)), headers={"Cache-Control": "no-store"})
+
+
 @app.post("/admin/prune", response_class=HTMLResponse)
 async def admin_prune(request: Request, keep: int = Form(100, ge=0, le=100000), confirm_text: str = Form("", max_length=40)):
     """Owner-only: preview, or with the typed confirmation remove, Wikipedia articles beyond `keep` per language."""

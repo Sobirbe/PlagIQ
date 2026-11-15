@@ -412,6 +412,26 @@ async def diagnostic(doi="", title="", passage=""):
     return data
 
 
+async def compact(confirm=False):
+    """Owner-only: report (or, with confirm, do) the compacting of the engine's library file. Raises EngineError."""
+    if not configured():
+        raise EngineError("Private corpus engine is not configured.", "engine_not_configured")
+    try:
+        async with _owner_client(timeout=1800.0) as client:
+            response = await client.post("/v1/compact", json={"confirm": bool(confirm)})
+    except httpx.HTTPError as exc:
+        raise EngineError("The engine did not answer (" + type(exc).__name__ + ").", "engine_unavailable")
+    if response.status_code == 429:
+        raise EngineError("The engine is busy; try again in a minute.", "engine_busy")
+    if response.status_code != 200:
+        try:
+            detail = response.json().get("detail", "")
+        except ValueError:
+            detail = ""
+        raise EngineError(f"The engine answered {response.status_code}" + (f": {detail}" if detail else "."), "engine_unavailable")
+    return response.json()
+
+
 async def prune(keep_per_language, confirm=False):
     """Owner-only Wikipedia pruning through the engine (preview unless confirm). Raises EngineError."""
     if not configured():

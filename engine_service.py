@@ -17,6 +17,7 @@ import gzip
 import json
 import re
 import shutil
+import sqlite3
 from fastapi.responses import StreamingResponse
 import corpus
 from corpus import DEPOSITS, LANGUAGES, category, connect, corpus_version, deposits, ingest, inventory, remove_deposit, search
@@ -380,6 +381,74 @@ def diagnostic(item: Diagnostic):
     finally:
         lock.release()
     return {'matches': len(matches), 'results': results}
+
+
+class Compact(BaseModel):
+    confirm: bool = False
+
+
+def compact_plan(db_path):
+    """Sizes for compacting: the file, the space unused inside it (left by removed texts), the free disk space, and
+    whether a compacted copy fits (it needs the live data plus a margin)."""
+    db_bytes = os.path.getsize(db_path) if os.path.exists(db_path) else 0
+    wal = db_path + '-wal'
+    wal_bytes = os.path.getsize(wal) if os.path.exists(wal) else 0
+    with closing(sqlite3.connect(db_path, timeout=60)) as db:
+        page = db.execute('PRAGMA page_size').fetchone()[0]
+        unused = db.execute('PRAGMA freelist_count').fetchone()[0] * page
+    free = shutil.disk_usage(os.path.dirname(os.path.abspath(db_path))).free
+    needed = max(0, db_bytes - unused) + 64 * 1024 * 1024
+    return {'db_bytes': db_bytes, 'wal_bytes': wal_bytes, 'unused_bytes': unused, 'free_bytes': free,
+            'needed_bytes': needed, 'possible': free >= needed}
+
+
+@app.post('/v1/compact', dependencies=[Depends(authorize)])
+def compact(item: Compact):
+    """Owner-only: give the space left by removed texts back to the disk. Without confirm it only reports the sizes.
+    With confirm, a compacted copy is written next to the library (VACUUM INTO), checked (integrity and the number of
+    texts), and only then replaces the library file. Checks and imports wait meanwhile (the engine lock)."""
+    db_path = os.environ.get('CORPUS_DB', 'corpus.sqlite3')
+    if not os.path.exists(db_path):
+        raise HTTPException(404, 'No library file')
+    plan = compact_plan(db_path)
+    if not item.confirm or not plan['possible']:
+        return {**plan, 'compacted': False}
+    if not lock.acquire(timeout=queue_seconds()):
+        raise HTTPException(429, 'Engine busy')
+    started = time.monotonic()
+    tmp = db_path + '.compact'
+    try:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+        with closing(sqlite3.connect(db_path, timeout=60)) as db:
+            db.execute('PRAGMA wal_checkpoint(TRUNCATE)')
+            before = db.execute('SELECT COUNT(*) FROM sources').fetchone()[0]
+            db.execute('VACUUM INTO ?', (tmp,))
+        with closing(sqlite3.connect(tmp)) as new:
+            ok = new.execute('PRAGMA quick_check').fetchone()[0] == 'ok'
+            after = new.execute('SELECT COUNT(*) FROM sources').fetchone()[0]
+        if not ok or after != before:
+            os.unlink(tmp)
+            log.error('compact: copy failed its check (quick_check ok=%s, texts %s -> %s); library unchanged', ok, before, after)
+            raise HTTPException(500, 'The compacted copy failed its check; the library was not changed.')
+        os.replace(tmp, db_path)                      # atomic on the same volume
+        for extra in (db_path + '-wal', db_path + '-shm'):
+            if os.path.exists(extra):
+                os.unlink(extra)
+        with closing(connect()) as db:               # WAL mode and schema on the new file
+            db.execute('SELECT COUNT(*) FROM sources').fetchone()
+    except sqlite3.Error as exc:
+        if os.path.exists(tmp):
+            os.unlink(tmp)
+        log.error('compact failed: %s; library unchanged', exc)
+        raise HTTPException(500, f'Compacting failed ({type(exc).__name__}); the library was not changed.')
+    finally:
+        lock.release()
+    new_bytes = os.path.getsize(db_path)
+    log.warning('compacted library: %s -> %s bytes, %s texts, %.1fs', plan['db_bytes'], new_bytes, before, time.monotonic() - started)
+    return {**plan, 'compacted': True, 'db_bytes_after': new_bytes, 'texts': before,
+            'seconds': round(time.monotonic() - started, 1), 'free_bytes_after': shutil.disk_usage(
+                os.path.dirname(os.path.abspath(db_path))).free}
 
 
 class Prune(BaseModel):
