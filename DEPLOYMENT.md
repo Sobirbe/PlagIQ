@@ -718,6 +718,20 @@ Removing texts (for example Wikipedia on /admin) frees space *inside* the engine
 2. Type **COMPACT** and press **Compact the library file**. The engine writes a compacted copy next to the file, checks it (database integrity and the same number of texts) and only then replaces the file; if the check fails, nothing changes. Checks and imports wait meanwhile, usually a minute or two.
 If there is not enough free space, it refuses and says so: enlarge the engine volume in Railway first. Never delete the engine volume to free space; it holds the library and the protected archive.
 
+## Part 3x — Translated reuse (pilot, off by default)
+
+PlagIQ can flag passages that appear to be **translated** from a text in another language in its library: for example an Uzbek thesis paragraph translated from a Russian article. The rule comes from `evaluation/CROSSLANG.md`: LaBSE sentence similarity; a library text is reported when at least 2 of the document's sentences each match one of its sentences at 0.80 or more. Measured on academic abstracts, it found 90–100% of machine translations, including edited ones, with no false alarms on about 1,700 real abstracts that were not translations. It has **not** been measured on whole theses, or on a library larger than 2,300 texts.
+
+On the results page and in the PDF it appears as a separate panel, **"Possible translated reuse — review"**, with each matched sentence beside its source sentence. It is **never added to the percentage**. Unpublished archive texts are never shown.
+
+**Switching it on** (Railway → **engine** service):
+1. Make sure the engine has about **4 GB of memory** available. Measured: about 1.9 GB more while running, with a peak of about 3.4 GB while the model loads. It also needs about **2 GB of free disk**: the model is 1.9 GB and is downloaded once to the engine volume, and the sentence index takes roughly 300 MB per 1,000 library texts.
+2. Add `CROSSLANG=1` and redeploy the engine.
+3. **/admin → Setup checklist → "Translated reuse (pilot)"** shows its progress: downloading the model (once), then indexing "x of y library texts", then ready. Indexing runs only while no check is running, about 80 sentences per second. Checks work normally meanwhile, and translated reuse is reported for the texts already indexed.
+4. To switch it off, remove `CROSSLANG` and redeploy. The model and the index stay on the volume and can be deleted later.
+
+Optional: `CROSSLANG_CUTOFF` (0.80), `CROSSLANG_SHORTLIST` (20), `CROSSLANG_MAX_SENTENCES` (2000 per check, about 25 s), `CROSSLANG_THREADS` (4).
+
 ## Part 4 — Checks before you approve the pull request
 
 Use only harmless sample text. Tick each item:

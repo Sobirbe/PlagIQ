@@ -51,6 +51,25 @@ def engine_problem():
     return "; ".join(problems)
 
 
+def crosslang_ok(library):
+    c = (library or {}).get("crosslang") or {}
+    if not c.get("enabled"):
+        return None                                      # optional, off
+    return c.get("state") == "ready" or (False if c.get("state") == "error" else None)
+
+
+def crosslang_detail(library):
+    c = (library or {}).get("crosslang") or {}
+    if not c.get("enabled"):
+        return "off (optional)"
+    state = c.get("state", "")
+    if state == "error":
+        return "error: " + str(c.get("error", ""))[:200]
+    if state in ("indexing", "ready"):
+        return f"{state}: {c.get('indexed', 0):,} of {c.get('total', 0):,} library texts indexed"
+    return {"downloading": "downloading the model (1.9 GB, once)", "loading": "loading the model"}.get(state, state or "starting")
+
+
 def checklist(library, probe=""):
     """[(area, ok, detail, how-to)]"""
     origin = os.environ.get("PUBLIC_ORIGIN", "")
@@ -97,6 +116,8 @@ def checklist(library, probe=""):
          "YANDEX_API_KEY + YANDEX_FOLDER_ID and/or BRAVE_API_KEY on the website (Part 3g)"),
         ("AI detector", aidetect.configured(), "Pangram" if aidetect.configured() else "no key",
          "PANGRAM_API_KEY on the website (Part 3j)"),
+        ("Translated reuse (pilot)", crosslang_ok(library), crosslang_detail(library),
+         "CROSSLANG=1 on the ENGINE, with about 4 GB of memory and 2 GB of free disk (Part 3x)"),
         ("Protected archive", engine_configured() and auth.enabled(), "on" if engine_configured() and auth.enabled() else "needs the engine and sign-in",
          "engine (Part 2) and Telegram sign-in (Part 3i); privacy notice reviewed (Part 3k)"),
         ("Payments (test mode only)", payments.enabled() or (None if os.environ.get("PAYMENTS_ENABLED") != "1" else False),

@@ -26,6 +26,7 @@ import import_job
 import staging
 import wikipedia_import
 import cyberleninka
+import crosslang
 import uz_journals
 
 log = logging.getLogger("plagiq.import")
@@ -143,6 +144,60 @@ def index_upgrade_loop():
             import_stop.wait(1)
 
 
+CROSSLANG_STATE = {"state": "off", "error": ""}
+
+
+def crosslang_loop():
+    """CROSSLANG=1: download the model once (to the volume), load it, then index the library a few texts at a time,
+    only while no check is running (the search lock is taken without waiting). Never stops the engine."""
+    try:
+        if crosslang.missing_files():
+            CROSSLANG_STATE.update(state="downloading")
+            crosslang.download()
+        CROSSLANG_STATE.update(state="loading")
+        encoder = crosslang.model()
+        CROSSLANG_STATE.update(state="indexing")
+    except Exception as exc:
+        CROSSLANG_STATE.update(state="error", error=f"{type(exc).__name__}: {str(exc)[:200]}")
+        log.warning("crosslang unavailable: %s", CROSSLANG_STATE["error"])
+        return
+    while not import_stop.is_set():
+        done = 0
+        if lock.acquire(blocking=False):
+            try:
+                with closing(connect()) as db:
+                    done = crosslang.index_some(db, encoder, limit=3)
+                    status = crosslang.index_status(db)
+                CROSSLANG_STATE.update(state="ready" if status["indexed"] >= status["total"] else "indexing", error="")
+            except Exception as exc:
+                CROSSLANG_STATE.update(error=f"{type(exc).__name__}: {str(exc)[:200]}")
+                log.warning("crosslang indexing failed: %s", CROSSLANG_STATE["error"])
+            finally:
+                lock.release()
+        import_stop.wait(0.2 if done else 30)
+
+
+def translated(db, text, language, exclude_ids=()):
+    """Possible translated reuse for /v1/checks, when the model is loaded (never waits for it)."""
+    if not crosslang.enabled() or crosslang._model is None:
+        return None
+    exclude = {row[0] for row in db.execute(
+        f"SELECT num FROM sources WHERE id IN ({','.join('?' * len(exclude_ids))})", list(exclude_ids))} if exclude_ids else set()
+    out = []
+    for item in crosslang.search(db, text, language, crosslang._model, exclude=exclude)[:10]:
+        identifier, raw, source_text = db.execute("SELECT id, metadata, text FROM sources WHERE num=?", (item["num"],)).fetchone()
+        m = json.loads(raw)
+        deposit = m.get("rights_basis") in DEPOSITS
+        out.append({"title": m.get("title", ""), "authors": m.get("authors", ""), "year": m.get("year"),
+                    "url": "" if deposit else m.get("url", ""), "language": m.get("language"),
+                    "rights_basis": m.get("rights_basis"), "owner": m.get("owner", "") if deposit else "",
+                    "sentences": item["sentences"],
+                    "pairs": [{"query_start": qs, "query_end": qe, "similarity": sim,
+                               "source_excerpt": "" if deposit else source_text[ss:se][:500]}
+                              for qs, qe, ss, se, sim in item["pairs"]]})
+    return out
+
+
 @asynccontextmanager
 async def lifespan(app):
     async def cleanup():
@@ -171,6 +226,8 @@ async def lifespan(app):
     except Exception as exc:
         log.warning("startup database check failed: %s: %s", type(exc).__name__, str(exc)[:300])
     threading.Thread(target=index_upgrade_loop, name="index-upgrade", daemon=True).start()
+    if crosslang.enabled():
+        threading.Thread(target=crosslang_loop, name="crosslang", daemon=True).start()
     worker = None
     if (import_job.settings()[0] or wikipedia_import.settings()[0] or cyberleninka.settings()[0]
             or uz_journals.settings()[0]):
@@ -247,8 +304,15 @@ def check(query: Query):
         if len(reports) >= 10:
             raise HTTPException(429, 'Transient report capacity reached')
         with closing(connect()) as db:
-            report = search(db, query.query_text, query.language,
-                            exclude={x for x in query.exclude if re.fullmatch('[0-9a-f]{64}', x)})
+            exclude = {x for x in query.exclude if re.fullmatch('[0-9a-f]{64}', x)}
+            report = search(db, query.query_text, query.language, exclude=exclude)
+            try:
+                found = translated(db, query.query_text, query.language, exclude)
+            except Exception as exc:                 # never fail a check because of this
+                log.warning("crosslang search failed: %s: %s", type(exc).__name__, str(exc)[:200])
+                found = None
+            if found is not None:
+                report['translated'] = found
         identifier = uuid.uuid4().hex
         reports[identifier] = (time.monotonic() + 180, report)
         return {'status_url': f'/v1/checks/{identifier}', 'report_url': f'/v1/checks/{identifier}/report'}
@@ -332,7 +396,14 @@ def library():
                 'free_bytes': usage.free, 'total_bytes': usage.total}
     except OSError:
         disk = None
-    return {'language_counts': counts, 'by_source': by_source, 'collection_counts': groups, 'total': len(rows), 'corpus_version': version, 'disk': disk,
+    cross = {"enabled": crosslang.enabled(), **CROSSLANG_STATE}
+    if crosslang.enabled():
+        try:
+            with closing(connect()) as db:
+                cross.update(crosslang.index_status(db))
+        except Exception as exc:
+            cross["error"] = type(exc).__name__
+    return {'language_counts': counts, 'by_source': by_source, 'collection_counts': groups, 'total': len(rows), 'corpus_version': version, 'disk': disk, 'crosslang': cross,
             'auto_import': import_job.settings()[0], 'auto_import_wikipedia': wikipedia_import.settings()[0],
             'imports': status}
 

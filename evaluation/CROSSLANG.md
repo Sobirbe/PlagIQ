@@ -128,6 +128,13 @@ The data includes real duplicates, so library de-duplication will matter in prod
    - a larger set of Uzbek negatives.
 5. **Infrastructure:** about 2 GB more memory for the engine, about 1–2 GB more disk for the model and the sentence index, and a one-off indexing run.
 
+## Built (November 2026): `crosslang.py` on the engine, off by default (`CROSSLANG=1`)
+- **Same model, lighter runtime.** It runs LaBSE's ONNX export (onnxruntime, tokenizers, numpy), with no PyTorch, at a pinned Hugging Face revision. On 7 Uzbek (Latin and Cyrillic), Russian and English sentences, its vectors were **identical** to sentence-transformers LaBSE: cosine 1.00000 for every sentence, 0.00000 maximum difference in the similarity matrix. So the measurements above apply unchanged.
+- **Memory** (measured on 4 CPU threads, with the memory arena and pre-packing disabled): about 1.9 GB resident after loading, with a peak of 3.4 GB while the model loads. Speed: about 80 sentences a second.
+- **Index:** sentence vectors are stored as float16. On 500 sentences, the largest change in any similarity was 0.0000 at four decimals.
+- **Rule as measured:** at least 2 sentences of one other-language library text at similarity 0.80 or more. A shortlist of 20 library texts is used per 40-sentence part of the manuscript. A sentence matching 5 or more different texts is treated as boilerplate and ignored. Results are shown separately as "possible translated reuse — review" and never added to the percentage.
+- **Still not measured:** whole theses, a library larger than 2,300 texts, and translations by systems other than NLLB.
+
 ## Reproduce
 ```bash
 pip install sentence-transformers pyarrow
