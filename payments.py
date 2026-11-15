@@ -1,4 +1,8 @@
-"""Balance top-up with Payme and Click, and per-check charging. TEST (sandbox) MODE ONLY.
+"""Payments for checks with Payme, Click and Uzum Bank, and per-check charging. TEST (sandbox) MODE ONLY.
+
+One document, one payment: the page pays the exact price of one check (create_order(..., purpose="check"),
+see pending_checks.py); the provider's confirmation credits it to the balance and the check takes it from there.
+The balance below therefore holds only such payments, refunds of failed checks and leftovers.
 
 This version accepts only PAYMENTS_MODE=test. With any other value payments stay off, so
 no real money can be taken until a later, separately reviewed change enables production.
@@ -174,6 +178,8 @@ def _connect():
             mode TEXT NOT NULL);
         CREATE INDEX IF NOT EXISTS ledger_user ON ledger (user, id);
     """)
+    if "purpose" not in {r[1] for r in db.execute("PRAGMA table_info(orders)")}:
+        db.execute("ALTER TABLE orders ADD COLUMN purpose TEXT")      # 'check': pays one check (pending_checks.py)
     return db
 
 
@@ -200,8 +206,10 @@ def account(user, limit=20):
         return {"balance_uzs": _balance(db, user["id"]), "ledger": ledger, "orders": orders}
 
 
-def create_order(user, provider, amount_uzs=None, package=None):
-    """A pending order; returns {"id", "pay_uzs", "credit_uzs", "provider", "pay_url"}."""
+def create_order(user, provider, amount_uzs=None, package=None, purpose="topup"):
+    """A pending order; returns {"id", "pay_uzs", "credit_uzs", "provider", "pay_url"}. purpose="check": the exact
+    price of one check (pending_checks.py); the provider's confirmation credits it like any top-up and the check
+    then takes it from the balance."""
     if not enabled():
         raise PaymentError("payments_off", "Payments are not switched on.")
     if provider not in providers():
@@ -221,8 +229,9 @@ def create_order(user, provider, amount_uzs=None, package=None):
             order_id = str(secrets.randbelow(9 * 10 ** 11) + 10 ** 11)       # 12 digits
             if not db.execute("SELECT 1 FROM orders WHERE id=?", (order_id,)).fetchone():
                 break
-        db.execute("INSERT INTO orders (id, user, provider, pay_uzs, credit_uzs, package, mode, state, created) "
-                   "VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?)", (order_id, user["id"], provider, pay, credit, package, mode(), _ms()))
+        db.execute("INSERT INTO orders (id, user, provider, pay_uzs, credit_uzs, package, mode, state, created, purpose) "
+                   "VALUES (?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?)", (order_id, user["id"], provider, pay, credit, package, mode(),
+                                                                    _ms(), purpose))
     result = {"id": order_id, "provider": provider, "pay_uzs": pay, "credit_uzs": credit,
               "pay_url": checkout_url(provider, order_id, pay)}
     if provider == "uzum":                         # paid inside the Uzum Bank app with the order number
@@ -252,7 +261,7 @@ def checkout_url(provider, order_id, pay_uzs):
 
 def order(user, order_id):
     with _lock, closing(_connect()) as db:
-        row = db.execute("SELECT id, provider, pay_uzs, credit_uzs, state, created, paid, mode, provider_ref FROM orders "
+        row = db.execute("SELECT id, provider, pay_uzs, credit_uzs, state, created, paid, mode, provider_ref, purpose FROM orders "
                          "WHERE id=? AND user=?", (str(order_id), user["id"])).fetchone()
         return dict(row) if row else None
 
