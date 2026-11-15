@@ -126,7 +126,8 @@ def test_doi_check_finds_missing_and_mismatched(registry):
     summary, _ = integrity.assess(HUMAN_EN + BIBLIOGRAPHY, check_dois=True)
     refs = summary["references"]
     assert refs == {"dois": 5, "checked": 4, "unchecked": 1, "not_found": ["10.1000/fake.9"],
-                    "mismatch": [{"doi": "10.1000/other.2", "title": "Coral reef bleaching in the Pacific ocean"}]}
+                    "mismatch": [{"doi": "10.1000/other.2", "title": "Coral reef bleaching in the Pacific ocean"}],
+                    "titles": 0, "titles_checked": 0, "titles_not_found": []}
     assert {"id": "doi_not_found", "count": 1} in summary["signals"] and summary["status"] == "review"
     assert not any("/h/10.1000/real.1" in p for p in registry)                     # doi.org only when OpenAlex lacks it
 

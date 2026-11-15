@@ -290,7 +290,7 @@ def _scope(t, mode, result):
 INTEGRITY_T = {
     "en": dict(title="AI-writing and manipulation indicators", status="Status", review="Review suggested",
                none="No indicators found", dois="References with DOIs", dois_v="{d} found, {c} checked, {u} could not be checked",
-               dois_off="Not checked (only in academic-publication mode, with consent)", not_found="DOI does not exist",
+               dois_off="Not checked (only in academic-publication mode, with consent)", not_found="DOI does not exist", ref_not_found="Reference not found in OpenAlex (check that it exists)",
                mismatch="DOI belongs to a different work", note="These are checkable signs that deserve a closer look, not proof "
                "of AI use, and finding none does not prove human authorship. These indicators are separate from the optional AI detector estimate. "
                "The text excerpts behind each indicator are shown on the results page only and are not kept.",
@@ -298,10 +298,11 @@ INTEGRITY_T = {
                            hidden_characters="Hidden characters (zero-width or direction controls)",
                            mixed_script="Words mixing Latin and Cyrillic look-alike letters",
                            markdown="Leftover chat formatting (##, **, ```)", doi_not_found="DOIs that do not exist",
-                           doi_mismatch="DOIs pointing to a different work")),
+                           doi_mismatch="DOIs pointing to a different work",
+                           reference_not_found="English references (no DOI) not found in OpenAlex")),
     "ru": dict(title="Индикаторы ИИ-текста и манипуляций", status="Статус", review="Рекомендуется проверка",
                none="Индикаторы не найдены", dois="Ссылки с DOI", dois_v="найдено {d}, проверено {c}, не удалось проверить {u}",
-               dois_off="Не проверялись (только в режиме научных публикаций, с согласия)", not_found="DOI не существует",
+               dois_off="Не проверялись (только в режиме научных публикаций, с согласия)", not_found="DOI не существует", ref_not_found="Ссылка не найдена в OpenAlex (проверьте, существует ли она)",
                mismatch="DOI относится к другой работе", note="Это проверяемые признаки, требующие внимания, а не доказательство "
                "использования ИИ; их отсутствие не доказывает авторство человека. Эти индикаторы не зависят от необязательной оценки ИИ-детектора. "
                "Фрагменты текста для каждого индикатора показываются только на странице результата и не сохраняются.",
@@ -309,10 +310,11 @@ INTEGRITY_T = {
                            hidden_characters="Скрытые символы (нулевой ширины или управления направлением)",
                            mixed_script="Слова со смешением похожих латинских и кириллических букв",
                            markdown="Остатки разметки чата (##, **, ```)", doi_not_found="Несуществующие DOI",
-                           doi_mismatch="DOI, ведущие на другую работу")),
+                           doi_mismatch="DOI, ведущие на другую работу",
+                           reference_not_found="Англоязычные ссылки (без DOI), не найденные в OpenAlex")),
     "uz": dict(title="Sun’iy intellekt va manipulyatsiya ko‘rsatkichlari", status="Holat", review="Tekshirish tavsiya etiladi",
                none="Ko‘rsatkichlar topilmadi", dois="DOI ko‘rsatilgan manbalar", dois_v="{d} ta topildi, {c} tasi tekshirildi, {u} tasini tekshirib bo‘lmadi",
-               dois_off="Tekshirilmadi (faqat ilmiy nashrlar rejimida, rozilik bilan)", not_found="DOI mavjud emas",
+               dois_off="Tekshirilmadi (faqat ilmiy nashrlar rejimida, rozilik bilan)", not_found="DOI mavjud emas", ref_not_found="Manba OpenAlex’da topilmadi (mavjudligini tekshiring)",
                mismatch="DOI boshqa ishga tegishli", note="Bular e’tibor talab qiladigan tekshiriladigan belgilar, sun’iy intellekt "
                "ishlatilganining isboti emas; ularning yo‘qligi ham inson muallifligini isbotlamaydi. Bu ko‘rsatkichlar ixtiyoriy AI "
                "detektor bahosidan alohida. Har bir ko‘rsatkichga oid matn parchalari faqat natija sahifasida ko‘rsatiladi va saqlanmaydi.",
@@ -320,7 +322,8 @@ INTEGRITY_T = {
                            hidden_characters="Yashirin belgilar (nol kenglikdagi yoki yo‘nalish belgilari)",
                            mixed_script="Lotin va kirill o‘xshash harflari aralashgan so‘zlar",
                            markdown="Qolib ketgan chat formatlash belgilari (##, **, ```)", doi_not_found="Mavjud bo‘lmagan DOI",
-                           doi_mismatch="Boshqa ishga tegishli DOI")),
+                           doi_mismatch="Boshqa ishga tegishli DOI",
+                           reference_not_found="OpenAlex’da topilmagan ingliz tilidagi manbalar (DOIsiz)")),
 }
 
 
@@ -357,6 +360,8 @@ def integrity_section(data, lang, st, table):
         rows.append((t["not_found"], doi))
     for item in (refs or {}).get("mismatch") or []:
         rows.append((t["mismatch"], f"{item['doi']} → {item.get('title') or '—'}"))
+    for entry in (refs or {}).get("titles_not_found") or []:
+        rows.append((t["ref_not_found"], entry))
     return [Paragraph(html.escape(t["title"]), st["h"]), table(rows), Paragraph(html.escape(t["note"]), st["small"])]
 
 
