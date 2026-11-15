@@ -6,6 +6,9 @@ Two ways to send, set by the owner on the website service:
       Resend, e.g. "PlagIQ <codes@mail.example.uz>". Used whenever RESEND_API_KEY is set. Each message carries an
       idempotency key, and network errors, 429 and 5xx answers are retried with backoff (Retry-After respected);
       other refusals are not retried.
+  * Brevo's web API (HTTPS; works where the hosting blocks outgoing mail ports, as on Railway's smaller plans):
+      BREVO_API_KEY (secret) and SMTP_FROM = the sender verified in Brevo, e.g. "PlagIQ <no-reply@example.org>".
+      Used whenever BREVO_API_KEY is set. Request: POST https://api.brevo.com/v3/smtp/email with header "api-key".
   * An SMTP server: SMTP_HOST, SMTP_PORT (587), SMTP_USER, SMTP_PASSWORD (secret), SMTP_FROM,
       SMTP_SECURITY = starttls (default) | ssl | none
 MAIL_BACKEND=dev is for development and tests only: nothing is e-mailed; messages are kept in memory (OUTBOX) and
@@ -43,14 +46,25 @@ def resend():
     return bool(os.environ.get("RESEND_API_KEY", "").strip())
 
 
+BREVO_URL = "https://api.brevo.com/v3/smtp/email"
+
+
+def brevo():
+    return bool(os.environ.get("BREVO_API_KEY", "").strip())
+
+
 def configured():
     sender = parseaddr(os.environ.get("SMTP_FROM", ""))[1]
-    return bool(sender and (resend() or os.environ.get("SMTP_HOST")))
+    return bool(sender and (resend() or brevo() or os.environ.get("SMTP_HOST")))
 
 
 def backend():
-    """"resend", "smtp", "dev" or "" (for the owner dashboard)."""
-    return "dev" if dev() else "resend" if resend() and configured() else "smtp" if configured() else ""
+    """"resend", "brevo", "smtp", "dev" or "" (for the owner dashboard). Resend is used first, then Brevo, then SMTP."""
+    if dev():
+        return "dev"
+    if not configured():
+        return ""
+    return "resend" if resend() else "brevo" if brevo() else "smtp"
 
 
 class MailError(Exception):
@@ -67,6 +81,8 @@ def send(to, subject, text):
         raise MailError("mail_not_configured")
     if resend():
         return _send_resend(to, subject, text)
+    if brevo():
+        return _send_brevo(to, subject, text)
     message = EmailMessage()
     message["From"] = os.environ["SMTP_FROM"]
     message["To"] = to
@@ -127,3 +143,28 @@ def _send_resend(to, subject, text, sleep=time.sleep):
             sleep(wait)
     log.warning("e-mail not sent via Resend: %s", detail)
     raise MailError(detail)
+
+
+def _send_brevo(to, subject, text):
+    name, address = parseaddr(os.environ["SMTP_FROM"])
+    body = json.dumps({"sender": {"name": name or "PlagIQ", "email": address}, "to": [{"email": to}],
+                       "subject": subject, "textContent": text}).encode()
+    request = urllib.request.Request(BREVO_URL, body, method="POST", headers={
+        "api-key": os.environ["BREVO_API_KEY"].strip(), "Content-Type": "application/json", "Accept": "application/json"})
+    try:
+        with urllib.request.urlopen(request, timeout=20) as reply:
+            if reply.status not in (200, 201, 202):
+                raise MailError(f"Brevo HTTP {reply.status}")
+    except urllib.error.HTTPError as exc:
+        try:                                    # Brevo explains refusals, e.g. {"code": "unauthorized", "message": "..."}
+            info = json.loads(exc.read() or b"{}")
+            reason = f"{info.get('code', '')}: {info.get('message', '')}".strip(": ")[:200]
+        except (ValueError, OSError):
+            reason = ""
+        detail = f"Brevo HTTP {exc.code}" + (f" ({reason})" if reason else "")
+        log.warning("e-mail not sent via Brevo: %s", detail)
+        raise MailError(detail) from None
+    except (OSError, ValueError) as exc:
+        detail = f"Brevo unreachable: {type(exc).__name__}: {str(exc)[:200]}"
+        log.warning("e-mail not sent via Brevo: %s", detail)
+        raise MailError(detail) from None

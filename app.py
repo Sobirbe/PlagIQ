@@ -895,7 +895,7 @@ async def admin_revoke(request: Request, grant_id: int = Form(...)):
 
 
 def mail_route():
-    return {"resend": "Resend", "dev": "the development backend (server log only)"}.get(
+    return {"resend": "Resend", "brevo": "Brevo", "dev": "the development backend (server log only)"}.get(
         mailer.backend(), os.environ.get("SMTP_HOST", "SMTP"))
 
 
@@ -906,6 +906,11 @@ def mail_hint(detail):
     if detail.startswith("Resend HTTP 403") or detail.startswith("Resend HTTP 422"):
         return ("Resend refused the sender: SMTP_FROM must be an address on a domain verified in Resend (Domains). "
                 "Until a domain is verified, Resend delivers only to your own Resend account address.")
+    if detail.startswith("Brevo HTTP 401") or "unauthorized" in detail.lower():
+        return "Brevo refused the API key: create a new key in Brevo (SMTP & API → API keys) and set BREVO_API_KEY."
+    if detail.startswith("Brevo HTTP 400") or detail.startswith("Brevo HTTP 403"):
+        return ("Brevo refused the message: check that the address in SMTP_FROM is a verified sender in Brevo (Senders) "
+                "and that the account is allowed to send transactional e-mail.")
     if "Authentication" in detail or "535" in detail or "534" in detail:
         return ("The mail server refused the login: check SMTP_USER and SMTP_PASSWORD (for Gmail: a 16-character "
                 "app password without spaces, and SMTP_USER = the same Gmail address).")
@@ -921,7 +926,7 @@ async def admin_test_email(request: Request, email: str = Form(..., max_length=2
     """Owner-only: check SMTP delivery before e-mail sign-in codes are switched on."""
     owner(request)
     if not (mailer.configured() or mailer.dev()):
-        message = "E-mail is not set up (RESEND_API_KEY or SMTP_HOST, plus SMTP_FROM), so nothing was sent."
+        message = "E-mail is not set up (RESEND_API_KEY, BREVO_API_KEY or SMTP_HOST, plus SMTP_FROM), so nothing was sent."
     else:
         try:
             await run_in_threadpool(mailer.send, email.strip(), "PlagIQ test e-mail",

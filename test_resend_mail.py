@@ -90,3 +90,11 @@ def test_sign_in_code_via_resend(resend, monkeypatch):
     assert client.get("/api/me").json()["auth"]["email_codes"] is True
     assert client.post("/auth/email/start", json={"email": "new@example.uz"}).json()["sent"] is True
     assert seen[-1]["body"]["to"] == ["new@example.uz"] and "sign-in code" in seen[-1]["body"]["subject"]
+
+
+def test_resend_is_used_before_brevo(resend, monkeypatch):
+    seen, _ = resend
+    monkeypatch.setenv("BREVO_API_KEY", "xkeysib-not-used")
+    assert mailer.backend() == "resend"
+    mailer.send("a@example.uz", "s", "t")
+    assert seen[-1]["auth"] == "Bearer re_test_not_real"
