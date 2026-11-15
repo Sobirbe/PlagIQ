@@ -1,0 +1,108 @@
+ChatGPT uchun so‘rovlar — PlagIQ AI detektori tadqiqoti uchun (o‘lchov ma’lumotlari)
+Prompts for ChatGPT — data for PlagIQ's Uzbek AI-detector measurement
+
+HOW TO USE: open a NEW ChatGPT chat for each block below, paste the whole block, and copy ChatGPT's answer
+into one text file (keep the block names A1, A2, ... B1, B2 ... before each answer). Send me the file.
+Do not edit ChatGPT's answers — the point is to measure unedited ChatGPT output.
+
+===== BLOCK A1 =====
+Quyidagi har bir mavzu bo‘yicha o‘zbek tilida (lotin yozuvida) ilmiy maqola uchun 80–120 so‘zli annotatsiya yozing. Har bir annotatsiyani alohida xatboshida, oldiga mavzu raqamini qo‘yib yozing.
+1. MANTIQIY AMALLAR
+2. ХУДОЖЕСТВЕННАЯ ИНТЕРПРЕТАЦИЯ ДУХОВНО-ПРОСВЕТИТЕЛЬСКИХ ИДЕЙ В ГАЗЕЛЯХ АЛИШЕРА НАВОИ И АБДУРРАХМАНА ДЖАМИ
+3. НАВОИЙ ЛИРИКАСИ ЖАНРЛАРИ ТАДҚИҚИ
+4. O'RTA MAKTABLARDA TURLI SINFLARDA INGLIZ TILI FANINI O'RGANISHDAGI MUAMMOLAR
+5. Сферик функцияларнинг амалий аҳамияти ҳақида
+6. BIOLOGIYANI O'QITISHDA O'QUVCHILARNING ILMIY DUNYOQARASHINI SHAKLLANTIRISH
+7. Ўзбекистон Республикасида аҳоли турмуш даражасидаги ҳудудий тафовутларининг айрим жиҳатлари
+8. TALABALARDA JISMONIY MADANIYANI RIVOJLANTIRISH
+9. TEXNIKA OLIY TA’LIM MUASSASALARIDA SFERIK TRIGONOMETRIYA FANINI FUZIONIZM G‘OYASI ASOSIDA O‘QITISH USULLARI
+10. ХОРИЖИЙ ТИЛЛАРНИ ЎҚИТИШДА БАДИИЙ АДАБИЁТДАН ФОЙДАЛАНИШ – РЕПРОДУКТИВ КОМПЕТЕНЦИЯНИ ШАКЛЛАНТИРИШ ОМИЛИ СИФАТИДА
+
+===== BLOCK A2 =====
+Quyidagi har bir mavzu bo‘yicha o‘zbek tilida (lotin yozuvida) ilmiy maqola uchun 80–120 so‘zli annotatsiya yozing. Har bir annotatsiyani alohida xatboshida, oldiga mavzu raqamini qo‘yib yozing.
+1. ЎЗБЕКИСТОН ВА АҚШ ЎРТАСИДА ФАН-ТАЪЛИМ СОҲАСИДА ЎЗАРО МАНФААТЛИ АЛОҚАЛАРИ ТАРИХИ
+2. АVЕSTО FАLSАFIY TА’LIMОTIDА IJTIMOIY HАMKОRLIK VA MULKDOR BO’LISH G’OYALARI
+3. BOSHLANG'ICH SINF O'QUVCHILARIDA ILMIY DUNYOQARASH ELEMENTLARINI SHAKLLANTIRISHDA ONA TILINI O'RGANISHNING O'RNI
+4. ТАРЖИМА КОМПЕТЕНЦИЯСИНИНГ ТАРКИБИЙ ҚИСМЛАРИ
+5. BOSHLANG’ICH SINF O’QUVCHILARIDA O`ZLASHTIRMOVCHILIKNI VUJUDGA KELTIRUVCHI OMILLAR
+6. Spiritual education of youth in the family and the era of globalization
+7. Ишлаб чиқариш корхоналаридан чиқадиган оқова сувларни механик услублар билан тозалаш самарадорлигини ошириш тўғрисида
+8. BUXORO TURKMANLARI BILAN BOG'LIQ JOY NOMLARI TAHLILI
+9. RUS PUBLITSISTLARI ASARLARIDA XIVA XONLIGI TARIXI HAQIDA QIMMATLI MA’LUMOTLAR
+10. Sopolli madaniyat taqinchoqlarining turlari va vazifasi xususida mulohazalar
+
+===== BLOCK A3 =====
+Quyidagi har bir mavzu bo‘yicha o‘zbek tilida (lotin yozuvida) ilmiy maqola uchun 80–120 so‘zli annotatsiya yozing. Har bir annotatsiyani alohida xatboshida, oldiga mavzu raqamini qo‘yib yozing.
+1. Рангли тасвирларни қайта ишлашнинг ўзига хос хусусиятлари
+2. Titan qotishmalari materiallariga ishlov berish usullarini tadqiq qilishni dolzarbligi
+3. Фарғона водийси этнографиясининг ўрганилиши (Мустақиллик йиллари ижтимоий-гуманитар журналлардаги мақолалар асосида)
+4. Bugungi kunda informatsion madaniyat va ma`naviyat
+5. "Ot" komponentli maqollar tasnifi
+6. DEMOKRATLASHTIRISH VA MA‘NAVIYATNI TADQIQ QILISHNING NAZARIY ASOSLARI
+7. MODUL-KREDIT TA’LIM TIZIMI SHAROITIDA TALABALARNING AXBOROT KOMPETENSIYASINI SHAKLLANTIRISHNING PEDAGOGIK ASOSLARI
+8. GLOBALLASHUV VA MAFKURAVIY O‘ZGARISHLARNING O‘ZARO ALOQADORLIGI
+9. БИЛВОСИТА НУТҚ — “ЛОЛАЗОР” РОМАНИДА БЕВОСИТА ПСИХОЛОГИЗМ КЎРИНИШЛАРИДАН БИРИ СИФАТИДА
+10. Qadimgi Xorazm mudofaa inshootlarining asosiy xususiytlari
+
+===== BLOCK A4 =====
+Quyidagi har bir mavzu bo‘yicha o‘zbek tilida (lotin yozuvida) ilmiy maqola uchun 80–120 so‘zli annotatsiya yozing. Har bir annotatsiyani alohida xatboshida, oldiga mavzu raqamini qo‘yib yozing.
+1. O'ZBEK-INGLIZ KORPUSI MATNLARINI EKSTRALINGVISTIK TEGLASH XUSUSIDA
+2. Шахар оқова сувларинидаги заҳарли моддаларни тозалашнинг долзарблиги
+3. Maktab o’quvchilarining xalqaro PISA va TIMSS testidan yuqori natijalarga erishishi uchun ba’zi tavsiyalar
+4. Suveren fondlar: nazariy jihatlari, amaldagi holati va istiqbollari
+5. Lingvistik ekspertiza tahlil bosqichlari mazmuni
+6. Maktabgacha yoshdagi bolalar kun tartibida jismoniy madaniyat daqiqalarini tashkil etish yo’llari
+7. XIX аср охири ва XX асрнинг бошларида Россия ва Англия муносабатларидаги геосиёсий жараёнлар ва бунинг Ўрта Осиёга таъсири
+8. МИЛЛИЙ КОРПУС ЯРАТИШНИНГ ТЕХНОЛОГИК ЖАРАЁНИ ХУСУСИДА
+9. Фарғона водийси этнослараро хўжалик-савдо муносабатларини ўраганилиши тарихидан.
+10. She'riy matnda fonostilistik vositalarning oʻrni
+
+===== BLOCK A5 =====
+Quyidagi har bir mavzu bo‘yicha o‘zbek tilida (lotin yozuvida) ilmiy maqola uchun 80–120 so‘zli annotatsiya yozing. Har bir annotatsiyani alohida xatboshida, oldiga mavzu raqamini qo‘yib yozing.
+1. СОЛИҚ ИМТИЁЗЛАРИНИ МАҚБУЛЛАШТИРИШГА ҚАРАТИЛГАН СОЛИҚ СИЁСАТИ
+2. TEMURIYLAR DAVRI MUTASAVVUFLARI - XOJA AHROR VALIY VA YA'QUB CHARXIYLARNING TASAVVUFIY QARASHLARIDA IJTIMOIY-AXLOQIY TARBIYA MASALLARI
+3. Tibbiyot xodimlarini tayyorlashda axborot texnologiyalar fanini o’qitish vositalari
+4. O‘ZBEKISTONDA OCHIQ MA’LUMOTLARDAN FOYDALANISH IMKONIYATLARI VA XALQARO TAJRIBA
+5. ОЙБЕКНИНГ “НАВОИЙ” РОМАНИ ТУРКЧА ТАРЖИМАСИДА ХОС СЎЗ (РЕАЛИЯ)ЛАРНИНГ БЕРИЛИШИ
+6. BOLALAR SEREBRAL FALAJLARIDA NUTQ BUZILISHLARI VA LOGOPEDIK ISHNI TASHKIL ETISH
+7. Қашқадарё вилояти шароитида полиз экинларидан ажратилган ва аниқланган замбуруғ турлари тавсифи
+8. ЎЗБЕК БОЛАЛАР АДАБИЁТИ: ЯНГИЛАНИШ ЗАРУРАТИ
+9. ЗАМОНАВИЙ ЛИНГВИСТИК КОРПУСЛАРНИНГ КОМПЬЮТЕР МОДЕЛЛАРИ
+10. МИЛЛИЙ ИНТЕРНЕТ НАШРЛАР ФАОЛИЯТИДА КРАУДСОРСИНГДАН ФОЙДАЛАНИШ
+
+===== BLOCK A6 =====
+Quyidagi har bir mavzu bo‘yicha o‘zbek tilida (lotin yozuvida) ilmiy maqola uchun 80–120 so‘zli annotatsiya yozing. Har bir annotatsiyani alohida xatboshida, oldiga mavzu raqamini qo‘yib yozing.
+1. ДАРСЛАРНИ ТАШКИЛ ЭТИШДА ТАЛАБАЛАР БИЛИМИНИ НАЗОРАТ ҚИЛИШНИНГ ИНТЕРАКТИВ ВОСИТАЛАРИ
+2. Минтақалар ижтимоий-иқтисодий ривожланиш даражаси ва унга таъсир қилувчи омилларнинг комплекс таҳлили
+3. АЛИШЕР НАВОИЙ ИЖОДИДА ФАҚР КОНЦЕПТИНИНГ БАДИИЙ ФУНКЦИЯСИГА ДОИР
+4. Tibbiyot institutlarida fizika fanini o’qitishning o’ziga xos jihatlari
+5. BO‘LAJAK MUHANDIS-KADRLARNI MASOFAVIY O‘QITISH NATIJALARINI “SMART” TEXNOLOGIYASI YORDAMIDA BAHOLASH
+6. OʼZBEKISTONDА ISHCHI KUCHI MIGRАTSIYASI SHАKILLАNISHINING OʼZIGА XOS XUDUDIY XUSUSIYATLАRI VА MUOMMOLАR
+7. Ixtisoslashtirilgan maktab ta’lim tizimida moslashuvchan ta’lim muhiti asoslari
+8. “ПОЛИТЕЙНМЕНТ” — ЗАМОНАВИЙ ТЕЛЕВИЗИОН ЖУРНАЛИСТИКАДА ИЖТИМОИЙ-СИЁСИЙ МАВЗУЛАРНИ ТАҚДИМ ЭТИШНИНГ ОММАБОП УСУЛИ СИФАТИДА
+9. Фукаролик суд ишларини соддалаштирилган тартибда юритишнинг устувор йўналишлари
+10. Бошқарув фаолиятида гендер тенглик масаласи
+
+===== BLOCK B1 =====
+Quyidagi annotatsiyalarning har birini ilmiy uslubda tahrirlab, yaxshilab bering (mazmunini o‘zgartirmang, tilini ravon va akademik qiling). Har birini alohida xatboshida, oldiga raqamini qo‘yib yozing. Javobni asl annotatsiya yozuvida (lotin yoki kirill) bering.
+1. Ushbu maqolada sanoat ishlarida raqamli texnologiyalardan izchil foydalanish oqibatlari bo‘yicha mulohazalar va dastlabki tadqiqot natijalari umumlashtirilgan. Jumladan, ishlab chiqarishni raqamlashtirish uchun uchraydigan to‘siqlar, muammolar, ularning kelib chiqish sabablari, qolaversa internet buyumlari (IoT) kiberfizik tizimlar o‘rganilgan. Maqolada raqamlashtirish imkoniyatining ta’rifi ishlab chiqilgan, bu esa korxonaning raqamlashtirish qobiliyati o‘z biznes modeli bilan o‘zaro aloqada bo‘lib, ma’lumotlarning o‘sishiga, ya’ni raqamlashtirishga imkon beradi va buning natijasida kelgusidagi tadqiqotlarning istiqbolli yo‘llarini ajratib ko‘rsatish mumkin bo‘ladi.
+2. Annontatsiya: Abdulla Qahhor (1907.17.9, Qo‘qon 1968.25.5, Moskva) — Oʻzbekiston xalq yozuvchisi (1967). Temirchi oilasida tug‘ilgan. Bolaligi Qo‘qon va uning atrofidagi qishloqlarda o‘tdi. Oqqo‘rg‘on qishlog‘idagi Mamajon qorining usuli savtiya maktabida tahsil ko‘rdi. Oilasi Qo‘qonga ko‘chib kelgach „Istiqlol“ nomli sho‘ro maktabiga o‘qishga kiradi, undan internat, „Kommuna“, „Namuna“ maktablarida, so‘ng bilim yurtida tahsil ko‘radi. Bilim yurtining „Adib“ qo‘lyozma jurnalida dastlabki mashqlari bilan qatnashadi. Toshkentdagi „Qizil O‘zbekiston“ gazetasi tahririyatining „Ishchibatrak maktublari“ varaqasiga muharrirlik qildi (1925). U gazetada ishlash jarayonida O‘rta Osiyo davlat universitetining ishchilar fakultetini tamomlaydi (1928). Abdulla Qahhor yana Qo‘qonga borib, dastlab o‘qituvchilarni qayta tayyorlash kursida muallimlik qiladi; ko‘p o‘tmay „Yangi Farg‘ona“ viloyat gazetasiga kotib va „Chig‘iriq“ hajviy bo‘limiga mudir etib tayinlanadi (1929). Abdulla Qahhorning „Oy kuyganda“ ilk hajviy sheʼri „Mushtum“ jurnalida Norin shilpiq taxallusi ostida bosildi (1924). So‘ng uning bir qancha hajviy sheʼr va hikoyalari „Mushtum“, „Yangi yo‘l“ jurnallari va „Qizil O‘zbekiston“ gaze
+3. Республика шошилинч гинекология бўлимининг Бухоро филиалидан патологик анатомия бюросига эндометриоид касаллиги билан касалланган 148 та репродуктив ёшдаги аёлларнинг юборилган операцион материаллари ўрганилди. Taдқиқот учун биопсия материаллари олинган. Гистологик препаратлар ёруглик микроскопида текширилиб керакли жойлар расмга олинди. Аденомиоз ва эндометриозда тўқиманинг морфометрик хусусиятлари Leykа микроскопида Автандилов сеткасидан фойдаланилган ҳолда,паренхима ва строма элементларининг нисбати ўрганилди. Taдқиқот натижаларига кўра қуйидаги ўзгаришлар аниқланди:гистологик жиҳатдан ҳам миометрийга,ҳам эндометрийга турли чукурликда кириб борган эндометриоид ўчоклар аниқланди.Ўчоклар иккита таркибий қисмга: яьни стромал ва безли тузилишга эга. Эндометриознинг турига қараб ушбу компонентнинг таркибий қисми ўзгариб турарди. Касалларнинг 49 тасида эндометриоид тухумдон кистаси, 24 aёлда ретроцервикал эндометриоз, 15 тасида бачадон аденомиози ва 60 беморда эса эндометриоид тугунларнинг турли комбинацияси аниқланди. Шундай қилиб,эндометриоид касаллигининг турли хил гистологик вариантларини морфологик таҳлил килиш натижалари турли кузатув ҳолатларида тўқима таркибий қисмлари ва тузи
+4. Maqolada ortiqchalik tamoyiliga asoslangan ikki yondosh hodisa –pleonazm va tavtоlogiyaning o`xshash hamda o`ziga xos jihatlari tilshunosolimlarning ilmiy qarashlari asosida chog`ishtirma xarakterda ochib berishga harakatqilingan. Takroriylik asosiy mezon qilib olinuvchi bu ikki hodisa tur va jins,umumiylik va xususiylik jihatidan farqlanishi to`g`risida xulosalar berilgan.Tasniflar bilan bir qatorda, o`zbek tilida mavjud pleonastik birliklar ro`yxati hammazkur maqoladan o`rin olgan. Har bir so`zning semalariga izoh berilar ekan,pleonastik birliklarda mazmuniy qavatlanish mavjudligi yaqqol ko`zga tashlanadi. Buesa pleonazm hodisasining tub mohiyatini ochib berish uchun xizmat qiladi.
+5. Harbiy huquqiy ta‘lim- tarbiya umumiy tarbiyaning ajralmas qismi bo`lib, insonni jamiyatda o`rnatilgan qonun-qoidalarga roiya etish, ularni hurmat qilishga chorlaydi. Huquqiy davlatni barpo etishda qatnashuvchi shaxs, huquq va erkinliklarini bilib qolmasdan, demokratiyaning tub ma'nosini anglashi lozim. Chunki demokratiya huquqiy davlatning tarkibiy qismidir. Huquqiy ta‘lim- tarbiya dastlab oilada, bog`chada, maktabda boshlanadi. Lekin huquqiy ta‘lim- tarbiya inson hayoti davomida doimiy ravishda davom etadigan jarayondir. Huquqiy davlat qurar ekanmiz fuqarolarning qonunlarni bilishi, qonunga itoatkorlik, huquqiy ongi va huquqiy madaniyatini rivojlantirish har birimizning burchimizdir. Bu borada Harbiy huquq fan o`qituvchilari, huquqni muhofaza qilish organlari va ommaviy axborot vositalarining xizmatlari katta bo`ladi va ular zimmasiga mas'uliyatli vazifalarni yuklaydi.
+
+===== BLOCK B2 =====
+Quyidagi annotatsiyalarning har birini ilmiy uslubda tahrirlab, yaxshilab bering (mazmunini o‘zgartirmang, tilini ravon va akademik qiling). Har birini alohida xatboshida, oldiga raqamini qo‘yib yozing. Javobni asl annotatsiya yozuvida (lotin yoki kirill) bering.
+1. Hozirgi kunda barcha tibbiyot muassalarida ish tajribasiga ega bo'lgan tibbiyot xodimlarining, shu jumladan asosan ayollarning ish faoliyatida sog'lig'iga ta'sir ko'rsatadigan shart sharoit va omillarni o'rganish usullari va natijalarini tahlil qilish muhim ahamiyatga ega bolib hisoblandi. Bu borada ko’pgina tibbiyot xodimlarining, ayniqsa, hamshira ayollarning sog'lig'iga ta'sir ko'rsatadigan omillarni baholashni tartibga soluvchi me'yoriy-huquqiy hujjatlar tizimlashtirilgan va tashkil etilgandir. Ko’pgina xorijiy olimlar tomonidan tibbiyot xodimlarga, shu jumladan ayollarga ish joylarida ta'sir ko'rsatadigan shart sharoit va omillar kompleksini baholash metodikasi ishlab chiqilgan va tavsiflangan. Shuningdek, tibbiyot xodimlarining, shu jumladan ayollarning turli mutaxassislik va turli yoshdagi kasbiy sabablarga ko'ra kasalliklarini rivojlanishining sabablari va xususiyatlari ko'rib chiqilgan. Tibbiy xodimlarning, shu jumladan sog'liqni saqlash tizimida ishlaydigan ayollarning o’z faoliyatida uchraydigan kasbiy kasalligi darajasini oldini olish va uni pasaytirish bo'yicha tavsiyalar ishlab chiqilganligi va amaliyotga tadbiq etilishi hamda uning nazorati bugungi kunda ahamiyatga m
+2. Annotatsiya: Mazkur maqolada xalqimizning sevimli shoirasi Zulfiya Mo‘minova she’riyatining o‘ziga xos jihatlari, shoiraning folklordan foydalanish mahorati haqida so‘z boradi. Maqolaga shoiraning folklor ta’sirida yozilgan “Oq ilon” va “Xalq ohanglari” she’rlari tahlil qilinadi. Sevimli shoirimiz Muhammad Yusuf: “ Shoirlar Xudoning erkatoylaridir”, degan bir jumlani aytganlar. Aslida, shoir zotini taqdir har doim erkalatavermaydi, biroq bu zot azoblar ichra ham lazzat, inkorlar ichra ham e’tirof va erkalanish hislarini topa biladi. Ayniqsa, bu qismat egasi ayol zoti bo‘lsa, bu “erkatoylik”ni tasavvur qilavering.
+3. Mazkur darslik umumiy pedagogika nazariyasi va amaliyoti fanidan pedagogik kasbning boshlang‘ich darajasini tanlagan pedagogika oily o‘quv yurtlari talabalari va pedagoglari uchun mo‘ljallangan o‘quv dasturi asosida tayyorlangan bo‘lib, unda pedagogikaning ilmiy asoslari, ta’lim jarayonining mohiyati, ta’lim nazariyasining maqsad va vazifalari, ta’lim jarayonining tamoyillari va metodlari, ta’limni tashkil etish shakllari va baholash mezonlari, tarbiya jarayonining tamoyillari va metodlari, barkamol shaxsni tarbiyalashga doir yo‘llar va vositalar, O‘zbekiston ta’lim tizimini boshqarish, shuningdek ta’lim texnologiyalari va rivojlanishiga oid tarixiy asoslari hamda pedagogik mahoratning tavsifi, o‘qituvchi faoliyatidagi o‘rni, pedagogik qobiliyati, pedagogik muloqot, nutq texnikasi va talabalarni pedagogik faoliyatini tashkil etishga ijodiy yondashish va pedagogik tajriba to‘plash haqida so‘z yuritiladi.
+4. Ushbu maqolada Sharq mutafakkirlarining kеng qamrоvli qarashlari bilan insоnni qanday qilib baхtli hayotga yo’llash mumkinligi bоrasidagi fikrlari yoritib berilgan. Оila muqaddasligi, uning barqarоrligi va bardavоmligini saqlash bоrasida Qur’оni Karim va hadislarda alоhida e’tibоr bеrilgan, shuningdеk, farzandlarning nasliy pоk bo’lishini hisоbga оlib, bo’lajak qaynоta va qaynоnalarni tanlash zaruriyati o’ziga хоs tarzda bayon etilgan. Bu fikrlar bugungi kunda ham hayotimizda o’z aksini tоpgan bo’lib, o’zbеk оilasi o’zining bоlajоnligi, оta-оna va farzandlar o’rtasidagi munоsabatlarining samimiyligi, оr-nоmusning kuchliligi, yoshlarga izzat, kеksalarga hurmat kabi fazilatlari bilan alоhida ajralib turadi.
+5. Maqolada aminotiokarbamid asosida suvda eruvchan oligomer birikmalar sintezi va ularning metallar korroziyasiga qarshi ingibitorlik xossalarini tadqiqot natijalari keltirilgan. Sintez qilingan birikmalarning tuzilishi infraqizil spektroskopiya usuli yordamida tahlil qilindi. Birikmalarning ingibitorlik xossalari turli temperatura va konsentratsiyalarda gravimetrik usul yordamida o‘rganildi. Olingan natijalarni tahlil qilish orqali ingibitorlarning metall sirtiga adsorbsiyasi monomolekulyar adsorbsiya nazariyasiga mosligi aniqlandi va Lengmyur izotermasi orqali jarayonning Gibbs energiyasi, entalpiya, entropiya qiymatlari aniqlandi.
+
+===== BLOCK B3 =====
+Quyidagi annotatsiyalarning har birini ilmiy uslubda tahrirlab, yaxshilab bering (mazmunini o‘zgartirmang, tilini ravon va akademik qiling). Har birini alohida xatboshida, oldiga raqamini qo‘yib yozing. Javobni asl annotatsiya yozuvida (lotin yoki kirill) bering.
+1. Maqolada sо‘nggi yillarda oliy ta‘lim tizimida amalga oshirilgan keng kо‘lamli islohotlar institutsional jihatdan tadqiq etilib, ularning ta‘lim sifatiga ta’siri kо‘rsatib о‘tilgan. Jamiyat hayotida о‘qituvchilar maqomi va ular mehnatini rag‘batlantirish borasida amalga oshirilayotgan chora tadbirlar о‘rganilib, oliy ta‘lim tizimida professor-о‘qituvchilarning kasbiy kompetensiyalarini takomillashtirishga doir dolzarb masalalar keltirilgan. Shuningdek, kasbiy kompetensiyalarni rivojlantirish borasida mutaxassis olim va tadqiqotchilar tomonidan ilgari surilgan qarashlar, fikr-mulohazalar, xorijiy tajribalar va nazariy yondashuvlar asosida bayon etilib, kasbiy kompetensiya masalasiga doir sо‘nggi yillarda mamlakatimizda amalga oshirilgan ilmiy tadqiqotlar misolida yoritilgan.
+2. Asadbek Sayfullo o'g'li Zairov Mirzo Ulug'bek nomidagi O'zbekiston Milliy universiteti Ijtimoiy fanlar fakulteti "Milliy g'oya, ma'naviyat asoslari va huquq ta'limi" yo'nalishi III bosqich talabasi ANNOTATSIYA Mazkur maqolada yangilanayotgan O'zbekiston taraqqiyoti va Markaziy Osiyo mintaqasidagi ustuvor vazifalarga urg'u qaratilgan.Qo'shni mamlakatlarning o'zaro hamkorligi hamda do'stona munosabatlarni yaxshilashdagi tutgan o'rni yoritilgan.Shuningdek global integratsiya va millatlararo hamjihatlikka oid qarashlarga to'xtalib o'tilgan.Kalit so'zlar: Yangi O'zbekiston, yangi qo'shnichilik, Markaziy Osiyo, global taraqqiyot, integratsiya, xalqaro hamjamiyat, millatlararo munosabat, xalq, tashqi siyosat, mafkura.
+3. Maqolada Surxondaryo viloyati mehnat resurslari, uning shakllanishi va joylanishi hamda unga ta’sir etuvchi omillar, xususan tabiiy, ijtimoiy, iqtisodiy va tarixiy omillar haqida so‘z yuritilgan. Shu bilan birgalikda Surxondaryo viloyati aholisining ishlab chiqarish sohalaridagi bandligi, uning tarmoqlari tarkibi, ishlab chiqarish sohalari va unda band aholining viloyat tumanlari bo‘yicha holati o‘rganilgan. Shuningdek, mehnat resurslari shakllanishi, uning bandligi, mustaqillikdan oldingi va keyingi davrlardagi o‘zgarishi masalalari ko‘rib chiqilgan.
+4. Тана хароратининг кўтарилиши фагоцитознинг фаоллашуви, интерферонлар синтези ва антителогенезнинг ортиши, лимфоцитларнинг фаоллашуви ва фарқланиши билан намоён бўлади. Шу билан бирга, сезиларли гипертермия кўпгина салбий оқибатларга, хусусан сурункали касалликларнинг авж олишига олиб келиши мумкин. Шунинг учун болаларда гипертермияни ўз вақтида даволаш муҳим ўрин тутади. Мақола болаларда иситманинг замонавий даволаш тамойилларига бағишланган бўлиб, дори воситаларни танлашнинг асосий мезонлари келтирилган. Шу билан бирга иситманинг патогенезига ва иситма туширувчи воситаларнинг таъсири, уларнинг самараси ва ножўя таъсирларига, шунингдек уларни қўллашга кўрсатмаларни белгилашга оид маълумотлар акс этган.
+5. Ushbu maqolada muallif ingliz va o’zbek tillarida o’timli va o’timsiz fe’llarning tasnifi muammosini, xususan o’zbek va ingliz tillarida fe’llarning leksik-semantik jihatdan o’xshashlik va farqli tomonlarini ilmiy asoslab o‘rgangan. Chunki, chog‘ishtirma tilshunoslik chet tili o‘qitish metodikasining lingvodidaktik asosi hisoblanib, bir-biriga qardosh bo‘lmagan tillardagi farq va o‘xshashliklarning metodik jihatdan ahamiyatining o‘rganilishi xorijiy tilni o‘zlashtirayotganlar nutqida ro‘y beradigan tillararo interferensiya va fasilitatsiyalarni aniqlash, o‘rganilayotgan tilning qulay va samarali jihatlarini aniq ko‘rsatish imkonini beradi. Shuningdek, turli tillarning o‘ziga xos tendensiya va qonuniyatlarini ochib berish, tillararo muqobillarni aniqlash, doimiy aloqada bo‘lgan tillarning o‘zaro boyishi hamda bir-biriga ta'sirini oydinlashtirish kabi masalalar o’rganilgan
