@@ -160,7 +160,7 @@ def test_check_uses_web_only_with_consent_and_keeps_no_page_text(site, monkeypat
                                         files={'submission': ('m.txt', manuscript.encode())}).json()
 
     without = check({})
-    assert calls == [] and without['web'] == {'enabled': False} and without['percent'] is None
+    assert calls == [] and without['web'] == {'enabled': False, 'reason': 'not_chosen'} and without['percent'] is None
     data = check({'web_search': 'true'})
     assert data['web']['compared'] == 2 and data['percent'] > 50
     top = max(data['sources'], key=lambda s: s['matched_tokens'])           # page order depends on download timing

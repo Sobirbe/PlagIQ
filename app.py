@@ -1720,7 +1720,9 @@ async def analyse(submission, reference, reference_text, language, mode, options
             # Transient: full texts are compared for this check only and discarded with `discovery`.
             progress.step("fulltext", min(len(ranked), max_works))
             fetched = await run_in_threadpool(fulltext.fetch_fulltexts, ranked, max_works, seconds, paid)
-        web = {"enabled": False}
+        # Why general web pages were (not) searched, stated next to the result so a low percentage is not read as
+        # "nothing was copied from the internet" (checkstatus.web_note).
+        web = {"enabled": False, "reason": "not_set_up" if not websearch.settings()[0] else "not_chosen"}
         if web_search and websearch.settings()[0]:
             # Separate consent: the same excerpts are sent to the search providers; pages are compared once and discarded.
             from discovery import spread_excerpts

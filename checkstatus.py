@@ -110,6 +110,22 @@ def assess(result):
     return result
 
 
+def web_note(result):
+    """Why general web pages were not searched in this check, or None (they were, or the check type does not compare
+    with published sources: one reference document, or the AI detector only).
+
+    "not_set_up": no web-search provider on this server; "not_chosen": the user did not tick web search;
+    "not_in_mode": the check type has no web search (PlagIQ library only); "not_searched": older reports."""
+    if result.get("sample") or result.get("mode") not in ("academic", "corpus"):
+        return None
+    web = result.get("web") or {}
+    if web.get("enabled"):
+        return None
+    if result.get("mode") == "corpus":
+        return "not_in_mode"
+    return web.get("reason") or "not_searched"
+
+
 def error_status(code, http_status):
     """Status for an error response (no result was produced)."""
     if code in EXTRACTION_CODES:
