@@ -11,7 +11,10 @@ very few false alarms on human writing? No detector has been shown to work on Uz
 - **AI-written:** 20 Uzbek abstracts written by Claude (an Anthropic model) for the titles of 20 human abstracts
   (`ai_batch1.json`, same topics, so topic cannot give the answer away).
 - **AI-polished:** 16 human abstracts rewritten by Claude "in better academic style" (`ai_polished1.json`).
-- **Planned:** the same tasks done by ChatGPT (and Gemini) from `chatgpt-prompts.txt`; other genres than abstracts.
+- **ChatGPT:** two independent runs of the prompts in `chatgpt-prompts.txt`, pasted by the owner from ChatGPT:
+  run 1 (`chatgpt.json`: 50 written for titles, 15 polished) and run 2 (`chatgpt2.json`: 60 written, 15 polished; the
+  same titles and originals, different answers).
+- **Planned:** Gemini; other genres than abstracts; more human texts.
 
 ## First feasibility check (`baseline.py`)
 Text is put into one script (Cyrillic → Latin), apostrophes unified and spacing/quotation quirks removed first, and
@@ -39,7 +42,30 @@ and Claude-written abstracts, with thresholds set on held-out human abstracts:
 A detector trained on one model's Uzbek does **not** recognise another model's: ChatGPT uses other stock openings and
 verbs ("Maqolada …", "bayon etiladi", "tavsiflanadi"). Every chatbot students use must be in the training data.
 
-**What this does not show:** 36 AI texts from one model are far too few; a classifier may learn one model's habits
+## Third check: train on both chatbots (`combined.py`)
+Every text is grouped with its topic (a human abstract, the AI abstracts written from its title, the AI polishes of it)
+and 5-fold cross-validation splits by group, so no test topic is seen in training. The human originals of polished texts
+are never trained on. Human abstracts: 381 (+31 polished originals); thresholds set on held-out human abstracts.
+
+| Trained on human + … | False alarms on human | Claude written (20) | ChatGPT written (50 + 60) | Claude polished (16) | ChatGPT polished (15 + 15) | Polished originals flagged (31) |
+|---|---|---|---|---|---|---|
+| Claude written | 1 % | 70 % | 12 % / 42 % | 25 % | 20 % / 13 % | 6 % |
+| Claude written | 5 % | 90 % | 38 % / 63 % | 25 % | 33 % / 13 % | 10 % |
+| Claude + ChatGPT written | 1 % | 75 % | **100 % / 97 %** | 25 % | 13 % / 13 % | 3 % |
+| Claude + ChatGPT written | 5 % | 95 % | 100 % / 100 % | 38 % | 47 % / 13 % | 10 % |
+| … + all polished | 1 % | 55 % | 90 % / 92 % | 25 % | 27 % / 7 % | 3 % |
+| … + all polished | 5 % | 90 % | 100 % / 100 % | 38 % | 40 % / 13 % | 10 % |
+
+(The two ChatGPT figures are run 1 / run 2.) Figures differ from the first two checks because the human set and folds
+changed; with ~4 human texts above a 1 % threshold and 15–20 AI texts per group, single texts move results by 5–7 points.
+
+- **Written from scratch:** once a chatbot is in the training data, its unseen-topic Uzbek abstracts are caught almost
+  always at 1 % false alarms. A chatbot that is *not* in training is mostly missed (first rows).
+- **Polished:** not solved. Polished texts are caught at about the rate the human originals themselves are flagged
+  (roughly 10–30 % vs 3–10 %); adding polished examples to training does not help. Polishing keeps the human author's
+  content and much of the wording, and a style classifier on 46 examples cannot separate it.
+
+**What this does not show:** AI texts are still few (20 Claude-written, 110 ChatGPT-written, 46 polished); a classifier may learn one model's habits
 rather than "AI"; human OpenAlex abstracts carry their own quirks (typos, run-on sentences) that student documents may
-not; abstracts are one short, formulaic genre. Polished text is clearly the hard case. No figure here may be used to
+not; abstracts are one short, formulaic genre. Polished text is the hard case and the most common student use. A detector good on written-from-scratch text could still be detecting "clean recent text" vs older, untidier human abstracts; it must be tested on recent human-written student work before any use. No figure here may be used to
 describe a product.
