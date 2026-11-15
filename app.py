@@ -894,8 +894,18 @@ async def admin_revoke(request: Request, grant_id: int = Form(...)):
     return await _admin_page_with(admin.pilot_section(f"Allowance #{grant_id} revoked." if done else "Nothing changed."))
 
 
+def mail_route():
+    return {"brevo": "Brevo", "dev": "the development backend (server log only)"}.get(
+        mailer.backend(), os.environ.get("SMTP_HOST", "SMTP"))
+
+
 def mail_hint(detail):
     """Plain-language next step for a failed test e-mail."""
+    if detail.startswith("Brevo HTTP 401") or "unauthorized" in detail.lower():
+        return "Brevo refused the API key: create a new key in Brevo (SMTP & API → API keys) and set BREVO_API_KEY."
+    if detail.startswith("Brevo HTTP 400") or detail.startswith("Brevo HTTP 403"):
+        return ("Brevo refused the message: check that the address in SMTP_FROM is a verified sender in Brevo (Senders) "
+                "and that the account is allowed to send transactional e-mail.")
     if "Authentication" in detail or "535" in detail or "534" in detail:
         return ("The mail server refused the login: check SMTP_USER and SMTP_PASSWORD (for Gmail: a 16-character "
                 "app password without spaces, and SMTP_USER = the same Gmail address).")
@@ -911,12 +921,12 @@ async def admin_test_email(request: Request, email: str = Form(..., max_length=2
     """Owner-only: check SMTP delivery before e-mail sign-in codes are switched on."""
     owner(request)
     if not (mailer.configured() or mailer.dev()):
-        message = "SMTP is not set up (SMTP_HOST, SMTP_FROM …), so nothing was sent."
+        message = "E-mail is not set up (BREVO_API_KEY or SMTP_HOST, plus SMTP_FROM), so nothing was sent."
     else:
         try:
             await run_in_threadpool(mailer.send, email.strip(), "PlagIQ test e-mail",
                                     "This is a test message from the PlagIQ owner dashboard. If it arrived, e-mail delivery works.")
-            message = (f"Test e-mail: sent to {email.strip()} through {os.environ.get('SMTP_HOST', 'the development backend')}. "
+            message = (f"Test e-mail: sent to {email.strip()} through {mail_route()}. "
                        "If it does not arrive within a few minutes (check spam too), tell the developer.")
         except mailer.MailError as exc:
             message = f"Test e-mail: sending FAILED — {exc}. " + mail_hint(str(exc))
