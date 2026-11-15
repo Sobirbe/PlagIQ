@@ -1,18 +1,28 @@
-"""Outgoing e-mail (account verification and password recovery) through the operator's SMTP server.
+"""Outgoing e-mail (sign-in codes, test e-mails, confirmation and recovery links of older accounts).
 
-Off until the owner sets, on the website service:
-  SMTP_HOST, SMTP_PORT (587), SMTP_USER, SMTP_PASSWORD (secret), SMTP_FROM (e.g. "PlagIQ <no-reply@example.org>"),
-  SMTP_SECURITY = starttls (default) | ssl | none
+Two ways to send, set by the owner on the website service:
+  * Resend's web API (HTTPS; works where the hosting blocks outgoing mail ports, as on Railway's smaller plans):
+      RESEND_API_KEY (secret; a sending-only key is enough) and SMTP_FROM = a sender on a domain verified in
+      Resend, e.g. "PlagIQ <codes@mail.example.uz>". Used whenever RESEND_API_KEY is set. Each message carries an
+      idempotency key, and network errors, 429 and 5xx answers are retried with backoff (Retry-After respected);
+      other refusals are not retried.
+  * An SMTP server: SMTP_HOST, SMTP_PORT (587), SMTP_USER, SMTP_PASSWORD (secret), SMTP_FROM,
+      SMTP_SECURITY = starttls (default) | ssl | none
 MAIL_BACKEND=dev is for development and tests only: nothing is e-mailed; messages are kept in memory (OUTBOX) and
 written to the server log, so the sign-in code can be read there. Never set it on the public site.
 
 Nothing is sent while these are missing; the site then says that recovery by e-mail is not available and points to
 support. Messages contain only the link and plain instructions, never the user's documents.
 """
+import json
 import logging
 import os
 import smtplib
 import ssl
+import time
+import urllib.error
+import urllib.request
+import uuid
 from email.message import EmailMessage
 from email.utils import parseaddr
 
@@ -25,8 +35,22 @@ def dev():
     return os.environ.get("MAIL_BACKEND", "").strip().lower() == "dev"
 
 
+RESEND_URL = "https://api.resend.com/emails"
+RESEND_TRIES = 3
+
+
+def resend():
+    return bool(os.environ.get("RESEND_API_KEY", "").strip())
+
+
 def configured():
-    return bool(os.environ.get("SMTP_HOST") and parseaddr(os.environ.get("SMTP_FROM", ""))[1])
+    sender = parseaddr(os.environ.get("SMTP_FROM", ""))[1]
+    return bool(sender and (resend() or os.environ.get("SMTP_HOST")))
+
+
+def backend():
+    """"resend", "smtp", "dev" or "" (for the owner dashboard)."""
+    return "dev" if dev() else "resend" if resend() and configured() else "smtp" if configured() else ""
 
 
 class MailError(Exception):
@@ -41,6 +65,8 @@ def send(to, subject, text):
         return
     if not configured():
         raise MailError("mail_not_configured")
+    if resend():
+        return _send_resend(to, subject, text)
     message = EmailMessage()
     message["From"] = os.environ["SMTP_FROM"]
     message["To"] = to
@@ -66,3 +92,38 @@ def send(to, subject, text):
         detail = f"{type(exc).__name__}: {str(exc)[:200]}".rstrip(": ")
         log.warning("e-mail not sent via %s:%s (%s): %s", host, port, security, detail)
         raise MailError(detail) from None
+
+
+def _send_resend(to, subject, text, sleep=time.sleep):
+    """POST /emails (resend.com/docs/api-reference/emails/send-email). One idempotency key for all retries of this
+    message, so a retry after a lost answer never sends it twice."""
+    body = json.dumps({"from": os.environ["SMTP_FROM"].strip(), "to": [to], "subject": subject, "text": text}).encode()
+    headers = {"Authorization": "Bearer " + os.environ["RESEND_API_KEY"].strip(), "Content-Type": "application/json",
+               "Accept": "application/json", "User-Agent": "PlagIQ", "Idempotency-Key": "plagiq-" + uuid.uuid4().hex}
+    detail = ""
+    for attempt in range(RESEND_TRIES):
+        wait = 2 ** attempt
+        try:
+            with urllib.request.urlopen(urllib.request.Request(RESEND_URL, body, headers, method="POST"), timeout=20) as reply:
+                answer = json.loads(reply.read() or b"{}")
+            log.info("e-mail sent via Resend (id %s)", answer.get("id", "?"))
+            return answer.get("id")
+        except urllib.error.HTTPError as exc:
+            try:                                 # Resend explains refusals: {"statusCode", "name", "message"}
+                info = json.loads(exc.read() or b"{}")
+                reason = f"{info.get('name', '')}: {info.get('message', '')}".strip(": ")[:200]
+            except (ValueError, OSError):
+                reason = ""
+            detail = f"Resend HTTP {exc.code}" + (f" ({reason})" if reason else "")
+            if exc.code != 429 and exc.code < 500:
+                break                            # wrong key, unverified sender ...: retrying cannot help
+            try:
+                wait = max(wait, min(int(exc.headers.get("retry-after", "0")), 30))
+            except (TypeError, ValueError):
+                pass
+        except (OSError, ValueError) as exc:
+            detail = f"Resend unreachable: {type(exc).__name__}: {str(exc)[:200]}"
+        if attempt < RESEND_TRIES - 1:
+            sleep(wait)
+    log.warning("e-mail not sent via Resend: %s", detail)
+    raise MailError(detail)
