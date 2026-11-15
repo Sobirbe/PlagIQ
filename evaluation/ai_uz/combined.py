@@ -40,15 +40,22 @@ REGIMES = {"E1": {"Claude written"},
                   "Claude polished", "ChatGPT run 1 polished", "ChatGPT run 2 polished"}}
 ORDER = ["Claude written", "ChatGPT run 1 written", "ChatGPT run 2 written",
          "Claude polished", "ChatGPT run 1 polished", "ChatGPT run 2 polished", "human (polished originals)"]
-print("texts:", {c: int((cat == c).sum()) for c in ["human"] + ORDER})
-for name, ai_train in REGIMES.items():
+def fit_folds(ai_train, extra=()):
+    """5 group folds; returns held-out scores for all items and the fold-averaged scores of `extra` texts."""
     trainable = (cat == "human") | np.isin(cat, list(ai_train))
-    s = np.zeros(len(X))
+    s, ex = np.zeros(len(X)), []
     for f in range(5):
         tr = np.where((fold != f) & trainable)[0]; te = np.where(fold == f)[0]
         vec = TfidfVectorizer(analyzer="char_wb", ngram_range=(2, 5), min_df=2, sublinear_tf=True)
         clf = LogisticRegression(max_iter=3000, C=4, class_weight="balanced").fit(vec.fit_transform([X[i] for i in tr]), y[tr])
         s[te] = clf.predict_proba(vec.transform([X[i] for i in te]))[:, 1]
+        if len(extra): ex.append(clf.predict_proba(vec.transform(list(extra)))[:, 1])
+    return s, (np.mean(ex, 0) if ex else None)
+
+if __name__ == "__main__":
+  print("texts:", {c: int((cat == c).sum()) for c in ["human"] + ORDER})
+  for name, ai_train in REGIMES.items():
+    s, _ = fit_folds(ai_train)
     hs = s[cat == "human"]
     print(f"\n{name}: trained on human + {', '.join(sorted(ai_train))}")
     for fp in (0.01, 0.05):

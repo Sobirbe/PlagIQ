@@ -1,0 +1,196 @@
+===== ARTICLE 1: ECONOMICS & FINANCE =====
+
+MAVZU: O‘ZBEKISTONDA RAQAMLI BANK XIZMATLARINING TIJORAT BANKLARI MOLIYAVIY BARQARORLIGIGA TA’SIRINI EKONOMETRIK BAHOLASH
+
+KIRISH
+So‘nggi yillarda global moliya bozorida raqamli transformatsiya jarayonlari bank sektorining an’anaviy biznes modellarini tubdan o‘zgartirmoqda. O‘zbekiston Respublikasida ham bank tizimini isloh qilish strategiyasi doirasida masofaviy bank xizmatlari, mobil ilovalar va raqamli to‘lov tizimlari jadal rivojlanmoqda. Raqamli texnologiyalarning joriy etilishi banklarning operatsion xarajatlarini kamaytirish, mijozlar bazasini kengaytirish va daromadlilik ko‘rsatkichlarini oshirish imkonini beradi. Biroq, raqamlashtirish jarayoni kiberxavfsizlik xatarlari va dastlabki kapital qo‘yilmalarning yuqoriligi bilan bog‘liq muammolarni ham keltirib chiqaradi. Mazkur tadqiqotning asosiy maqsadi O‘zbekiston tijorat banklari faoliyatida raqamli xizmatlar ulushining o‘sishi ularning moliyaviy barqarorligi va rentabelligiga qanday ta’sir ko‘rsatishini empirik jihatdan aniqlashdan iborat.
+
+ADABIYOTLAR SHARHI
+Raqamli moliyaviy texnologiyalar (FinTech) va bank barqarorligi o‘rtasidagi bog‘liqlik xalqaro ilmiy adabiyotlarda keng o‘rganilgan. Xususan, X. Vang va M. Li (2021) tomonidan o‘tkazilgan tadqiqotlarda raqamli transformatsiya banklarning operatsion samaradorligini oshirishi, biroq kichik banklar uchun raqobat bosimini kuchaytirishi ta’kidlangan. Yevropa Markaziy banki tadqiqotchilari (K. Smit, 2022) masofaviy xizmatlarning rivojlanishi aktivlar rentabelligi (ROA) va kapital rentabelligiga (ROE) ijobiy ta’sir ko‘rsatishini isbotlagan. Mahalliy olimlardan A. Vahobov va Sh. Abdullayeva (2023) O‘zbekiston bank tizimida raqamli ekotizimlarni shakllantirishning nazariy asoslarini tadqiq etgan bo‘lsalar-da, ushbu omillarning bank barqarorligi indeksiga (Z-score) ta’siri yetarlicha ekonometrik tahlil qilinmagan.
+
+TAKLIF ETILAYOTGAN MODEL
+Tadqiqotda tijorat banklarining moliyaviy barqarorligini baholash uchun dinamik panel ma’lumotlar modelidan (GMM — Umumlashtirilgan momentlar usuli) foydalaniladi. Bank barqarorligi ko‘rsatkichi sifatida Z-indeksi tanlab olindi. Modelning matematik ko‘rinishi quyidagicha ifodalanadi:
+
+$$Z_{i,t} = \alpha + \beta_1 DIG_{i,t} + \beta_2 SIZE_{i,t} + \beta_3 NPL_{i,t} + \beta_4 INF_t + \mu_i + \varepsilon_{i,t}$$
+
+Bu yerda $Z_{i,t}$ — $i$-bankning $t$-davrdagi moliyaviy barqarorlik indeksi; $DIG_{i,t}$ — raqamli tranzaksiyalar hajmining umumiy tranzaksiyalardagi ulushi; $SIZE_{i,t}$ — bank aktivlarining natural logarifmi; $NPL_{i,t}$ — muammoli kreditlar ulushi; $INF_t$ — yillik inflyatsiya darajasi; $\mu_i$ — bankka xos kuzatilmaydigan effektlar; $\varepsilon_{i,t}$ — tasodifiy xatolik.
+
+MA’LUMOTLAR VA BAHOLASH NATIJALARI
+Tahlil uchun O‘zbekiston Respublikasi Markaziy bankining 2018–2025-yillar oralig‘idagi 24 ta tijorat bankiga oid choraklik hisobot ma’lumotlaridan foydalanildi (jami 768 ta kuzatuv). Korrelyatsion va regression tahlil natijalari shuni ko‘rsatdiki, raqamli tranzaksiyalar ulushining ($DIG$) 1 foizga oshishi bankning Z-indeksini o‘rtacha 0,14 birlikka oshiradi ($p < 0.01$). Shu bilan birga, muammoli kreditlar ulushining ($NPL$) o‘sishi barqarorlikka sezilarli salbiy ta’sir ko‘rsatishi ($\beta_3 = -0.42$, $p < 0.05$) aniqlandi. Bank hajmi ($SIZE$) ko‘rsatkichi esa yirik banklarda raqamlashtirishdan olinadigan miqyos samarasi yuqori ekanligini tasdiqladi.
+
+MUHOKAMA
+Olingan empirik natijalar xalqaro tadqiqotlar xulosalari bilan hamohang bo‘lib, raqamli texnologiyalarga yo‘naltirilgan investitsiyalar uzoq muddatli istiqbolda banklarning moliyaviy mustahkamligini ta’minlashini ko‘rsatadi. Biroq, tahlil jarayonida kichik va o‘rta banklar uchun dasturiy ta’minot va kiberxavfsizlik infratuzilmasini yaratish xarajatlari qisqa muddatda sof foyda marjasini pasaytirishi kuzatildi. Shuningdek, raqamli kreditlash mexanizmlarining kengayishi skoring tizimlari takomillashtirilmagan taqdirda kredit risklarini oshirishi mumkin.
+
+XULOSA
+Xulosa qilib aytganda, O‘zbekiston tijorat banklarida raqamli xizmatlarni rivojlantirish ularning moliyaviy barqarorligini oshirishning muhim drayveri hisoblanadi. Bank boshqaruviga raqamli infratuzilmani modernizatsiya qilish bilan bir qatorda, sun’iy intellektga asoslangan kredit skoring modellarini joriy etish hamda kiberxavfsizlik protokollarini kuchaytirish tavsiya etiladi.
+
+ADABIYOTLAR VA QISQARTMALAR
+1. Vang X., Li M. Digital Transformation and Bank Stability: Evidence from Emerging Markets // Journal of Banking & Finance. – 2021. – Vol. 132. – P. 106–124.
+2. Smit K. FinTech Adoption and Profitability in European Banking Sector // ECB Working Paper Series. – 2022. – No. 2645.
+3. Vahobov A., Abdullayeva Sh. O‘zbekistonda raqamli bank tizimini rivojlantirish istiqbollari. – Toshkent: Iqtisod-Moliya, 2023. – 210 b.
+Qisqartmalar: GMM — Umumlashtirilgan momentlar usuli; ROA — Aktivlar rentabelligi; ROE — Kapital rentabelligi; NPL — Muammoli kreditlar.
+
+
+===== ARTICLE 2: COMPUTER SCIENCE & ARTIFICIAL INTELLIGENCE =====
+
+MAVZU: O‘ZBEK TILIDAGI MATNLARDA SENTIMENT TAHLIL UCHUN TRANSFORMER ARXITEKTURASIGA ASOSLANGAN MODELNI TAKOMILLASHTIRISH
+
+KIRISH
+Tabiiy tilni qayta ishlash (NLP) sohasida matnlarning hissiy bo‘yoqdorligini avtomatik aniqlash, ya’ni sentiment tahlil (Sentiment Analysis) zamonaviy axborot tizimlarining ajralmas qismiga aylandi. Ijtimoiy tarmoqlar, elektron tijorat platformalari va ommaviy axborot vositalaridagi foydalanuvchi fikrlarini tahlil qilish jamoatchilik fikrini o‘rganishda muhim ahamiyat kasb etadi. Biroq, o‘zbek tili agglyutinativ til bo‘lib, so‘z yasovchi va shakl yasovchi qo‘shimchalarning ko‘pligi hamda belgilangan (labeled) ma’lumotlar bazasining cheklanganligi sababli yuqori aniqlikdagi modellarni yaratish muayyan qiyinchiliklarni tug‘diradi. Ushbu tadqiqotda o‘zbek tilidagi matnlarning hissiy ohangini aniqlash uchun moslashtirilgan Transformer modeli taklif etiladi.
+
+ADABIYOTLAR SHARHI
+So‘nggi o‘n yillikda sentiment tahlil usullari lug‘atga asoslangan yondashuvlardan chuqur o‘qitish (Deep Learning) modellariga o‘tdi. J. Devlin va boshqalar (2019) tomonidan taqdim etilgan BERT arxitekturasi kontekstual bog‘liqliklarni aniqlashda inqilobiy natijalarni ko‘rsatdi. Ko‘p tilli modellar, jumladan XLM-RoBERTa (A. Konno va boshq., 2020) kam resursli tillar uchun samarali yechim sifatida e’tirof etildi. O‘zbek tili uchun B. Mengliyev va U. Salayev (2022) tomonidan morfologik tahlil algoritmlari ishlab chiqilgan bo‘lsa-da, sub-so‘z (subword) tokenizatsiyasini o‘zbek tilining agglyutinativ tabiatiga moslashtirish orqali sentiment tahlil aniqligini oshirish masalasi yetarlicha tadqiq etilmagan.
+
+TAKLIF ETILAYOTGAN MODEL
+Tadqiqotda XLM-RoBERTa bazaviy arxitekturasiga asoslangan va o‘zbek tilining morfologik xususiyatlarini hisobga oluvchi UzSent-BERT modeli taklif etiladi. Modelning kirish qismida Byte-Pair Encoding (BPE) tokenizatori o‘zbek tili korpusi asosida qayta o‘qitildi. Matn ketma-ketligini tasniflash uchun oxirgi yashirin qatlamning $[CLS]$ tokeni vektoridan foydalaniladi va ehtimollik taqsimoti Softmax funksiyasi orqali hisoblanadi:
+
+$$P(y = c \mid X) = \frac{\exp(W_c h_{[CLS]} + b_c)}{\sum_{k=1}^{C} \exp(W_k h_{[CLS]} + b_k)}$$
+
+Bu yerda $h_{[CLS]}$ — kirish matnining umumlashtirilgan kontekstual vektori; $W_c$ va $b_c$ — o‘qitiladigan vazn matritsasi va siljish vektori; $C$ — hissiy sinflar soni (ijobiy, salbiy, neytral).
+
+MA’LUMOTLAR VA BAHOLASH NATIJALARI
+Eksperimentlar uchun O‘zbekistondagi yirik internet nashrlari izohlari va elektron tijorat platformalaridan yig‘ilgan 45 000 ta matndan iborat muvozanatlashtirilgan korpus shakllantirildi. Ma’lumotlar 80% o‘qitish, 10% validatsiya va 10% test to‘plamlariga ajratildi. Taklif etilgan UzSent-BERT modeli an’anaviy LSTM va bazaviy mBERT modellari bilan taqqoslandi. Sinov natijalariga ko‘ra, LSTM modeli 76,4% aniqlik (F1-score: 0.758), mBERT modeli 84,2% aniqlik (F1-score: 0.839) ko‘rsatgan bo‘lsa, taklif etilgan UzSent-BERT modeli 91,3% aniqlikka (F1-score: 0.911) erishdi.
+
+MUHOKAMA
+Tajriba natijalari shuni ko‘rsatadiki, tokenizator lug‘atini o‘zbek tilidagi o‘zak va affikslar tuzilishiga moslashtirish modelning kam uchraydigan so‘zlarni (OOV — Out-of-Vocabulary) tushunish qobiliyatini sezilarli darajada oshiradi. Biroq, matnlarda kinoya (sarkazm), sheva so‘zlari hamda lotin va kirill alifbolarining aralash qo‘llanilishi holatlarida modelning xatolik darajasi nisbatan yuqori bo‘lib qolmoqda. Kelgusidagi ishlarda ikki alifboli parallel korpuslarni kengaytirish orqali ushbu cheklovni bartaraf etish rejalashtirilgan.
+
+XULOSA
+Ishlab chiqilgan UzSent-BERT modeli o‘zbek tilidagi matnlarning hissiy mazmunini yuqori aniqlikda tasniflash imkonini beradi. Mazkur yechim davlat organlari va biznes subyektlari uchun mijozlar fikrini avtomatik monitoring qilish tizimlarini yaratishda samarali vosita bo‘lib xizmat qiladi.
+
+ADABIYOTLAR VA QISQARTMALAR
+1. Devlin J., Chang M. W., Lee K., Toutanova K. BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding // NAACL-HLT. – 2019. – P. 4171–4186.
+2. Conneau A. et al. Unsupervised Cross-lingual Representation Learning at Scale // ACL. – 2020. – P. 8440–8451.
+3. Mengliyev B., Salayev U. O‘zbek tili kompyuter lingvistikasi muammolari. – Toshkent: Fan, 2022. – 184 b.
+Qisqartmalar: NLP — Tabiiy tilni qayta ishlash; BERT — Ikki tomonlama kodlovchi transformatorlar; BPE — Bayt juftliklarini kodlash; LSTM — Uzoq qisqa muddatli xotira.
+
+
+===== ARTICLE 3: ECOLOGY & AGRICULTURE =====
+
+MAVZU: OROLBO‘YI MINTAQASIDA SHO‘RLANGAN TUPROQLAR UNUMDORLIGINI OSHIRISHDA BIOKO‘MIR VA MIKROBIOLOGIK O‘G‘ITLARNING KOMPLEKS TA’SIRI
+
+KIRISH
+Iqlim o‘zgarishi va suv resurslarining tanqisligi sharoitida Orolbo‘yi mintaqasida tuproqlarning ikkilamchi sho‘rlanishi va degradatsiyasi qishloq xo‘jaligi ishlab chiqarishi uchun jiddiy xavf tug‘dirmoqda. Tuproq tarkibida suvda eruvchan tuzlar konsentratsiyasining ortishi o‘simliklarning o‘sishini sekinlashtiradi, mikrobiologik faollikni pasaytiradi va hosildorlikning keskin kamayishiga olib keladi. An’anaviy kimyoviy meliorantlardan haddan tashqari foydalanish esa ekologik muvozanatni yanada izdan chiqaradi. Shu bois, tuproq strukturasini tiklash va tuz stressini kamaytirish uchun ekologik xavfsiz texnologiyalarni, xususan, bioko‘mir (biochar) va mahalliy tuzga chidamli bakteriya shtammlarini birgalikda qo‘llash dolzarb ilmiy-amaliy ahamiyatga ega.
+
+ADABIYOTLAR SHARHI
+Bioko‘mirning tuproq xossalariga ta’siri jahon agrar fanida faol tadqiq qilinmoqda. J. Leman va S. Jozef (2015) bioko‘mirning yuqori g‘ovakliligi tuproqda namlikni ushlab turish qobiliyatini oshirishi va kation almashinuvi sig‘imini (CEC) yaxshilashini ko‘rsatib bergan. Xitoylik tadqiqotchilar (L. Chjan va boshq., 2020) sho‘rlangan tuproqlarda bioko‘mir va azot fiksatsiyalovchi bakteriyalarning birgalikda qo‘llanilishi natriy ionlarining ($Na^+$) o‘simlik ildiziga so‘rilishini kamaytirishini aniqlagan. O‘zbekiston sharoitida R. Qo‘ziyev va N. Abdurahmonov (2021) sho‘rlangan tuproqlar melioratsiyasi bo‘yicha fundamental tadqiqotlar olib borgan bo‘lsalar-da, Qoraqalpog‘istonning o‘rtacha va kuchli sho‘rlangan o‘tloqi-allyuvial tuproqlarida bioko‘mir hamda biopreparatlarning sinergik samarasi yetarlicha o‘rganilmagan.
+
+TAKLIF ETILAYOTGAN MODEL
+Dala tajribalari 2023–2025-yillarda Qoraqalpog‘iston Respublikasining Chimboy tumanidagi o‘rtacha sho‘rlangan (quruq qoldiq 0,65–0,85%) tuproqlarda 4 ta variant va 3 ta takroriylikda o‘tkazildi: 1) Nazorat (o‘g‘itsiz); 2) Bioko‘mir (10 t/ga, g‘o‘zapoya chiqindisidan $500^\circ\text{C}$ piroliz usulida olingan); 3) Mikrobiologik o‘g‘it (*Azotobacter chroococcum* va *Bacillus megaterium* shtammlari asosida); 4) Kompleks variant (Bioko‘mir 10 t/ga + Mikrobiologik o‘g‘it). Tuproq sho‘rlanish darajasi va hosildorlik o‘rtasidagi bog‘liqlik ko‘p omilli dispersiya tahlili (ANOVA) orqali baholandi:
+
+$$Y_{ij} = \mu + \tau_i + \beta_j + (\tau\beta)_{ij} + \epsilon_{ij}$$
+
+Bu yerda $Y_{ij}$ — kuzatilayotgan agrokimyoviy yoki hosildorlik ko‘rsatkichi; $\mu$ — umumiy o‘rtacha qiymat; $\tau_i$ — bioko‘mir dozasining ta’siri; $\beta_j$ — mikrobiologik o‘g‘it ta’siri; $(\tau\beta)_{ij}$ — omillarning o‘zaro ta’sir effekti; $\epsilon_{ij}$ — tajriba xatoligi.
+
+MA’LUMOTLAR VA BAHOLASH NATIJALARI
+Tadqiqot davomida tuproqning 0–30 sm haydov qatlamidagi elektr o‘tkazuvchanligi ($EC$), gumus miqdori, umumiy azot va harakatchan fosfor miqdorlari tahlil qilindi. Kompleks variantda tuproqning elektr o‘tkazuvchanligi nazorat variantiga nisbatan $4,8\text{ dS/m}$ dan $2,9\text{ dS/m}$ gacha (39,5% ga) pasaydi. Tuproq namligini saqlash ko‘rsatkichi 18,4% ga oshdi. Tajriba ekinlari sifatida ekilgan kuzgi bug‘doyning («Grom» navi) hosildorligi nazorat variantida $24,2\text{ s/ga}$ ni tashkil etgan bo‘lsa, faqat bioko‘mir qo‘llanilganda $31,5\text{ s/ga}$, mikrobiologik o‘g‘itda $29,8\text{ s/ga}$ va kompleks variantda eng yuqori — $38,6\text{ s/ga}$ ga yetdi ($LSD_{05} = 1,45\text{ s/ga}$).
+
+MUHOKAMA
+Olingan natijalar bioko‘mir va foydali tuproq mikroorganizmlari o‘rtasida kuchli sinergik ta’sir mavjudligini tasdiqlaydi. Bioko‘mirning g‘ovak strukturasi mikroorganizmlar uchun qulay yashash muhiti (mikro-nishe) yaratib, ularni yuqori tuz konsentratsiyasi va harorat o‘zgarishlaridan himoya qiladi. O‘z navbatida, bakteriyalar ajratadigan ekzopolisaxaridlar tuproq zarrachalarini biriktirib, tuzlarning yuvilishini osonlashtiradi. Shunga qaramay, bioko‘mirni sanoat miqyosida ishlab chiqarish tannarxini pasaytirish masalasi fermer xo‘jaliklari uchun iqtisodiy jihatdan muhim omil bo‘lib qolmoqda.
+
+XULOSA
+Orolbo‘yi mintaqasining sho‘rlangan tuproqlari sharoitida mahalliy qishloq xo‘jaligi chiqindilaridan tayyorlangan bioko‘mirni mikrobiologik o‘g‘itlar bilan birgalikda qo‘llash tuproq unumdorligini tiklash va don hosildorligini 59% gacha oshirish imkonini beradi. Ushbu texnologiyani mintaqadagi sho‘rlangan yerlarni melioratsiyalash dasturlariga kiritish maqsadga muvofiqdir.
+
+ADABIYOTLAR VA QISQARTMALAR
+1. Lehmann J., Joseph S. Biochar for Environmental Management: Science, Technology and Implementation. – London: Routledge, 2015. – 944 p.
+2. Zhang L. et al. Synergistic effects of biochar and halotolerant bacteria on saline soil remediation // Soil Biology and Biochemistry. – 2020. – Vol. 148. – P. 107892.
+3. Qo‘ziyev R., Abdurahmonov N. O‘zbekistonning sho‘rlangan tuproqlari va ularning unumdorligini oshirish yo‘llari. – Toshkent: Navro‘z, 2021. – 256 b.
+Qisqartmalar: CEC — Kation almashinuvi sig‘imi; EC — Elektr o‘tkazuvchanlik; ANOVA — Dispersiya tahlili; LSD — Eng kichik muhim farq.
+
+
+===== ARTICLE 4: MEDICINE & PUBLIC HEALTH =====
+
+MAVZU: ARTERIAL GIPERTENZIYA VA 2-TIP QANDLI DIABET BILAN OG‘RIGAN BEMORLARDA YURAK-QON TOMIR ASORATLARI XAVFINI PROGNOZLASHNING KLINIK-BIOKIMYOVIY MODELI
+
+KIRISH
+Arterial gipertenziya (AG) va 2-tip qandli diabetning (QD2) birgalikda kechishi zamonaviy kardiologiya va endokrinologiyaning eng dolzarb muammolaridan biridir. Ushbu ikki patologiyaning komorbidligi endotelial disfunksiyani chuqurlashtirib, ateroskleroz rivojlanishini tezlashtiradi va o‘tkir koronar sindrom hamda miya insulti kabi og‘ir yurak-qon tomir asoratlari (YQTA) xavfini 3–4 barobarga oshiradi. An’anaviy xavf shkalalari (masalan, SCORE2) har doim ham markaziy Osiyo populyatsiyasining genetik va metabolik xususiyatlarini to‘liq aks ettirmaydi. Shu munosabat bilan, yallig‘lanish va oksidlovchi stress biomarkerlarini o‘z ichiga olgan integrallashgan prognozlash modelini ishlab chiqish bemorlarni erta bosqichda stratifikatsiya qilish imkonini beradi.
+
+ADABIYOTLAR SHARHI
+Komorbid bemorlarda yurak-qon tomir xavfini baholash bo‘yicha qator xalqaro tadqiqotlar o‘tkazilgan. P. Ridker va boshqalar (2018) yuqori sezuvchanlikdagi C-reaktiv oqsil (hs-CRP) miqdorining ortishi arterial bosim nazorat qilingan taqdirda ham kardiovaskulyar o‘lim xavfini mustaqil ravishda bashorat qilishini isbotlagan. G. Bakris va M. Kosiborod (2021) diabetik nefropatiya va mikroalbuminuriyaning chap qorincha gipertrofiyasi bilan uzviy bog‘liqligini ko‘rsatib bergan. O‘zbekistonda G. Hamidullayeva va R. Qurbonov (2022) arterial gipertenziyali bemorlarda metabolik sindrom komponentlarini o‘rgangan bo‘lsalar-da, galectin-3 va NT-proBNP kabi zamonaviy biomarkerlar asosida 5 yillik asoratlar xavfini hisoblovchi matematik model yetarlicha ishlab chiqilmagan.
+
+TAKLIF ETILAYOTGAN MODEL
+Tadqiqotga 2021–2025-yillarda Respublika ixtisoslashtirilgan kardiologiya ilmiy-amaliy tibbiyot markazida kuzatuvda bo‘lgan AG va QD2 tashxisi qo‘yilgan 320 nafar bemor (o‘rtacha yoshi $58,4 \pm 7,2$ yosh) jalb etildi. Bemorlar 36 oy davomida prospektiv kuzatildi. Asosiy yakuniy nuqta sifatida miokard infarkti, ishemik insult va yurak yetishmovchiligi tufayli gospitalizatsiya holatlari qayd etildi. Xavf ehtimolini hisoblash uchun ko‘p omilli logistik regressiya modeli qurildi:
+
+$$\ln\left(\frac{P}{1-P}\right) = \beta_0 + \beta_1 HbA1c + \beta_2 SBP + \beta_3 \ln(hsCRP) + \beta_4 Gal3 + \beta_5 eGFR$$
+
+Bu yerda $P$ — 3 yil ichida yirik yurak-qon tomir asoratlari rivojlanish ehtimoli; $HbA1c$ — glikirlangan gemoglobin (%); $SBP$ — o‘rtacha sistolik arterial bosim (mm sim. ust.); $hsCRP$ — yuqori sezuvchan C-reaktiv oqsil (mg/l); $Gal3$ — qon zardobidagi Galectin-3 darajasi (ng/ml); $eGFR$ — koptokchalar filtratsiyasi tezligi ($\text{ml/min/1,73 m}^2$).
+
+MA’LUMOTLAR VA BAHOLASH NATIJALARI
+Kuzatuv davri yakunida 320 nafar bemordan 68 nafarida (21,25%) yirik yurak-qon tomir asoratlari aniqlandi. Ko‘p omilli tahlil natijalariga ko‘ra, asoratlar rivojlanishining eng kuchli mustaqil prediktorlari sifatida Galectin-3 darajasining $17,8\text{ ng/ml}$ dan yuqori bo‘lishi ($OR = 2,84$; 95% II: 1,65–4,89; $p < 0,001$), $HbA1c > 8,0\%$ ($OR = 2,15$; $p = 0,004$) va $hsCRP > 3,0\text{ mg/l}$ ($OR = 1,92$; $p = 0,012$) aniqlandi. Taklif etilgan modelning ROC-tahlilidagi egri chiziq ostidagi maydoni ($AUC$) 0,874 ni tashkil etdi (sezuvchanlik — 83,8%, spetsifiklik — 81,2%), bu esa standart SCORE2-Diabetes shkalasiga ($AUC = 0,762$) nisbatan statistika jihatdan ishonchli ustunlikni ($p < 0,01$) ko‘rsatdi.
+
+MUHOKAMA
+Tadqiqot natijalari shuni ko‘rsatadiki, AG va QD2 komorbidligida miokard fibrozi markeri bo‘lgan Galectin-3 hamda tizimli yallig‘lanish ko‘rsatkichi hs-CRP an’anaviy gemodinamik ko‘rsatkichlarga qaraganda patologik jarayonning subklinik bosqichini aniqroq aks ettiradi. Ushbu biomarkerlarni klinik amaliyotga kiritish yuqori xavf guruhidagi bemorlarni o‘z vaqtida aniqlash va ularga SGLT2 ingibitorlari hamda GLP-1 retseptorlari agonistlarini erta tayinlash imkonini beradi. Tadqiqotning cheklovi sifatida kuzatuvning bir markazda o‘tkazilganligi va bemorlarning dori terapiyasiga moyillik (komplayens) darajasining turlichaligini qayd etish mumkin.
+
+XULOSA
+Ishlab chiqilgan klinik-biokimyoviy prognozlash modeli arterial gipertenziya va 2-tip qandli diabet bilan og‘rigan bemorlarda yurak-qon tomir asoratlari xavfini yuqori aniqlikda baholash imkonini beradi. Ushbu algoritmni birlamchi tibbiy-sanitariya yordami va ixtisoslashtirilgan kardiologiya bo‘limlari amaliyotiga tatbiq etish nogironlik va o‘lim ko‘rsatkichlarini kamaytirishga xizmat qiladi.
+
+ADABIYOTLAR VA QISQARTMALAR
+1. Ridker P. M. et al. Antiinflammatory Therapy with Canakinumab for Atherosclerotic Disease // New England Journal of Medicine. – 2017. – Vol. 377. – P. 1119–1131.
+2. Bakris G., Kosiborod M. Cardiorenal Protection in Type 2 Diabetes // Diabetes Care. – 2021. – Vol. 44(5). – P. 1085–1093.
+3. Hamidullayeva G. A., Qurbonov R. D. Arterial gipertenziya va metabolik buzilishlar. – Toshkent: Tibbiyot, 2022. – 240 b.
+Qisqartmalar: AG — Arterial gipertenziya; QD2 — 2-tip qandli diabet; YQTA — Yurak-qon tomir asoratlari; OR — Imkoniyatlar nisbati; AUC — Egri chiziq ostidagi maydon.
+
+
+===== ARTICLE 5: PEDAGOGY & HIGHER EDUCATION =====
+
+MAVZU: OLIY TA’LIM MUASSASALARIDA MUHANDISLIK FANLARINI O‘QITISHDA VIRTUAL LABORATORIYALAR VA SIMULYATSIYA TEXNOLOGIYALARINING SAMARADORLIGI
+
+KIRISH
+Zamonaviy muhandislik ta’limi nazariy bilimlarni amaliy ko‘nikmalar bilan uyg‘unlashtirishni talab etadi. Biroq, ko‘plab texnika oliy ta’lim muassasalarida qimmatbaho laboratoriya jihozlarining yetishmasligi, xavfsizlik texnikasi cheklovlari va talabalar sonining ko‘pligi sababli real tajribalarni to‘liq hajmda o‘tkazish imkoniyati cheklangan. Axborot-kommunikatsiya texnologiyalarining rivojlanishi o‘quv jarayoniga virtual laboratoriyalar va interfaol simulyatsiya muhitlarini (MATLAB/Simulink, LabVIEW, Multisim) joriy etish imkonini yaratdi. Ushbu tadqiqotning maqsadi muhandislik yo‘nalishi talabalarining kasbiy kompetensiyalarini shakllantirishda virtual va an’anaviy laboratoriyalarni birgalikda qo‘llash (gibrid yondashuv) samaradorligini eksperimental asoslashdan iborat.
+
+ADABIYOTLAR SHARHI
+Muhandislik ta’limida virtual laboratoriyalarning o‘rni bo‘yicha jahon miqyosida keng ko‘lamli tadqiqotlar olib borilgan. T. de Yong va boshqalar (2013) virtual laboratoriyalar talabalarga murakkab fizik jarayonlarni vizualizatsiya qilish va xato qilishdan qo‘rqmasdan ko‘p martalik tajribalar o‘tkazish imkonini berishini ta’kidlagan. J. Brinson (2015) 56 ta empirik tadqiqotni meta-tahlil qilib, virtual laboratoriyalar natijalari an’anaviy laboratoriyalardan kam emasligini, ayrim hollarda esa konseptual tushunishni chuqurlashtirishini ko‘rsatgan. O‘zbekistonda U. Begimqulov va N. Muslimov (2020) ta’limni axborotlashtirishning nazariy-metodik asoslarini ishlab chiqqan bo‘lsalar-da, texnika OTMlarida gibrid laboratoriya mashg‘ulotlarining talabalar kognitiv yuklamasi va o‘zlashtirish ko‘rsatkichlariga ta’siri miqdoriy jihatdan yetarlicha o‘rganilmagan.
+
+TAKLIF ETILAYOTGAN MODEL
+Tadqiqot doirasida «Elektronika va sxemotexnika» fanini o‘qitishning uch bosqichli gibrid laboratoriya modeli ishlab chiqildi: 1) Tayyorgarlik bosqichi (talabalar virtual simulyatorda sxemani yig‘adi va parametrlarini hisoblaydi); 2) Amaliy bosqich (real laboratoriya stendida fizik tajriba o‘tkaziladi); 3) Tahliliy bosqich (virtual va real o‘lchov natijalari o‘rtasidagi farqlar sabablari tahlil qilinadi). Pedagogik eksperiment samaradorligini baholash uchun nazorat va tajriba guruhlarining natijalari Styudentning $t$-mezoni hamda Kovariatsiya tahlili (ANCOVA) orqali tekshirildi:
+
+$$Y_{ij} = \mu + \alpha_i + \beta(X_{ij} - \bar{X}) + \varepsilon_{ij}$$
+
+Bu yerda $Y_{ij}$ — yakuniy nazorat balli; $\mu$ — umumiy o‘rtacha ball; $\alpha_i$ — o‘qitish metodikasining effekti (an’anaviy yoki gibrid); $X_{ij}$ — dastlabki bilim darajasi (pre-test balli); $\beta$ — regressiya koeffitsiyenti.
+
+MA’LUMOTLAR VA BAHOLASH NATIJALARI
+Pedagogik eksperiment 2024–2025-o‘quv yilida Toshkent davlat texnika universitetining 2-kursida tahsil olayotgan 160 nafar talaba ishtirokida o‘tkazildi. Talabalar teng tarkibli nazorat ($n = 80$, faqat an’anaviy laboratoriya) va tajriba ($n = 80$, gibrid model) guruhlariga ajratildi. Dastlabki test (pre-test) natijalari ikki guruhda statistik jihatdan farq qilmadi ($t = 0,42; p = 0,67$). Bir semestr davomidagi o‘qitishdan so‘ng yakuniy nazoratda tajriba guruhining o‘rtacha bali $84,6 \pm 6,8$ ballni, nazorat guruhining o‘rtacha bali esa $73,2 \pm 8,4$ ballni tashkil etdi ($t = 9,43; p < 0,001$). Shuningdek, tajriba guruhida laboratoriya ishini bajarishga sarflanadigan vaqt 32% ga qisqardi va jihozlarning noto‘g‘ri ulanish hollari 4,5 barobarga kamaydi.
+
+MUHOKAMA
+Olingan natijalar virtual simulyatsiyalarni real laboratoriya mashg‘ulotlaridan oldin qo‘llash talabalarning kognitiv yuklamasini kamaytirishini ko‘rsatadi. Talaba real stend oldiga kelishidan avval jarayonning mohiyatini virtual muhitda anglab yetadi, bu esa uning ishonchini oshiradi va texnik xatolarni minimallashtiradi. Shu bilan birga, faqat virtual laboratoriyalar bilan cheklanib qolish talabalarda real o‘lchov asboblari bilan ishlash motorikasini rivojlantirmasligi sababli, aynan gibrid yondashuv eng optimal yechim ekanligi tasdiqlandi.
+
+XULOSA
+Muhandislik fanlarini o‘qitishda virtual laboratoriyalar va real tajribalarni uyg‘unlashtiruvchi gibrid metodika talabalarning nazariy bilimlarini chuqurlashtirish va amaliy ko‘nikmalarini shakllantirishda yuqori samaradorlikka ega. Texnika OTMlari o‘quv dasturlariga simulyatsion dasturiy paketlarni integratsiya qilish ta’lim sifatini xalqaro standartlar darajasiga olib chiqishga xizmat qiladi.
+
+ADABIYOTLAR VA QISQARTMALAR
+1. de Jong T., Linn M. C., Zacharia Z. C. Physical and Virtual Laboratories in Science and Engineering Education // Science. – 2013. – Vol. 340(6130). – P. 305–308.
+2. Brinson J. R. Learning outcome achievement in non-traditional (virtual and remote) versus traditional (hands-on) laboratories // Computers & Education. – 2015. – Vol. 87. – P. 218–237.
+3. Begimqulov U. Sh. Pedagogik ta’lim jarayonlarini axborotlashtirishni tashkil etish va boshqarish nazariyasi. – Toshkent: Fan, 2020. – 296 b.
+Qisqartmalar: OTM — Oliy ta’lim muassasasi; AKT — Axborot-kommunikatsiya texnologiyalari; ANCOVA — Kovariatsiya tahlili.
+
+
+===== ARTICLE 6: LINGUISTICS & TRANSLATION STUDIES =====
+
+MAVZU: O‘ZBEK VA INGLIZ TILLARIDA YURIDIK TERMINLARNING SEMANTIK-STRUKTURAVIY XUSUSIYATLARI VA TARJIMA TRANSFORMATSIYALARI
+
+KIRISH
+Xalqaro huquqiy, iqtisodiy va diplomatik aloqalarning kengayishi sharoitida yuridik matnlarni o‘zbek tilidan ingliz tiliga va aksincha tarjima qilish sifatiga qo‘yiladigan talablar tobora ortib bormoqda. Yuridik terminologiya yuqori darajadagi aniqlik, bir ma’nolilik va rasmiy-idoraviy uslubga xos qat’iy standartlashuvni talab etadi. Biroq, o‘zbek va ingliz tillarining turli til oilalariga mansubligi hamda O‘zbekiston (roman-german huquq tizimi) va Angliya-AQSH (umumiy huquq — Common Law tizimi) huquqiy tizimlari o‘rtasidagi konseptual farqlar tarjima jarayonida jiddiy lakunalarni keltirib chiqaradi. Mazkur tadqiqotning maqsadi ikki tildagi yuridik terminlarning strukturaviy-semantik modellarini qiyosiy tahlil qilish va ekvivalentsiz terminlarni tarjima qilishning optimal transformatsiya usullarini aniqlashdan iborat.
+
+ADABIYOTLAR SHARHI
+Yuridik tarjima nazariyasi va terminshunoslik masalalari jahon tilshunosligida chuqur o‘rganilgan. S. Sharshevich (1997) yuridik tarjimani nafaqat tillararo, balki huquqiy tizimlararo kommunikatsiya jarayoni sifatida tavsiflagan. P. Nyumark (1988) madaniy va institutsional terminlarni tarjima qilishda funksional ekvivalentlik va deskriptiv (tavsifiy) tarjima usullarining ustuvorligini asoslagan. O‘zbek tilshunosligida H. Dadaboyev (2019) o‘zbek terminologiyasining shakllanish tarixi va rivojlanish tamoyillarini, G. Salomov va N. Komilovlar esa tarjima transformatsiyalari nazariyasini tadqiq etganlar. Shunga qaramay, zamonaviy xalqaro shartnomalar va qonunchilik hujjatlarida uchraydigan ko‘p komponentli yuridik terminlarning korpus asosidagi statistik-strukturaviy tahlili yetarlicha amalga oshirilmagan.
+
+TAKLIF ETILAYOTGAN MODEL
+Tadqiqotda qiyosiy-tipologik, komponent tahlil va korpus lingvistikasi usullaridan foydalanildi. Terminlarning strukturaviy modellari (sodda, qo‘shma, birikmali terminlar) va tarjima transformatsiyalari chastotasini aniqlash uchun L. Barxudarov va V. Komissarov tasniflariga asoslangan to‘rt bosqichli tahlil modeli qo‘llanildi: 1) Leksik-semantik ekvivalentlikni aniqlash; 2) Huquqiy tizimlararo konseptual moslikni tekshirish; 3) Tarjima transformatsiyasi turini tanlash (kalka, transkripsiya, tavsifiy tarjima, modulyatsiya); 4) Kontekstual verifikatsiya. Tarjima ekvivalentligi koeffitsienti ($K_{eq}$) quyidagi formula orqali hisoblandi:
+
+$$K_{eq} = \frac{N_{full} + 0.5 N_{part}}{N_{total}}$$
+
+Bu yerda $N_{full}$ — to‘liq ekvivalentga ega terminlar soni; $N_{part}$ — qisman ekvivalentga ega terminlar soni; $N_{total}$ — tahlil qilingan terminlarning umumiy miqdori.
+
+MA’LUMOTLAR VA BAHOLASH NATIJALARI
+Tahlil materiali sifatida O‘zbekiston Respublikasi Fuqarolik kodeksi, Xalqaro tijorat arbitraji to‘g‘risidagi qonun hamda ularning rasmiy ingliz tilidagi tarjimalaridan (2020–2025-yillar nashrlari) ajratib olingan 1 200 ta yuridik termin va terminologik birikmalar olindi. Strukturaviy tahlil shuni ko‘rsatdiki, o‘zbek tilida ikki va uch komponentli birikmali terminlar (masalan, *majburiyatlarning bajarilishini ta’minlash*, *aybsizlik prezumpsiyasi*) 64,5% ni, ingliz tilida esa ko‘p komponentli otli birikmalar (Noun + Noun konstruksiyalari, masalan, *breach of contract*, *intellectual property rights*) 71,2% ni tashkil etadi. Tarjima usullari bo‘yicha: to‘liq ekvivalentlar — 41,0%, kalkalash — 26,5%, tavsifiy tarjima — 18,3%, transkripsiya/transliteratsiya — 9,2% va funksional analoglar — 5,0% hollarda qo‘llanilgan. Umuman olganda, o‘zbek-ingliz yuridik terminologiyasida ekvivalentlik koeffitsienti $K_{eq} = 0,54$ ni tashkil etdi.
+
+MUHOKAMA
+Tahlil natijalari shuni ko‘rsatadiki, o‘zbek yuridik terminologiyasida baynalmilal (lotin va yunon o‘zakli) terminlarning salmog‘i yuqori bo‘lsa-da, milliy huquqiy institutlarni ifodalovchi birliklarni (masalan, *mahalla fuqarolar yig‘ini*, *surishtiruv organi*) ingliz tiliga o‘girishda kalkalash usuli ma’no noaniqligiga olib kelishi mumkin. Bunday hollarda tavsifiy tarjima va izohli havolalardan foydalanish huquqiy mas’uliyat nuqtai nazaridan eng xavfsiz yondashuv hisoblanadi. Shuningdek, ingliz tilidagi *trust*, *tort*, *affidavit* kabi Common Law terminlarini o‘zbek tiliga tarjima qilishda ularni milliy huquq terminlari bilan sun’iy almashtirmaslik lozim.
+
+XULOSA
+O‘zbek va ingliz yuridik terminlarini tarjima qilishda nafaqat til birliklarining lug‘aviy ma’nosiga, balki ikki mamlakat huquqiy tizimlarining institutsional xususiyatlariga tayanish zarur. Tadqiqot natijalari asosida ikki tilli yuridik lug‘atlarni takomillashtirish va yuridik tarjimonlar uchun maxsus uslubiy tavsiyalar ishlab chiqish maqsadga muvofiqdir.
+
+ADABIYOTLAR VA QISQARTMALAR
+1. Šarčević S. New Approach to Legal Translation. – The Hague: Kluwer Law International, 1997. – 308 p.
+2. Newmark P. A Textbook of Translation. – New York: Prentice Hall, 1988. – 292 p.
+3. Dadaboyev H. O‘zbek terminologiyasi. – Toshkent: Yoshlar nashriyot uyi, 2019. – 136 b.
+Qisqartmalar: FK — Fuqarolik kodeksi; XTA — Xalqaro tijorat arbitraji; Common Law — Umumiy huquq tizimi.
