@@ -108,14 +108,21 @@ The site checks Russian as well as Uzbek (Russian is currently sent to Pangram).
 `prompts-ru.txt` (60 titles to write for, 15 abstracts to polish; `ru_plan.json`), saved as `ru_<chatbot>.json`.
 LaTeX, Markdown, quote/dash variants and ё are removed first.
 
-Percentages: AI texts caught at the threshold where 1 % (5 %) of held-out human abstracts are flagged.
+Percentages: AI texts caught at the threshold where 1 % (5 %) of held-out human abstracts are flagged (60 written
+and 15 polished per chatbot; 15 polished originals).
 
-| Trained on human + … | Claude written (60) | Gemini written (60) | Claude polished (15) | Gemini polished (15) | Polished originals flagged (15) |
+| Trained on human + written by … | ChatGPT written | Claude written | Gemini written | Polished (ChatGPT / Claude / Gemini) | Polished originals flagged |
 |---|---|---|---|---|---|
-| Gemini | 15 % (40 %) — unseen | 65 % (82 %) | 0 % (7 %) | 7 % (40 %) | 0 % (7 %) |
-| Claude | 57 % (80 %) | 33 % (52 %) — unseen | 0 % (13 %) | 13 % (20 %) | 0 % (0 %) |
-| Claude + Gemini | 50 % (73 %) | 63 % (80 %) | 0 % (13 %) | 13 % (33 %) | 0 % (7 %) |
+| all three | **100 %** (100 %) | 53 % (80 %) | 57 % (78 %) | 7 / 0 / 7 % | 0 % (0 %) |
+| Claude + Gemini (ChatGPT unseen) | 35 % (67 %) | 50 % (73 %) | 63 % (80 %) | 7 / 0 / 13 % | 0 % (7 %) |
+| ChatGPT + Gemini (Claude unseen) | 100 % (100 %) | 27 % (53 %) | 62 % (80 %) | 0 / 0 / 7 % | 0 % (0 %) |
+| ChatGPT + Claude (Gemini unseen) | 100 % (100 %) | 57 % (88 %) | 20 % (60 %) | 13 / 0 / 7 % | 0 % (0 %) |
 
-Russian is harder than Uzbek even for a chatbot in training (50–65 % at 1 % false alarms, against 92–100 % in Uzbek):
-Russian academic prose is formulaic in humans too, so the styles overlap more. An unseen chatbot is mostly missed
-(15–33 %), and polished text is not caught (0–13 %). ChatGPT answers are pending.
+- ChatGPT's Russian is very recognisable once it is in training (100 %), and not because of its padding: 44 of its 60
+  abstracts end with one of four identical stock sentences ("Дополнительно обозначены вопросы, требующие более
+  подробной эмпирической проверки." etc.), but with those sentences removed it is still caught 100 % (40 % unseen).
+- Claude's and Gemini's Russian is caught only about half the time even when in training: Russian academic prose is
+  formulaic in humans too, so the styles overlap more than in Uzbek.
+- An unseen chatbot is mostly missed (20–35 % at 1 %); polished text is not caught (0–13 %).
+- ChatGPT wrote one word with a Latin letter inside Cyrillic ("многoантенных"), the same kind of slip seen in Gemini's
+  Uzbek polishes.
