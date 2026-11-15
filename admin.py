@@ -372,7 +372,7 @@ def pilot_section(message=""):
             '<button>Send test e-mail</button></form>')
 
 
-def page(library, probe="", inventory=None, diagnostic="", pruning=None, pilot=None):
+def page(library, probe="", inventory=None, diagnostic="", pruning=None, pilot=None, notice=""):
     esc = html.escape
     mark = lambda ok: "✅" if ok else "➖" if ok is None else "❌"          # None = optional, not set
     rows = "".join(f'<tr><td>{mark(ok)}</td><th>{esc(a)}</th><td>{esc(d)}</td><td class="h">{"" if ok else esc(h)}</td></tr>'
@@ -431,8 +431,10 @@ def page(library, probe="", inventory=None, diagnostic="", pruning=None, pilot=N
             f'main{{max-width:980px;margin:24px auto;padding:0 16px}}section{{background:#fff;border:1px solid #dce6e5;border-radius:14px;padding:18px;margin:0 0 16px;overflow-x:auto}}'
             f'h1{{font-size:24px}}h2{{font-size:18px;margin:0 0 10px}}h3{{font-size:15px}}table{{border-collapse:collapse;width:100%;font-size:14px}}'
             f'th,td{{text-align:left;padding:7px 8px;border-bottom:1px solid #e6eeed;vertical-align:top}}td.h{{color:#7a4a00;font-size:13px}}'
-            f'.warn{{color:#9b2c16;font-weight:700}}.note{{color:#51676a}}.diag label{{display:block;margin:6px 0}}.diag input,.diag textarea{{width:100%;padding:6px;border:1px solid #cfe0dd;border-radius:8px;font:inherit}}.diag button{{margin-top:6px;padding:8px 14px;border-radius:8px;border:1px solid #006D70;background:#006D70;color:#fff;font-weight:700}}code{{background:#f2f4f4;padding:1px 4px;border-radius:4px}}</style></head><body><main>'
-            f'<h1>PlagIQ owner dashboard</h1><section><h2>Setup checklist</h2><table>{rows}</table></section>'
+            f'.warn{{color:#9b2c16;font-weight:700}}.notice{{background:#fff3cd;border:1px solid #e0c36b;border-radius:12px;padding:12px 16px;font-weight:700}}.note{{color:#51676a}}.diag label{{display:block;margin:6px 0}}.diag input,.diag textarea{{width:100%;padding:6px;border:1px solid #cfe0dd;border-radius:8px;font:inherit}}.diag button{{margin-top:6px;padding:8px 14px;border-radius:8px;border:1px solid #006D70;background:#006D70;color:#fff;font-weight:700}}code{{background:#f2f4f4;padding:1px 4px;border-radius:4px}}</style></head><body><main>'
+            f'<h1>PlagIQ owner dashboard</h1>'
+            + (f'<p class="notice" role="status">{html.escape(notice)}</p>' if notice else '') +
+            f'<section><h2>Setup checklist</h2><table>{rows}</table></section>'
             f'<section><h2>Library</h2>{lib}</section>'
             f'<section><h2>Library details</h2>{details(inventory) if library and library.get("available") else "<p>The engine is not connected.</p>"}</section>'
             f'<section id="source-check"><h2>Source check (DOI or title)</h2>{diagnostic or diagnostic_form()}</section>'

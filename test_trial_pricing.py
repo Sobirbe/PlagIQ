@@ -480,3 +480,12 @@ def test_admin_grants_owner_only(site, monkeypatch):
     assert page.status_code == 200 and "Granted" in page.text
     assert entitlements.grants_for(42)[0]["remaining"] == 2
     assert "Granted" not in site.post("/admin/grants", data={"user_id": "42", "checks": "500"}).text
+
+
+def test_sign_in_mail_failure_is_reported_not_hidden(site, monkeypatch):
+    def down(*a, **k):
+        raise mailer.MailError("TimeoutError: timed out")
+    monkeypatch.setattr(mailer, "send", down)
+    for address in ("old@example.uz", "nobody@example.uz"):        # the same answer whether or not an account exists
+        r = site.post("/auth/email/start", json={"email": address})
+        assert r.status_code == 503 and r.json()["code"] == "mail_failed"

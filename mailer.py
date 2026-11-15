@@ -61,4 +61,8 @@ def send(to, subject, text):
                 server.login(os.environ["SMTP_USER"], os.environ.get("SMTP_PASSWORD", ""))
             server.send_message(message)
     except (OSError, smtplib.SMTPException) as exc:
-        raise MailError(type(exc).__name__) from None
+        # The reason (e.g. "SMTPAuthenticationError: 535 Username and Password not accepted" or "TimeoutError")
+        # goes to the server log and to the owner's test on /admin; never the password, never to visitors.
+        detail = f"{type(exc).__name__}: {str(exc)[:200]}".rstrip(": ")
+        log.warning("e-mail not sent via %s:%s (%s): %s", host, port, security, detail)
+        raise MailError(detail) from None
