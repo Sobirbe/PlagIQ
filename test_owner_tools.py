@@ -149,9 +149,51 @@ def test_admin_form_posts_with_null_origin_from_the_same_site(monkeypatch, tmp_p
     sign_in(client)
     same = client.post("/admin/test-email", data={"email": "owner@example.uz"},
                        headers={"Origin": "null", "Sec-Fetch-Site": "same-origin"})
-    assert same.status_code == 200 and "Sent" in same.text and mailer.OUTBOX[-1]["to"] == "owner@example.uz"
+    assert same.status_code == 200 and "sent to owner@example.uz" in same.text and mailer.OUTBOX[-1]["to"] == "owner@example.uz"
     for headers in ({"Origin": "null", "Sec-Fetch-Site": "cross-site"}, {"Origin": "null"},
                     {"Origin": "https://evil.example", "Sec-Fetch-Site": "same-origin"}):
         refused = client.post("/admin/test-email", data={"email": "x@example.uz"}, headers=headers)
         assert refused.status_code == 403 and refused.json()["code"] == "origin_rejected", headers
     assert len(mailer.OUTBOX) == 1
+
+
+def test_failed_test_email_is_shown_at_the_top_with_the_reason(monkeypatch, tmp_path, caplog):
+    import smtplib
+    from fastapi.testclient import TestClient
+    import app as web
+    from test_auth_ai import TOKEN, sign_in
+    for k, v in {"TELEGRAM_BOT_TOKEN": TOKEN, "USERS_DB": str(tmp_path / "u.sqlite3"), "OWNER_TELEGRAM_IDS": "42",
+                 "SMTP_HOST": "smtp.gmail.com", "SMTP_FROM": "PlagIQ <owner@example.uz>", "SMTP_USER": "owner@example.uz",
+                 "SMTP_PASSWORD": "not-a-real-password"}.items():
+        monkeypatch.setenv(k, v)
+    monkeypatch.delenv("MAIL_BACKEND", raising=False)
+    client = TestClient(web.app)
+    sign_in(client)
+
+    class Refused:
+        def __init__(self, *a, **k):
+            pass
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            return False
+
+        def starttls(self, **k):
+            pass
+
+        def login(self, *a):
+            raise smtplib.SMTPAuthenticationError(535, b"5.7.8 Username and Password not accepted")
+    monkeypatch.setattr(smtplib, "SMTP", Refused)
+    page = client.post("/admin/test-email", data={"email": "owner@example.uz"}).text
+    top = page.split("<section>", 1)[0]
+    assert "sending FAILED" in top and "SMTPAuthenticationError" in top and "app password" in top
+    assert "not-a-real-password" not in page and "not-a-real-password" not in caplog.text
+
+    def blocked(*a, **k):
+        raise TimeoutError("timed out")
+    monkeypatch.setattr(smtplib, "SMTP", blocked)
+    page = client.post("/admin/test-email", data={"email": "owner@example.uz"}).text
+    assert "TimeoutError" in page.split("<section>", 1)[0] and "block outgoing mail" in page
+    assert "e-mail not sent via smtp.gmail.com:587" in caplog.text

@@ -467,7 +467,10 @@ async def email_start(request: Request):
     except auth.AccountError as exc:
         raise ApiError(exc.status, exc.code, str(exc))
     if not sent:
-        logging.getLogger("plagiq.auth").error("sign-in e-mail could not be sent")
+        # Every address gets a code the same way, so a sending failure says nothing about accounts: say so, instead
+        # of letting the user wait for a code that will not come.
+        logging.getLogger("plagiq.auth").error("sign-in e-mail could not be sent (reason in the plagiq.mail line above)")
+        raise ApiError(503, "mail_failed", "The e-mail could not be sent right now. Try again later or continue with Telegram.")
     return {"sent": True, "minutes": auth.CODE_MINUTES}
 
 
@@ -864,11 +867,11 @@ async def admin_page(request: Request):
                         headers={"Cache-Control": "no-store"})
 
 
-async def _admin_page_with(pilot):
+async def _admin_page_with(pilot, notice=""):
     data = await engine_library() if corpus_configured() else None
     inventory = await engine_client.inventory() if data is not None else None
-    return HTMLResponse(admin.page({"available": data is not None, **(data or {})}, "", inventory, pilot=pilot),
-                        headers={"Cache-Control": "no-store"})
+    return HTMLResponse(admin.page({"available": data is not None, **(data or {})}, "", inventory, pilot=pilot,
+                                   notice=notice), headers={"Cache-Control": "no-store"})
 
 
 @app.post("/admin/grants", response_class=HTMLResponse)
@@ -881,7 +884,7 @@ async def admin_grant(request: Request, user_id: int = Form(...), checks: int = 
         message = f"Granted: allowance #{gid}, {checks} check(s) up to {max_words:,} words for {days} day(s)."
     except entitlements.EntitlementError as exc:
         message = str(exc)
-    return await _admin_page_with(admin.pilot_section(message))
+    return await _admin_page_with(admin.pilot_section(message), message)
 
 
 @app.post("/admin/grants/revoke", response_class=HTMLResponse)
@@ -889,6 +892,18 @@ async def admin_revoke(request: Request, grant_id: int = Form(...)):
     owner(request)
     done = await run_in_threadpool(entitlements.revoke, grant_id)
     return await _admin_page_with(admin.pilot_section(f"Allowance #{grant_id} revoked." if done else "Nothing changed."))
+
+
+def mail_hint(detail):
+    """Plain-language next step for a failed test e-mail."""
+    if "Authentication" in detail or "535" in detail or "534" in detail:
+        return ("The mail server refused the login: check SMTP_USER and SMTP_PASSWORD (for Gmail: a 16-character "
+                "app password without spaces, and SMTP_USER = the same Gmail address).")
+    if any(word in detail for word in ("Timeout", "timed out", "ConnectionRefused", "Network is unreachable", "OSError",
+                                       "ConnectionReset", "gaierror")):
+        return ("The server could not reach the mail server at all. The hosting may block outgoing mail ports "
+                "(587/465); check the hosting plan, or use an e-mail service with a web API.")
+    return "Check the SMTP settings (DEPLOYMENT.md, Part 3v)."
 
 
 @app.post("/admin/test-email", response_class=HTMLResponse)
@@ -901,10 +916,11 @@ async def admin_test_email(request: Request, email: str = Form(..., max_length=2
         try:
             await run_in_threadpool(mailer.send, email.strip(), "PlagIQ test e-mail",
                                     "This is a test message from the PlagIQ owner dashboard. If it arrived, e-mail delivery works.")
-            message = "Sent. If it arrives (check spam too), set EMAIL_SIGNIN=1 on the website to turn on sign-in codes."
+            message = (f"Test e-mail: sent to {email.strip()} through {os.environ.get('SMTP_HOST', 'the development backend')}. "
+                       "If it does not arrive within a few minutes (check spam too), tell the developer.")
         except mailer.MailError as exc:
-            message = f"Sending failed ({exc}). Check the SMTP settings."
-    return await _admin_page_with(admin.pilot_section(message))
+            message = f"Test e-mail: sending FAILED — {exc}. " + mail_hint(str(exc))
+    return await _admin_page_with(admin.pilot_section(message), message)
 
 
 @app.post("/admin/prune", response_class=HTMLResponse)
