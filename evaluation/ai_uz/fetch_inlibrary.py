@@ -8,6 +8,10 @@ authors' work: they stay out of the repository (inlibrary_*.json are gitignored)
 
     python3 fetch_inlibrary.py meta            # resumable; writes inlibrary_meta.json
     python3 fetch_inlibrary.py text [limit]    # resumable; writes inlibrary_full_uz.json (passages, like human_full_uz)
+
+Status (16 November 2026): stage 1 found 12,442 live pre-ChatGPT records, 4,292 of them Uzbek. Stage 2 is not usable:
+inLibrary now answers article pages with "Access denied" behind a browser check, i.e. it does not want automated
+readers there, so no full text was taken (and the block is not to be worked around). Ask inLibrary for access first.
 """
 import json, os, re, sys, time, urllib.error, urllib.parse, urllib.request
 from html import unescape

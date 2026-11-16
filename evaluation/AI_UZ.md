@@ -223,6 +223,13 @@ Threshold 0.875. 2023+ journal passages (never trained on) flagged: IMRS 0 of 96
 The indicator flags only text very close to the chatbot writing it learned, so these are lower bounds on chatbot use,
 not estimates of it.
 
+**Open Uzbek databases (pre-ChatGPT human text).** inLibrary.uz (CC BY 4.0 per its licence page; OAI-PMH feed;
+robots.txt Crawl-delay 8): its feed lists 12,442 live records last changed before 30 November 2022, 4,292 in Uzbek
+(`fetch_inlibrary.py`). Its article pages, though, now return "Access denied" behind a browser check, so no full text
+was taken; using it needs inLibrary's agreement. CyberLeninka lists articles only through an API its robots.txt
+disallows. The OAK journal list from ilmiz.uz (467 journals) is now a source for the engine's open-licence importer
+(plagiarism library); for training, its journals' pre-2023 articles still have to be fetched from each publisher.
+
 **Prompt files with others' abstracts.** `chatgpt-prompts.txt`, `gemini-prompts.txt` and `prompts-ru.txt` (on the
 `development/uz-ai-study` branch) quote human abstracts from OpenAlex whose licences were not checked, so they are not
 on the main branch; `prompts-full-uz.txt` quotes only passages whose CC BY licence was confirmed, with their sources.
