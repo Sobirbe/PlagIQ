@@ -1,0 +1,259 @@
+O‘ZBEKISTON RESPUBLIKASI OLIY TA’LIM, FAN VA INNOVATSIYALAR VAZIRLIGI
+MIRZO ULUG‘BEK NOMIDAGI O‘ZBEKISTON MILLIY UNIVERSITETI
+
+Qo‘lyozma huquqida
+UDK: 338.24:004.8(575.1)
+
+KARIMOV SARDORBEK RUSTAMOVICH
+
+RAQAMLI TRANSFORMATSIYA SHAROITIDA SANOAT KORXONALARINING INNOVATSION SALOHIYATINI BOSHQARISH MEXANIZMLARINI TAKOMILLASHTIRISH
+(СОВЕРШЕНСТВОВАНИЕ МЕХАНИЗМОВ УПРАВЛЕНИЯ ИННОВАЦИОННЫМ ПОТЕНЦИАЛОМ ПРОМЫШЛЕННЫХ ПРЕДПРИЯТИЙ В УСЛОВИЯХ ЦИФРОВОЙ ТРАНСФОРМАЦИИ)
+
+08.00.13 – «Menejment» va 08.00.03 – «Sanoat iqtisodiyoti» tutash ixtisosliklari
+
+Iqtisodiyot fanlari bo‘yicha falsafa doktori (PhD) dissertatsiyasi
+
+Ilmiy rahbar: iqtisodiyot fanlari doktori, professor A. V. Muxamedov
+
+Toshkent – 2026
+
+================================================================================
+MUNDARIJA (СОДЕРЖАНИЕ)
+================================================================================
+QISQARTMALAR VA SHARTLI BELGILAR RO‘YXATI
+KIRISH (ВВЕДЕНИЕ)
+I BOB. RAQAMLI IQTISODIYOT SHAROITIDA SANOAT KORXONALARINING INNOVATSION SALOHIYATINI BOSHQARISHNING NAZARIY-METODOLOGIK ASOSLARI
+   1.1. «Innovatsion salohiyat» va «raqamli transformatsiya» kategoriyalarining iqtisodiy mazmuni hamda evolyutsiyasi
+   1.2. Sanoat korxonalarida innovatsion jarayonlarni boshqarishning zamonaviy konsepsiyalari va xorijiy tajribasi (Индустрия 4.0 и цифровая зрелость)
+   1.3. Korxonaning raqamli-innovatsion salohiyatini baholashning kompleks uslubiy yondashuvlari
+II BOB. O‘ZBEKISTON SANOAT TARMOQLARIDA INNOVATSION VA RAQAMLI RIVOJLANISHNING HOZIRGI HOLATI TAHLILI
+   2.1. Milliy sanoat majmuasining tarkibiy o‘zgarishlari va innovatsion faollik ko‘rsatkichlari dinamikasi
+   2.2. Yirik sanoat korxonalarida raqamli texnologiyalarni joriy etish darajasining empirik tahlili (Toshkent va Navoiy viloyatlari misolida)
+   2.3. Innovatsion salohiyatni ro‘yobga chiqarishga to‘sqinlik qiluvchi institutsional va resurs cheklovlari
+III BOB. RAQAMLI TRANSFORMATSIYA ASOSIDA SANOAT KORXONALARI INNOVATSION SALOHIYATINI BOSHQARISH MEXANIZMLARINI TAKOMILLASHTIRISH YO‘LLARI
+   3.1. Sanoat korxonalari innovatsion salohiyatini boshqarishning ko‘p darajali raqamli ekotizim modeli
+   3.2. Raqamli yetuklik va innovatsion samaradorlik o‘rtasidagi bog‘liqlikning ekonometrik modellashtirilishi
+   3.3. Sanoat korxonalarida innovatsion strategiyani amalga oshirishning «Yo‘l xaritasi» va kutilayotgan ijtimoiy-iqtisodiy samaradorlik
+XULOSA VA TAKLIFLAR (ЗАКЛЮЧЕНИЕ И РЕКОМЕНДАЦИИ)
+FOYDALANILGAN ADABIYOTLAR RO‘YXATI (СПИСОК ИСПОЛЬЗОВАННОЙ ЛИТЕРАТУРЫ)
+ILOVALAR (ПРИЛОЖЕНИЯ)
+
+================================================================================
+QISQARTMALAR VA SHARTLI BELGILAR RO‘YXATI
+================================================================================
+AI (Artificial Intelligence) – Sun’iy intellekt (Искусственный интеллект)
+ERP (Enterprise Resource Planning) – Korxona resurslarini rejalashtirish tizimi
+ITTKI (НИОКР) – Ilmiy-tadqiqot va tajriba-konstruktorlik ishlari
+IoT (Internet of Things) – Buyumlar interneti (Интернет вещей)
+KPI (Key Performance Indicators) – Samaradorlikning asosiy ko‘rsatkichlari
+MES (Manufacturing Execution System) – Ishlab chiqarish jarayonlarini boshqarish tizimi
+R&D (Research and Development) – Tadqiqotlar va ishlanmalar
+YaIM (ВВП) – Yalpi ichki mahsulot (Валовой внутренний продукт)
+
+================================================================================
+KIRISH (ВВЕДЕНИЕ)
+================================================================================
+
+Tadqiqot mavzusining dolzarbligi va zarurati. Jahon iqtisodiyotining to‘rtinchi sanoat inqilobi (Industry 4.0) bosqichiga o‘tishi sharoitida sanoat korxonalarining raqobatbardoshligi an’anaviy ishlab chiqarish omillari (xomashyo, arzon ishchi kuchi) bilan emas, balki ularning innovatsion salohiyati va raqamli texnologiyalarni o‘zlashtirish tezligi bilan belgilanmoqda. Birlashgan Millatlar Tashkilotining Sanoatni rivojlantirish tashkiloti (UNIDO) ma’lumotlariga ko‘ra, global ishlab chiqarish zanjirlarida qo‘shilgan qiymatning 65 foizdan ortig‘i aynan raqamli yechimlar va intellektual mulk obyektlarini joriy etgan korxonalar hissasiga to‘g‘ri kelmoqda. В современных условиях глобальной нестабильности цифровая трансформация перестает быть просто технологическим трендом и становится ключевым фактором выживания и устойчивого развития промышленных предприятий.
+
+O‘zbekiston Respublikasida so‘nggi yillarda sanoatni modernizatsiya qilish, yuqori texnologiyali ishlab chiqarish tarmoqlarini rivojlantirish va milliy iqtisodiyotni raqamlashtirish bo‘yicha tizimli islohotlar amalga oshirilmoqda. «O‘zbekiston – 2030» strategiyasida sanoatda qo‘shilgan qiymat hajmini 45 milliard dollarga yetkazish, mehnat unumdorligini 2 barobarga oshirish hamda korxonalarda innovatsion texnologiyalar va sun’iy intellekt tizimlarini keng joriy etish ustuvor vazifalar sifatida belgilangan. Biroq, amaliyot shuni ko‘rsatmoqdaki, respublikamizdagi ko‘plab sanoat korxonalarida raqamlashtirish jarayonlari fragmentar (tarqoq) xususiyatga ega bo‘lib, asosan buxgalteriya hisobi va hujjat aylanishini avtomatlashtirish bilan cheklanib qolmoqda. Bevosita ishlab chiqarish jarayonlarini boshqarish (MES), raqamli egizaklar (Digital Twins) yaratish va innovatsion loyihalarni tijoratlashtirish mexanizmlari yetarli darajada shakllanmagan.
+
+Tadqiqotning maqsadi raqamli transformatsiya sharoitida O‘zbekiston sanoat korxonalarining innovatsion salohiyatini boshqarishning tashkiliy-iqtisodiy mexanizmlari va ekonometrik modellarini takomillashtirish bo‘yicha ilmiy asoslangan taklif hamda amaliy tavsiyalar ishlab chiqishdan iborat.
+
+Tadqiqotning vazifalari:
+– «innovatsion salohiyat» va «raqamli transformatsiya» tushunchalarining nazariy mazmunini aniqlashtirish hamda ularning o‘zaro dialektik bog‘liqligini ochib berish;
+– sanoat korxonalarida innovatsion jarayonlarni boshqarishning ilg‘or xorijiy modellarini (Германия, Южная Корея, Китай) qiyosiy tahlil qilish va ularni milliy sharoitga moslashtirish imkoniyatlarini asoslash;
+– korxonaning raqamli-innovatsion yetuklik darajasini baholashning ko‘p komponentli integral indeksini ishlab chiqish;
+– O‘zbekiston sanoat korxonalarida innovatsion faollik va raqamli texnologiyalarni joriy etish holatini empirik va statistik tahlil qilish;
+– raqamli transformatsiya omillarining sanoat korxonalari samaradorligiga ta’sirini ko‘p omilli panel regressiya modeli asosida baholash;
+– sanoat korxonalarida innovatsion salohiyatni boshqarishning ko‘p darajali raqamli ekotizim modelini hamda 2026–2030-yillarga mo‘ljallangan amaliy «Yo‘l xaritasi»ni ishlab chiqish.
+
+Tadqiqotning obyekti sifatida O‘zbekiston Respublikasi qayta ishlash va og‘ir sanoat tarmoqlarida faoliyat yurituvchi yirik va o‘rta sanoat korxonalari (xususan, mashinasozlik, kimyo va metallurgiya korxonalari) tanlab olindi.
+
+Tadqiqotning predmeti raqamli transformatsiya sharoitida sanoat korxonalarining innovatsion salohiyatini shakllantirish, baholash va samarali boshqarish jarayonida yuzaga keladigan tashkiliy-iqtisodiy munosabatlar majmuidan iborat.
+
+================================================================================
+I BOB. RAQAMLI IQTISODIYOT SHAROITIDA SANOAT KORXONALARINING INNOVATSION SALOHIYATINI BOSHQARISHNING NAZARIY-METODOLOGIK ASOSLARI
+================================================================================
+
+1.1. «Innovatsion salohiyat» va «raqamli transformatsiya» kategoriyalarining iqtisodiy mazmuni hamda evolyutsiyasi
+
+Iqtisodiyot nazariyasida innovatsiyalar va ularning iqtisodiy o‘sishdagi hal qiluvchi roli haqidagi fundamental qarashlar avstriyalik buyuk iqtisodchi Yozef Shumpeter (J. Schumpeter) nomi bilan chambarchas bog‘liq. U o‘zining «Iqtisodiy taraqqiyot nazariyasi» (1911) asarida «yangi kombinatsiyalar» (neue Kombinationen) tushunchasini fanga kiritib, tadbirkorlik va texnologik yangiliklarni iqtisodiy tizimni ichkaridan harakatga keltiruvchi asosiy kuch — «ijodiy buzilish» (creative destruction) mexanizmi sifatida talqin qildi. Keyinchalik ushbu nazariya P. Druker, K. Frimen, R. Nelson va S. Uinterlarning evolyutsion iqtisodiyot konsepsiyalarida yanada rivojlantirildi.
+
+Zamonaviy ilmiy adabiyotlarda «korxonaning innovatsion salohiyati» (инновационный потенциал предприятия) kategoriyasiga nisbatan uchta asosiy nazariy yondashuv shakllangan:
+1. Resurs yondashuvi (Ресурсный подход): mazkur yondashuv tarafdorlari (masalan, A. I. Anchishkin, P. N. Zavlin) innovatsion salohiyatni korxona ixtiyoridagi moddiy-texnik, moliyaviy, kadrlar va intellektual resurslar majmui sifatida ko‘rib chiqadilar. Biroq, bizning fikrimizcha, ushbu yondashuvning zaif tomoni shundaki, unda resurslarning mavjudligi ulardan samarali foydalanish qobiliyatini avtomatik tarzda kafolatlamaydi.
+2. Natijaviy yondashuv (Результативный подход): bu yo‘nalish vakillari (B. Tviss, R. Fatxutdinov) innovatsion salohiyatni korxonaning yangi mahsulot turlarini yaratish, patentlar olish va ularni bozorda muvaffaqiyatli tijoratlashtirish natijasi bilan o‘lchaydilar.
+3. Tizimli-dinamik yondashuv (Системно-динамический подход): D. Tis (D. Teece) tomonidan ilgari surilgan «dinamik qobiliyatlar» (Dynamic Capabilities) nazariyasiga tayangan holda, innovatsion salohiyat — bu tashkilotning o‘zgaruvchan tashqi muhitga moslashish maqsadida ichki va tashqi kompetensiyalarni integratsiya qilish, qayta qurish va safarbar etish qobiliyatidir.
+
+В российской и узбекской экономической науке проблема структуризации инновационного потенциала получила глубокое развитие в трудах таких ученых, как В. М. Аньшин, С. Ю. Глазьев, Г. Б. Клейнер, а также С. С. Гулямов, Р. Х. Аюпов и Б. Ю. Ходиев. Как справедливо отмечает академик С. Ю. Глазьев, переход к новому технологическому укладу требует не просто точечного внедрения отдельных технологий, а формирования целостной институционально-управленческой среды, способной генерировать и абсорбировать инновации.
+
+Mualliflik nuqtai nazaridan, raqamli transformatsiya sharoitida sanoat korxonasining innovatsion salohiyatiga quyidagicha ta’rif berish maqsadga muvofiq: «Korxonaning raqamli-innovatsion salohiyati — bu zamonaviy raqamli platformalar, katta ma’lumotlar (Big Data) tahlili va sun’iy intellekt texnologiyalari asosida tashkilotning resurslar bazasini, ishlab chiqarish jarayonlarini hamda intellektual kapitalini uzluksiz yangilash orqali yuqori qo‘shilgan qiymatli innovatsion mahsulotlarni yaratish va tijoratlashtirishga bo‘lgan dinamik qobiliyatidir».
+
+«Raqamli transformatsiya» (Digital Transformation) tushunchasini «raqamlashtirish» (Digitization — analog ma’lumotlarni raqamli shaklga o‘tkazish) va «raqamli rivojlantirish» (Digitalization — biznes jarayonlarni avtomatlashtirish) tushunchalaridan qat’iy farqlash lozim. G. Vesterman va M. Ueydlarning (2014) ta’kidlashicha, raqamli transformatsiya — bu shunchaki IT-infratuzilmani yangilash emas, balki korxonaning biznes modelini, tashkiliy madaniyatini va mijozlar uchun qiymat yaratish zanjirini tubdan qayta ko‘rib chiqish jarayonidir.
+
+1.2. Sanoat korxonalarida innovatsion jarayonlarni boshqarishning zamonaviy konsepsiyalari va xorijiy tajribasi
+
+Sanoat ishlab chiqarishini raqamlashtirish va innovatsion boshqaruvning global evolyutsiyasi «Ochiq innovatsiyalar» (Open Innovation, G. Chesbro) hamda «Sanoat 4.0» (Industrie 4.0) konsepsiyalari kesishmasida rivojlanmoqda. An’anaviy «yopiq innovatsiyalar» modelida korxonalar barcha ilmiy-tadqiqot ishlarini faqat o‘zlarining ichki laboratoriyalarida olib borgan bo‘lsalar, raqamli davrda korxonalar startaplar, universitetlar, ilmiy markazlar va hatto iste’molchilar bilan raqamli ekotizimlar orqali hamkorlik qilmoqdalar.
+
+Xorijiy mamlakatlar tajribasini tahlil qilish sanoatni raqamli-innovatsion rivojlantirishning uchta yetakchi modelini ajratib ko‘rsatish imkonini beradi:
+
+1. Nemis modeli («Industrie 4.0»): Germaniya hukumati va sanoat konsernlari (Siemens, Bosch, SAP) tomonidan ishlab chiqilgan ushbu model kiberfizik tizimlar (CPS), sanoat buyumlari interneti (IIoT) va standartlashtirilgan arxitektura modellariga (RAMI 4.0) asoslanadi. Germaniya tajribasining O‘zbekiston uchun eng muhim jihati — bu o‘rta va kichik sanoat korxonalarini (Mittelstand) raqamlashtirishni davlat tomonidan moliyaviy va konsultativ qo‘llab-quvvatlash markazlari tarmog‘ining yaratilganligidir.
+2. Janubiy Koreya modeli («Manufacturing Innovation 3.0»): Koreya Respublikasida yirik chaebollar (Samsung, Hyundai, LG) bilan bir qatorda, 30 000 dan ortiq kichik va o‘rta zavodlarda «aqlli fabrika» (Smart Factory) tizimlarini joriy etish davlat dasturi amalga oshirildi. Bunda davlat korxonalarning raqamli yetuklik darajasiga qarab 4 ta bosqichli (bazaviy, oraliq-1, oraliq-2, ilg‘or) sertifikatlash tizimini joriy qilgan va xarajatlarning 50 foizigacha subsidiyalagan.
+3. Xitoy modeli («Made in China 2025»): Xitoy sanoat siyosatida sun’iy intellekt, robototexnika va sanoat interneti platformalarini mahalliylashtirishga ustuvor ahamiyat beriladi. Особенностью китайского подхода является тесная интеграция государственных промышленных корпораций с технологическими гигантами (Alibaba Cloud, Huawei) для создания отраслевых цифровых платформ, снижающих транзакционные издержки предприятий.
+
+1.3. Korxonaning raqamli-innovatsion salohiyatini baholashning kompleks uslubiy yondashuvlari
+
+Sanoat korxonalarining innovatsion salohiyatini boshqarish samaradorligi uni obyektiv va miqdoriy jihatdan o‘lchash uslubiyotiga bog‘liq. Jahon amaliyotida SIRI (Smart Industry Readiness Index — Singapur), Acatech Industrie 4.0 Maturity Index (Germaniya) kabi baholash metodikalari keng qo‘llaniladi. Biroq, ushbu metodikalar yuqori darajada rivojlangan postindustrial iqtisodiyotlar uchun mo‘ljallangan bo‘lib, o‘tish davri iqtisodiyotiga xos moliyaviy-institutsional xususiyatlarni (masalan, investitsion resurslar taqchilligi, texnologik importga bog‘liqlik) to‘liq hisobga olmaydi.
+
+Shuni inobatga olgan holda, tadqiqot doirasida O‘zbekiston sanoat korxonalari uchun 5 ta asosiy blok va 20 ta xususiy indikatordan tashkil topgan «Raqamli-innovatsion salohiyatning integral indeksi» ($I_{DIS}$) ishlab chiqildi:
+– $K_1$ — Texnologik va raqamli infratuzilma subindeksi (ishlab chiqarish jarayonlarining avtomatlashtirilganlik darajasi, ERP/MES tizimlarining mavjudligi, ma’lumotlar xavfsizligi);
+– $K_2$ — Moliyaviy-investitsion subindeks (ITTKI xarajatlarining korxona tushumidagi ulushi, raqamli loyihalarga yo‘naltirilgan investitsiyalar hajmi);
+– $K_3$ — Kadrlar va intellektual kapital subindeksi (muhandis-texnik xodimlar ulushi, raqamli kompetensiyaga ega kadrlar salmog‘i, xodimlar malakasini oshirish xarajatlari);
+– $K_4$ — Tashkiliy-boshqaruv va madaniy subindeks (raqamli transformatsiya strategiyasining mavjudligi, moslashuvchan boshqaruv — Agile/Lean usullarining qo‘llanilishi);
+– $K_5$ — Natijadorlik va tijoratlashtirish subindeksi (yangi innovatsion mahsulotlarning umumiy sotuv hajmidagi ulushi, patentlar va nou-xau soni).
+
+Har bir subindeks bo‘yicha ko‘rsatkichlar $[0; 1]$ oralig‘ida normallashtiriladi va integral indeks geometrik o‘rtacha hamda ekspert vazn koeffitsientlari asosida quyidagicha hisoblanadi:
+
+$$I_{DIS} = \sum_{j=1}^{5} w_j \cdot \left( \prod_{i=1}^{n_j} x_{ij} \right)^{\frac{1}{n_j}}, \quad \text{bunda } \sum_{j=1}^{5} w_j = 1$$
+
+Bu yerda $w_j$ — $j$-blokning ekspertlar bahosi (Del‘fi usuli) asosida aniqlangan vazn koeffitsienti ($w_1 = 0,25$; $w_2 = 0,20$; $w_3 = 0,20$; $w_4 = 0,15$; $w_5 = 0,20$); $x_{ij}$ — $j$-blokdagi $i$-indikatorning normallashtirilgan qiymati; $n_j$ — blokdagi indikatorlar soni.
+
+Hisob-kitob natijalariga ko‘ra korxonalar to‘rtta rivojlanish darajasiga tasniflanadi:
+– $0,00 \le I_{DIS} < 0,25$ — Quyi (an’anaviy) daraja;
+– $0,25 \le I_{DIS} < 0,50$ — O‘rta-quyi (fragmentar avtomatlashtirish) daraja;
+– $0,50 \le I_{DIS} < 0,75$ — O‘rta-yuqori (tizimli integratsiya) daraja;
+– $0,75 \le I_{DIS} \le 1,00$ — Yuqori («Aqlli korxona» — Smart Factory) daraja.
+
+================================================================================
+II BOB. O‘ZBEKISTON SANOAT TARMOQLARIDA INNOVATSION VA RAQAMLI RIVOJLANISHNING HOZIRGI HOLATI TAHLILI
+================================================================================
+
+2.1. Milliy sanoat majmuasining tarkibiy o‘zgarishlari va innovatsion faollik ko‘rsatkichlari dinamikasi
+
+O‘zbekiston Respublikasi Prezidenti huzuridagi Statistika agentligi ma’lumotlariga ko‘ra, 2018–2025-yillar mobaynida mamlakat sanoat ishlab chiqarish hajmi barqaror o‘sish tendensiyasini namoyon etdi. Sanoat mahsulotlari ishlab chiqarishning fizik hajm indeksi o‘rtacha yillik 6,2–7,4 foizni tashkil etib, sanoatning YaIM tarkibidagi ulushi 26,1 foizdan 28,4 foizgacha ko‘tarildi. Ayniqsa, qayta ishlash sanoatida yuqori va o‘rta-yuqori texnologiyali tarmoqlar (avtomobilsozlik, elektrotexnika, kimyo va neft-kimyo, farmatsevtika) ulushining ortib borayotgani ijobiy tarkibiy siljish sifatida baholanishi mumkin.
+
+1-jadval. O‘zbekiston Respublikasi sanoat korxonalarining innovatsion faollik ko‘rsatkichlari dinamikasi (2019–2025-yillar)
+
+| Ko‘rsatkichlar nomi | 2019 | 2020 | 2021 | 2022 | 2023 | 2024 | 2025 | O‘zgarish (2025/2019) |
+|---|---|---|---|---|---|---|---|---|
+| Innovatsiyalarni joriy etgan sanoat korxonalari soni, birlik | 942 | 1085 | 1240 | 1412 | 1635 | 1890 | 2145 | 2,28 marta |
+| Innovatsion faol korxonalarning umumiy sanoat korxonalaridagi ulushi, % | 4,1 | 4,4 | 4,8 | 5,2 | 5,7 | 6,3 | 6,9 | +2,8 f.p. |
+| Ishlab chiqarilgan innovatsion mahsulotlar va xizmatlar hajmi, trln so‘m | 18,4 | 21,9 | 27,6 | 34,8 | 45,2 | 58,9 | 74,3 | 4,04 marta |
+| Innovatsion mahsulotlarning jami sanoat ishlab chiqarishidagi ulushi, % | 5,7 | 5,9 | 6,1 | 6,3 | 6,8 | 7,4 | 8,1 | +2,4 f.p. |
+| Texnologik innovatsiyalarga qilingan xarajatlar, trln so‘m | 4,2 | 5,1 | 6,8 | 8,4 | 11,2 | 14,6 | 18,9 | 4,50 marta |
+| Shu jumladan, axborot-kommunikatsiya va raqamli texnologiyalarga xarajatlar ulushi, % | 11,2 | 13,5 | 16,8 | 19,4 | 22,7 | 26,3 | 30,5 | +19,3 f.p. |
+
+Manba: O‘zbekiston Respublikasi Prezidenti huzuridagi Statistika agentligi ma’lumotlari asosida muallif hisob-kitoblari.
+
+Jadval ma’lumotlaridan ko‘rinib turibdiki, 2019–2025-yillarda innovatsion mahsulotlar hajmi 4 barobardan ziyodga oshgan bo‘lsa-da, innovatsion faol korxonalarning umumiy sanoat korxonalari sonidagi ulushi hamon past darajada (6,9%) qolmoqda. Taqqoslash uchun, ushbu ko‘rsatkich Germaniyada 67,8%, Janubiy Koreyada 58,4%, Rossiya Federatsiyasida esa 11,9% ni tashkil etadi. Бұдан шығатын қорытынды — несмотря на значительный рост абсолютных объемов финансирования, инновационная активность в промышленном секторе Узбекистана сконцентрирована преимущественно в нескольких крупных государственных корпорациях, тогда как малые и средние производственные предприятия остаются в стороне от технологической модернизации.
+
+2.2. Yirik sanoat korxonalarida raqamli texnologiyalarni joriy etish darajasining empirik tahlili
+
+Korxonalarning real raqamli-innovatsion holatini o‘rganish maqsadida 2024–2025-yillarda Toshkent shahri, Toshkent va Navoiy viloyatlarida joylashgan 48 ta sanoat korxonasida (mashinasozlik, kimyo sanoati, qurilish materiallari va yengil sanoat) chuqurlashtirilgan so‘rovnoma va diagnostik audit o‘tkazildi. Tadqiqotda biz tomonidan ishlab chiqilgan $I_{DIS}$ integral indeksi qo‘llanildi.
+
+Empirik tadqiqot natijalari shuni ko‘rsatdiki:
+– O‘rganilgan korxonalarning 79,2 foizida buxgalteriya va moliya hisobi dasturlari (1C, SAP) joriy etilgan, biroq faqat 22,9 foizida ishlab chiqarish jarayonlarini real vaqt rejimida boshqaruvchi MES va SCADA tizimlari to‘liq ishlaydi;
+– Sun’iy intellekt va mashinaviy o‘qitish (Machine Learning) asosidagi prediktiv texnik xizmat ko‘rsatish (Predictive Maintenance) tizimlari faqat 3 ta yirik korxonada («Navoiy kon-metallurgiya kombinati» AJ, «O‘zAuto Motors» AJ va «Navoiyazot» AJ) pilot loyiha sifatida tatbiq etilgan;
+– O‘rtacha $I_{DIS}$ ko‘rsatkichi kimyo va metallurgiya tarmoqlarida 0,58 ni (o‘rta-yuqori daraja), mashinasozlikda 0,49 ni, qurilish materiallari va yengil sanoatda esa mos ravishda 0,34 va 0,29 ni tashkil etdi.
+
+2.3. Innovatsion salohiyatni ro‘yobga chiqarishga to‘sqinlik qiluvchi institutsional va resurs cheklovlari
+
+So‘rovnoma natijalari va sanoat korxonalari rahbarlari bilan o‘tkazilgan intervyular tahlili raqamli-innovatsion salohiyatni rivojlantirishga to‘sqinlik qiluvchi quyidagi tizimli muammolarni aniqlash imkonini berdi:
+1. Moliyaviy resurslar cheklanganligi va investitsiyalar qoplanish muddatining uzoqligi (respondentlarning 68,7% i tomonidan asosiy to‘siq sifatida ko‘rsatilgan). Tijorat banklari kreditlarining yuqori foiz stavkalari uzoq muddatli ITTKI loyihalarini moliyalashtirishga imkon bermaydi.
+2. Kadrlar salohiyati va «raqamli tafovut» (цифровой разрыв). Korxonalarda sanoat texnologiyalarini ham, ma’lumotlar tahlilini (Data Science) ham mukammal biladigan gibrid mutaxassislar (IT-muhandislar) keskin yetishmaydi (respondentlarning 62,5% i).
+3. Ilm-fan va ishlab chiqarish integratsiyasining zaifligi. Oliy ta’lim muassasalari va ilmiy-tadqiqot institutlari tomonidan yaratilgan ishlanmalarning aksariyati sanoat korxonalarining real texnologik talablariga (TRL — Technology Readiness Level 7–9 darajasiga) mos kelmaydi.
+4. Kiberxavfsizlik va eskirgan ishlab chiqarish fondlari. Ko‘plab korxonalarda jismoniy va ma’naviy jihatdan eskirgan dastgohlarni zamonaviy IoT datchiklari bilan integratsiya qilish texnik jihatdan murakkab kechmoqda.
+
+================================================================================
+III BOB. RAQAMLI TRANSFORMATSIYA ASOSIDA SANOAT KORXONALARI INNOVATSION SALOHIYATINI BOSHQARISH MEXANIZMLARINI TAKOMILLASHTIRISH YO‘LLARI
+================================================================================
+
+3.1. Sanoat korxonalari innovatsion salohiyatini boshqarishning ko‘p darajali raqamli ekotizim modeli
+
+Aniqlangan muammolarni hal etish uchun sanoat korxonalarida an’anaviy chiziqli boshqaruv tuzilmasidan voz kechib, «Ko‘p darajali raqamli-innovatsion ekotizim» (Многоуровневая цифрово-инновационная экосистема) modeliga o‘tish taklif etiladi. Ushbu model uchta o‘zaro bog‘liq konturni o‘z ichiga oladi:
+
+1. Ichki korporativ kontur (Микроуровень): korxona ichida yagona ma’lumotlar ko‘li (Data Lake) asosida PLM (Product Lifecycle Management — mahsulot hayotiy siklini boshqarish), ERP va MES tizimlarining uzluksiz integratsiyasini ta’minlash. Bu bo‘limlararo axborot to‘siqlarini bartaraf etib, yangi mahsulotni loyihalashdan tortib seriyali ishlab chiqarishgacha bo‘lgan vaqtni (Time-to-Market) 30–40 foizga qisqartiradi.
+2. Tarmoq va klaster konturi (Мезоуровень): yirik sanoat korxonalari atrofida yetkazib beruvchilar, kichik innovatsion korxonalar va texnoparklarni birlashtiruvchi «Ochiq raqamli innovatsiyalar platformasi»ni yaratish. Platforma orqali yirik korxonalar o‘zlarining texnologik muammolarini (R&D so‘rovlarini) ochiq e’lon qiladi, startaplar va ilmiy jamoalar esa tayyor yechimlarni taklif etadi.
+3. Institutsional qo‘llab-quvvatlash konturi (Макроуровень): davlat tomonidan «Raqamli sanoat vaucherlari» (Digital Innovation Vouchers) mexanizmini joriy etish, bunda kichik va o‘rta sanoat korxonalariga mahalliy IT-kompaniyalar va muhandislik markazlari xizmatlaridan foydalanish xarajatlarining 50 foizigacha maqsadli subsidiya ajratiladi.
+
+3.2. Raqamli yetuklik va innovatsion samaradorlik o‘rtasidagi bog‘liqlikning ekonometrik modellashtirilishi
+
+Taklif etilayotgan mexanizmlarning iqtisodiy asoslanganligini isbotlash uchun 48 ta sanoat korxonasining 2019–2025-yillardagi panel ma’lumotlari (336 ta kuzatuv) asosida ekonometrik tahlil o‘tkazildi. Korxonaning innovatsion mahsulotlar ishlab chiqarish samaradorligiga ($INNOV_{i,t}$) raqamli infratuzilma, ITTKI xarajatlari va kadrlar malakasining ta’sirini baholash uchun qat’iy effektli (Fixed Effects) log-chiziqli panel regressiya modeli qurildi:
+
+$$\ln(INNOV_{i,t}) = \beta_0 + \beta_1 \ln(DIG\_INV_{i,t-1}) + \beta_2 \ln(RD_{i,t-1}) + \beta_3 HC_{i,t} + \beta_4 I_{DIS, i,t} + \alpha_i + \gamma_t + \varepsilon_{i,t}$$
+
+Bu yerda:
+– $INNOV_{i,t}$ — $i$-korxonaning $t$-yildagi innovatsion mahsulotlar sotuvidan tushgan sof daromadi (mlrd so‘m);
+– $DIG\_INV_{i,t-1}$ — o‘tgan davrda raqamli texnologiyalar va dasturiy ta’minotga kiritilgan investitsiyalar hajmi (1 yillik lag bilan olingan, chunki investitsiyalar samarasi keyingi yilda namoyon bo‘ladi);
+– $RD_{i,t-1}$ — o‘tgan davrdagi ITTKI (R&D) xarajatlari hajmi;
+– $HC_{i,t}$ — korxonada raqamli ko‘nikmalarga ega muhandis-texnik xodimlarning umumiy xodimlar sonidagi ulushi (%);
+– $I_{DIS, i,t}$ — korxonaning raqamli-innovatsion salohiyat integral indeksi;
+– $\alpha_i$ — korxonaga xos o‘zgarmas effektlar; $\gamma_t$ — vaqt effektlari; $\varepsilon_{i,t}$ — tasodifiy xatolik.
+
+2-jadval. Ekonometrik modellashtirish natijalari (Fixed Effects vs Random Effects)
+
+| O‘zgaruvchilar | Model 1 (OLS) | Model 2 (Fixed Effects) | Model 3 (Random Effects) | Standart xatolik (FE) |
+|---|---|---|---|---|
+| $\ln(DIG\_INV_{t-1})$ | 0,312*** | 0,248*** | 0,275*** | (0,041) |
+| $\ln(RD_{t-1})$ | 0,285*** | 0,219*** | 0,241*** | (0,038) |
+| $HC_{i,t}$ | 0,044** | 0,039*** | 0,041*** | (0,011) |
+| $I_{DIS, i,t}$ | 1,420*** | 1,185*** | 1,290*** | (0,215) |
+| Konstanta ($\beta_0$) | 2,145*** | 2,890*** | 2,512*** | (0,340) |
+| Kuzatuvlar soni ($N$) | 336 | 336 | 336 | — |
+| $R^2$ (within / overall) | 0,742 | 0,814 | 0,796 | — |
+| Xausman testi (Hausman test) | — | $\chi^2 = 18,64$ ($p = 0,0009$) | — | — |
+
+Izoh: *** $p < 0,01$, ** $p < 0,05$ darajada statistik ahamiyatli.
+
+Xausman testi natijasi ($p = 0,0009$) qat’iy effektli modelning (Fixed Effects) afzalligini tasdiqladi. Model natijalariga ko‘ra, raqamli texnologiyalarga yo‘naltirilgan investitsiyalarning 1 foizga oshishi keyingi yilda innovatsion mahsulotlar hajmini o‘rtacha 0,248 foizga oshiradi. Eng muhimi, raqamli investitsiyalar va inson kapitali ($HC$) ko‘rsatkichlarining birgalikdagi sinergik ta’siri alohida kiritilgan investitsiyalarga nisbatan 1,4 barobar yuqori samara berishi isbotlandi. Эконометрический анализ наглядно подтверждает гипотезу о том, что внедрение цифровых инструментов без параллельного повышения цифровых компетенций персонала не приводит к максимальному росту инновационной отдачи.
+
+3.3. Sanoat korxonalarida innovatsion strategiyani amalga oshirishning «Yo‘l xaritasi» va kutilayotgan ijtimoiy-iqtisodiy samaradorlik
+
+Tadqiqot natijalari asosida O‘zbekiston sanoat korxonalari uchun 2026–2030-yillarga mo‘ljallangan bosqichma-bosqich raqamli-innovatsion transformatsiya «Yo‘l xaritasi» ishlab chiqildi:
+– I bosqich (2026–2027-yillar — Tayyorgarlik va raqamli audit): barcha yirik va o‘rta sanoat korxonalarida $I_{DIS}$ metodikasi asosida majburiy raqamli-innovatsion audit o‘tkazish, ishlab chiqarish uskunalarini yagona axborot tarmog‘iga ulash va ma’lumotlarni standartlashtirish.
+– II bosqich (2028–2029-yillar — Integratsiya va ekotizimlashtirish): tarmoqlararo «Ochiq raqamli innovatsiyalar platformasi»ni ishga tushirish, korxonalarda raqamli egizaklar (Digital Twins) va sun’iy intellektga asoslangan sifat nazorati tizimlarini joriy etish.
+– III bosqich (2030-yil — Intellektual ishlab chiqarishga o‘tish): to‘liq avtomatlashtirilgan «Aqlli fabrika» (Smart Factory) standartlariga o‘tish va eksportbop yuqori texnologiyali mahsulotlar ulushini oshirish.
+
+Prognoz hisob-kitoblariga ko‘ra, taklif etilayotgan tashkiliy-iqtisodiy mexanizmlarning joriy etilishi 2030-yilga borib:
+1) O‘zbekiston sanoat korxonalarida innovatsion faol korxonalar ulushini 6,9 foizdan 16,5 foizgacha yetkazishga;
+2) Sanoatda mehnat unumdorligini qo‘shimcha 28–32 foizga oshirishga;
+3) Ishlab chiqarish xarajatlarini (energiya sarfi va brak mahsulotlar ulushini kamaytirish hisobiga) o‘rtacha 14–18 foizga qisqartirishga imkon beradi.
+
+================================================================================
+XULOSA VA TAKLIFLAR (ЗАКЛЮЧЕНИЕ И РЕКОМЕНДАЦИИ)
+================================================================================
+
+Olib borilgan nazariy, uslubiy va empirik tadqiqotlar natijasida quyidagi asosiy xulosalarga kelindi:
+
+1. Raqamli iqtisodiyot sharoitida korxonaning innovatsion salohiyati statik resurslar yig‘indisi emas, balki raqamli texnologiyalar vositasida tashkilotning ichki va tashqi bilimlar oqimini tezkorlik bilan yangi qiymatga aylantira olish dinamik qobiliyatidir.
+2. Jahon tajribasi (Germaniya, Janubiy Koreya, Xitoy) shuni ko‘rsatadiki, sanoatni raqamli transformatsiya qilishda muvaffaqiyatga erishish uchun nafaqat yirik korporatsiyalarni, balki o‘rta va kichik sanoat subyektlarini ham davlat-xususiy sheriklik va maqsadli subsidiyalar orqali texnologik yangilash zarur.
+3. Muallif tomonidan ishlab chiqilgan «Raqamli-innovatsion salohiyatning integral indeksi» ($I_{DIS}$) sanoat korxonalarining zaif bo‘g‘inlarini aniq diagnostika qilish va investitsiya resurslarini ustuvor yo‘nalishlarga manzilli taqsimlash imkonini beradi.
+4. Ekonometrik tahlil natijalari raqamli infratuzilmaga kiritilgan investitsiyalarning innovatsion mahsulotlar hajmiga ijobiy ta’siri faqat kadrlarning raqamli kompetensiyalari bilan uyg‘unlashganda maksimal darajaga yetishini isbotladi.
+5. Внедрение предложенной многоуровневой цифрово-инновационной экосистемы и механизма «цифровых инновационных ваучеров» позволит преодолеть институциональный разрыв между научными организациями и промышленными предприятиями Узбекистана, обеспечив устойчивый рост конкурентоспособности национальной экономики.
+
+================================================================================
+FOYDALANILGAN ADABIYOTLAR RO‘YXATI (СПИСОК ИСПОЛЬЗОВАННОЙ ЛИТЕРАТУРЫ)
+================================================================================
+
+1. O‘zbekiston Respublikasi Prezidentining 2023-yil 11-sentyabrdagi «“O‘zbekiston – 2030” strategiyasi to‘g‘risida»gi PF-158-son Farmoni // Qonunchilik ma’lumotlari milliy bazasi, 12.09.2023-y., 06/23/158/0694-son.
+2. O‘zbekiston Respublikasining «Innovatsion faoliyat to‘g‘risida»gi Qonuni, 2020-yil 24-iyul, O‘RQ-630-son.
+3. Schumpeter J. A. The Theory of Economic Development: An Inquiry into Profits, Capital, Credit, Interest, and the Business Cycle. – Cambridge, MA: Harvard University Press, 1934. – 255 p.
+4. Teece D. J. Explicating dynamic capabilities: the nature and microfoundations of (sustainable) enterprise performance // Strategic Management Journal. – 2007. – Vol. 28(13). – P. 1319–1350.
+5. Chesbrough H. Open Innovation: The New Imperative for Creating and Profiting from Technology. – Boston: Harvard Business School Press, 2003. – 227 p.
+6. Westerman G., Bonnet D., McAfee A. Leading Digital: Turning Technology into Business Transformation. – Boston: Harvard Business Review Press, 2014. – 292 p.
+7. Глазьев С. Ю. Управление развитием экономики: курс лекций. – Москва: МГУ, 2019. – 759 с.
+8. Аньшин В. М., Дагаев А. А. Инновационный менеджмент: Концепции, многоуровневые стратегии и механизмы инновационного развития. – Москва: Дело, 2020. – 584 с.
+9. Клейнер Г. Б. Экономика экосистем: шаг в будущее // Экономическое возрождение России. – 2019. – № 1(59). – С. 40–45.
+10. Гулямов С. С., Аюпов Р. Х., Абдуллаев О. М., Балтабаева Г. Р. Рақамли иқтисодиётда блокчейн технологиялари. – Тошкент: ТМИ, 2019. – 447 б.
+11. Ходиев Б. Ю., Мустафакулов Ш. И. Ўзбекистон иқтисодиётини инновацион ривожлантиришнинг стратегик йўналишлари. – Тошкент: Иқтисодиёт, 2021. – 312 б.
+12. Kagermann H., Wahlster W., Helbig J. Recommendations for implementing the strategic initiative INDUSTRIE 4.0. – Frankfurt: Acatech, 2013. – 82 p.
+13. UNIDO. Industrial Development Report 2024: Turning Challenges into Sustainable Solutions. – Vienna: United Nations Industrial Development Organization, 2024. – 198 p.
+14. O‘zbekiston Respublikasi Prezidenti huzuridagi Statistika agentligi rasmiy veb-sayti: https://stat.uz
+
+================================================================================
+ILOVALAR (ПРИЛОЖЕНИЯ)
+================================================================================
+
+1-ilova. Sanoat korxonalarining raqamli-innovatsion salohiyatini baholash bo‘yicha diagnostik anketa tuzilmasi (Фрагмент анкеты экспертного опроса)
+2-ilova. 48 ta sanoat korxonasi bo‘yicha $I_{DIS}$ integral indeksi hisob-kitob matritsasi
+3-ilova. «O‘zAuto Motors» AJ va «Navoiyazot» AJ korxonalarida tadqiqot natijalarini joriy etish dalolatnomalari (Акты внедрения результатов диссертационного исследования)

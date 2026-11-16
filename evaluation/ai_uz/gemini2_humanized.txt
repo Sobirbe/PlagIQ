@@ -1,0 +1,196 @@
+===== ARTICLE 7: SOCIOLOGY & DEMOGRAPHY =====
+
+MAVZU: O‘ZBEKISTON YOSHLARI ORASIDA ICHKI VA TASHQI MEHNAT MIGRATSIYASINING OILAVIY QADRIYATLARGA TA’SIRI: SOTSIOLOGIK TAHLIL
+
+KIRISH
+Bugungi globallashuv va bozor munosabatlari chuqurlashib borayotgan bir sharoitda mehnat resurslarining hududiy harakatchanligi nafaqat iqtisodiy, balki murakkab ijtimoiy-madaniy hodisaga aylanib ulgurdi. O‘zbekiston aholisining qariyb yarmini yoshlar tashkil etishini inobatga olsak, ularning ish izlab yirik shaharlarga (xususan, Toshkent shahriga) yoki xorijiy davlatlarga yo‘l olishi an’anaviy o‘zbek oilasi institutida sezilarli o‘zgarishlarni yuzaga keltirmoqda. Bir tomondan, migrantlarning pul o‘tkazmalari oilalarning moddiy farovonligini ta’minlayotgan bo‘lsa, ikkinchi tomondan, er-xotinning uzoq muddat ayro yashashi, farzandlar tarbiyasining bobo-buvilar zimmasiga tushishi va shahar muhitiga moslashuv natijasida yoshlarning nikoh va oilaga bo‘lgan qarashlari transformatsiyaga uchramoqda. Ushbu maqolada aynan mana shu ijtimoiy siljishlarning asl sabablari va oqibatlarini empirik ma’lumotlar asosida tahlil qilishga harakat qilindi.
+
+ADABIYOTLAR SHARHI
+Migratsiya jarayonlarining oila institutiga ta’siri jahon sotsiologiyasida "transmilliy oilalar" (transnational families) konsepsiyasi doirasida keng o‘rganilgan. Jumladan, R. Parrenyas (2005) o‘z tadqiqotlarida ota-onalardan birining xorijda ishlashi bolalarning psixo-emotsional holatiga va oilaviy rollar taqsimotiga jiddiy ta’sir ko‘rsatishini asoslab bergan. MDH mamlakatlari misolida V. Mukomel (2019) mehnat migrantlarining qabul qiluvchi jamiyat me’yorlarini o‘zlashtirishi natijasida ularning an’anaviy patriarxal qarashlari yumshab borishini qayd etadi. O‘zbekistonlik sotsiologlardan M. Bekmurodov va A. Xolbekovlar oila sotsiologiyasi va yoshlar ijtimoiylashuvi masalalarini atroflicha yoritgan bo‘lsalar-da, so‘nggi yillardagi ichki va tashqi migratsiya to‘lqinlarining yosh oilalardagi ajrimlar hamda gender rollari o‘zgarishiga ta’siri yetarlicha qiyosiy o‘rganilmagan.
+
+TAKLIF ETILAYOTGAN MODEL
+Tadqiqot jarayonida miqdoriy (anketa so‘rovi) va sifat (chuqurlashtirilgan intervyu) usullari uyg‘unlashtirildi. Respondentlarning an’anaviy oilaviy qadriyatlarga sodiqlik darajasini o‘lchash uchun 5 ballik Likert shkalasiga asoslangan "Oilaviy qadriyatlar transformatsiyasi indeksi" ($I_{OQT}$) ishlab chiqildi. Omillar o‘rtasidagi bog‘liqlikni aniqlash maqsadida tartibli logistik regressiya (Ordered Logit) modelidan foydalanildi:
+
+$$P(Y_i \le j) = \frac{\exp(\alpha_j - \sum_{k=1}^{m} \beta_k X_{ik})}{1 + \exp(\alpha_j - \sum_{k=1}^{m} \beta_k X_{ik})}$$
+
+Bu yerda $Y_i$ — $i$-respondentning oilaviy qadriyatlarga munosabat darajasi ($j = 1, \dots, 5$); $\alpha_j$ — chegara parametrlari; $X_{ik}$ — mustaqil o‘zgaruvchilar (migratsiya davomiyligi, migratsiya turi — ichki yoki tashqi, ma’lumot darajasi, yosh va jins).
+
+MA’LUMOTLAR VA BAHOLASH NATIJALARI
+Sotsiologik so‘rov 2024-yilning kuzida Farg‘ona, Samarqand va Qashqadaryo viloyatlaridan Toshkent shahriga hamda xorijga (Rossiya, Qozog‘iston, Janubiy Koreya) ishlash uchun ketgan 18–35 yoshdagi 640 nafar yoshlar va ularning oila a’zolari o‘rtasida o‘tkazildi. Natijalar shuni ko‘rsatdiki, 2 yildan ortiq vaqt davomida tashqi migratsiyada bo‘lgan yoshlar orasida nikohga individual tanlov sifatida qarash (ota-ona roziligidan ko‘ra shaxsiy qarorni ustun qo‘yish) ko‘rsatkichi migratsiyada bo‘lmagan tengdoshlariga nisbatan 34,2% ga yuqori ($p < 0,01$). Shuningdek, ichki migrantlar (ayniqsa, poytaxtda doimiy ishlovchi yosh ayollar) orasida oilada ayolning iqtisodiy mustaqilligi muhimligi haqidagi fikr 68,5% respondentlar tomonidan qo‘llab-quvvatlangan. Biroq, respondentlarning 41% i uzoq muddatli ayriliq er-xotin o‘rtasidagi hissiy begonalashuvga sabab bo‘layotganini tan olgan.
+
+MUHOKAMA
+Olingan raqamlar shundan dalolat beradiki, migratsiya yoshlar ongida o‘ziga xos "madaniy gibridlik"ni shakllantirmoqda. Yoshlar bir vaqtning o‘zida ham milliy urf-odatlar (masalan, ota-onani moddiy ta’minlash burchi)ni saqlab qolishga intilmoqda, ham zamonaviy shahar hayotiga xos egalitar (teng huquqli) oilaviy munosabatlarni o‘zlashtirmoqda. Shu o‘rinda bir jihatni alohida ta’kidlash joiz: tashqi migratsiyadan farqli o‘laroq, ichki migratsiya oilalarning butunlay parchalanishiga emas, balki ularning nuklearlashuviga (katta oiladan alohida yashashga intilishiga) ko‘proq turtki bermoqda. Albatta, so‘rov natijalarida respondentlarning ijtimoiy maqbul javob berishga moyilligi ma’lum darajada cheklov sifatida qaralishi mumkin.
+
+XULOSA
+Xulosa o‘rnida aytish mumkinki, mehnat migratsiyasi o‘zbek oilasini inqirozga emas, balki tarkibiy va funksional qayta moslashuvga olib kelmoqda. Davlat yoshlar siyosati va oilani qo‘llab-quvvatlash dasturlarini ishlab chiqishda migrant oilalarga psixologik-huquqiy maslahat xizmatlarini kengaytirish hamda ichki mehnat bozorida munosib ish o‘rinlarini yaratish orqali majburiy uzoq muddatli ayriliqlarning oldini olish muhim ahamiyatga ega.
+
+ADABIYOTLAR VA QISQARTMALAR
+1. Parreñas R. S. Children of Global Migration: Transnational Families and Gendered Woes. – Stanford: Stanford University Press, 2005. – 212 p.
+2. Мукомель В. И. Трансформация семейных ценностей трудовых мигрантов в мегаполисах // Социологические исследования. – 2019. – № 4. – С. 78–89.
+3. Bekmurodov M. B. O‘zbek mentaliteti: kecha va bugun. – Toshkent: Yangi asr avlodi, 2021. – 192 b.
+Qisqartmalar: MDH — Mustaqil Davlatlar Hamdo‘stligi; OQT — Oilaviy qadriyatlar transformatsiyasi.
+
+
+===== ARTICLE 8: HISTORY & ARCHAEOLOGY =====
+
+MAVZU: SO‘G‘D SAVDO YO‘LLARIDA PUL MUOMALASI VA TANGASHUNOSLIK MANBALARI (VI–VIII ASRLAR)
+
+KIRISH
+Buyuk Ipak yo‘lining markaziy bo‘g‘inida joylashgan So‘g‘d vohasi ilk o‘rta asrlarda Yevroosiyo qit’asidagi xalqaro savdo va madaniy almashinuvning asosiy harakatlantiruvchi kuchlaridan biri bo‘lgan. VI–VIII asrlarda so‘g‘d savdogarlari nafaqat Xitoydan Vizantiyagacha bo‘lgan karvon yo‘llarini nazorat qilganlar, balki o‘zlarining rivojlangan moliya-pul tizimini ham shakllantirganlar. Arxeologik qazishmalar davomida Panjikent, Samarqand (Afrosiyob), Buxoro va Poykend yodgorliklaridan topilgan ko‘plab mis va kumush tangalar o‘sha davrning siyosiy tarixi, hukmdorlar sulolasi hamda ichki va tashqi bozor munosabatlarini o‘rganishda bebaho birlamchi manba bo‘lib xizmat qiladi. Ushbu tadqiqotda VI–VIII asrlarga oid So‘g‘d tangalarining metrologik xususiyatlari va ularning mintaqaviy savdo integratsiyasidagi o‘rni tahlil qilinadi.
+
+ADABIYOTLAR SHARHI
+So‘g‘d numizmatikasini ilmiy jihatdan tizimlashtirishga O. Smirnova (1963, 1981) ulkan hissa qo‘shgan bo‘lib, u Panjikent tangalari katalogini tuzish orqali So‘g‘d ixshidlarining xronologiyasini aniqlashtirgan. E. Rtveladze (2002) O‘rta Osiyo pul muomalasi tarixini o‘rganar ekan, So‘g‘dda Xitoy tipidagi to‘rtburchak teshikli mis tangalarning zarb etilishi Uzoq Sharq bilan savdo aloqalarining bevosita natijasi ekanligini ta’kidlaydi. So‘nggi yillarda A. Naymark va M. Baratovalar tomonidan Buxoro vohasi tangalari («buxorxudot» dirhamlari) va ularning tarkibidagi kumush miqdori bo‘yicha qiziqarli kuzatuvlar e’lon qilindi. Shunga qaramay, turli So‘g‘d mulklari (Samarqand, Kesh, Naxshab, Choch) tangalarining vazn standartlari o‘zaro qanday muvofiqlashtirilgani masalasi hali ham bahsli bo‘lib qolmoqda.
+
+TAKLIF ETILAYOTGAN MODEL
+Tadqiqotda tarixiy-qiyosiy tahlil, paleografik o‘qish hamda tangalarning kimyoviy tarkibini buzmasdan aniqlovchi rentgen-fluoressent tahlil (XRF) usullaridan foydalanildi. Turli davrlarda zarb etilgan tangalarning qadrsizlanish (inflyatsiya) darajasini aniqlash uchun tanga tarkibidagi qimmatbaho metall ulushi va uning og‘irligi o‘rtasidagi nisbatni ifodalovchi "Real tanga qiymati indeksi" ($V_r$) hisoblandi:
+
+$$V_r = \frac{W_a \cdot C_m}{W_s}$$
+
+Bu yerda $W_a$ — topilgan tangalarning o‘rtacha haqiqiy vazni (grammda); $C_m$ — qotishma tarkibidagi sof kumush yoki misning foiz ulushi; $W_s$ — mazkur nominal uchun qabul qilingan dastlabki etalon vazn.
+
+MA’LUMOTLAR VA BAHOLASH NATIJALARI
+Tahlil uchun Samarqand davlat muzey-qo‘riqxonasi fondlari va 2019–2024-yillarda Afrosiyob hamda Kofirqal’a yodgorliklarida o‘tkazilgan arxeologik qazishmalar chog‘ida topilgan 485 dona tanga o‘rganildi. Metrologik o‘lchovlar shuni ko‘rsatdiki, VII asrning ikkinchi yarmida hukmronlik qilgan ixshid Varxuman davriga oid Xitoy namunasidagi mis tangalarning o‘rtacha vazni $3,42 \pm 0,18\text{ g}$ ni tashkil etgan bo‘lsa, VIII asr boshlariga (Devashtich davri) kelib bu ko‘rsatkich $2,15 \pm 0,24\text{ g}$ gacha pasaygan ($V_r$ indeksi 1,00 dan 0,63 gacha tushgan). Buxorxudot dirhamlarining XRF tahlili esa VII asr oxirlarida kumush probasi 82–85% atrofida bo‘lganini, arab istilosidan keyingi dastlabki o‘n yilliklarda esa mis qo‘shilishi hisobiga 54–60% gacha kamayganini ko‘rsatdi.
+
+MUHOKAMA
+Tangalar vaznining VII asr oxiri va VIII asr boshlarida izchil kamayib borishi tasodifiy holat emas. Bu davr So‘g‘d konfederatsiyasi uchun bir tomondan Turk xoqonligi bilan murakkab munosabatlar, ikkinchi tomondan esa arab qo‘shinlarining Movarounnahrga yurishlari bilan tavsiflanadi. Harbiy xarajatlarning keskin ortishi va karvon savdosidagi uzilishlar mahalliy hukmdorlarni tanga vaznini kamaytirish orqali qo‘shimcha emissiya qilishga majbur etgan. Qizig‘i shundaki, tashqi ko‘rinishi Xitoy *kayyuan tunbao* tangalariga taqlidan quyilgan mahalliy mis tangalar faqat ichki chakana savdo uchun xizmat qilgan bo‘lsa, yirik xalqaro bitimlarda kumush dirhamlar va og‘irlik o‘lchov birligi — kumush yombilar asosiy to‘lov vositasi bo‘lib qolavergan.
+
+XULOSA
+VI–VIII asrlarda So‘g‘d vohasida pul muomalasi yuksak darajada tashkil etilgan bo‘lib, u ham xalqaro savdo talablariga, ham ichki bozor ehtiyojlariga moslashuvchan tizim edi. Tangashunoslik manbalarining metrologik va kimyoviy tahlili yozma manbalarda kam yoritilgan siyosiy-iqtisodiy inqiroz davrlarini aniq xronologik jihatdan qayta tiklash imkonini beradi.
+
+ADABIYOTLAR VA QISQARTMALAR
+1. Смирнова О. И. Сводный каталог согдийских монет. Бронза. – Москва: Наука, 1981. – 548 с.
+2. Ртвеладзе Э. В. Древние и раннесредневековые монеты историко-культурных областей Узбекистана. – Ташкент: Media Land, 2002. – 240 с.
+3. Naymark A. Coins of Bukharan Sogd // Numismatic Chronicle. – 2018. – Vol. 178. – P. 215–244.
+Qisqartmalar: XRF — Rentgen-fluoressent tahlil.
+
+
+===== ARTICLE 9: ARCHITECTURE & URBAN PLANNING =====
+
+MAVZU: TOSHKENT SHAHRI MISOLIDA "ISSIQLIK OROLI" EFFEKTINI KAMAYTIRISHDA YASHIL INFRATUZILMA VA LANDSHAFT REJALASHTIRISHNING ROLI
+
+KIRISH
+So‘nggi o‘n yillikda Toshkent shahrida urbanizatsiya jarayonlarining jadallashuvi, ko‘p qavatli binolar zichligining ortishi va asfalt-beton qoplamali maydonlarning kengayishi shahar mikroiqlimida jiddiy o‘zgarishlarga olib kelmoqda. Ayniqsa, yoz oylarida shahar markaziy qismlarining atrofdagi qishloq hududlariga nisbatan sezilarli darajada qizib ketishi — ya’ni "Shahar issiqlik oroli" (Urban Heat Island — UHI) effekti aholi salomatligi va energiya iste’moliga salbiy ta’sir ko‘rsatmoqda. Konditsionerlar va sovutish tizimlariga bo‘lgan talabning ortishi elektr tarmoqlariga tushadigan yuklamani oshirmoqda. Shu nuqtai nazardan, shaharsozlik amaliyotida yashil infratuzilma elementlarini (ekologik koridorlar, cho‘ntak bog‘lar, vertikal ko‘kalamzorlashtirish) ilmiy asoslangan holda joylashtirish dolzarb me’moriy-ekologik vazifadir.
+
+ADABIYOTLAR SHARHI
+Shahar issiqlik oroli fenomeni va uni yumshatish yo‘llari zamonaviy urbanistikada keng tadqiq etilgan. T. Oke (1982) shahar geometriyasining ("shahar kanyoni" effekti) quyosh radiatsiyasini yutish va tungi sovishni sekinlashtirishdagi rolini nazariy jihatdan asoslab bergan. M. Santamouris (2020) o‘zining qiyosiy tadqiqotlarida shahar ichidagi yashil hududlar va suv havzalarining kombinatsiyasi havo haroratini o‘rtacha $1,5^\circ\text{C}$ dan $3,5^\circ\text{C}$ gacha pasaytirishi mumkinligini ko‘rsatgan. Mahalliy olimlardan A. Qodirov va D. Zokirovalar Toshkent shahrining yashil zonasini rivojlantirish va arid iqlim sharoitiga mos daraxt turlarini tanlash bo‘yicha qimmatli tavsiyalar bergan bo‘lsalar-da, masofaviy zondlash (sun’iy yo‘ldosh tasvirlari) ma’lumotlari asosida tumanlar kesimidagi issiqlik anomaliyalarini modellashtirish yetarlicha o‘rganilmagan.
+
+TAKLIF ETILAYOTGAN MODEL
+Tadqiqotda geoinformatsion tizimlar (GIS) va Landsat-8/9 sun’iy yo‘ldoshlarining issiqlik diapazonidagi (TIRS) tasvirlari asosida Yer sirti harorati ($LST$ — Land Surface Temperature) hamda Normallashtirilgan farqli o‘simlik indeksi ($NDVI$) hisoblandi. Yashil qoplam zichligining haroratga ta’sirini miqdoriy baholash uchun fazoviy regressiya modeli qurildi:
+
+$$LST_i = \beta_0 + \beta_1 NDVI_i + \beta_2 NDBI_i + \beta_3 DIST_{water, i} + \varepsilon_i$$
+
+Bu yerda $LST_i$ — $i$-hududning yer sirti harorati ($^\circ\text{C}$); $NDVI_i$ — o‘simlik qoplami indeksi; $NDBI_i$ — qurilish zichligi indeksi (Normalized Difference Built-up Index); $DIST_{water, i}$ — eng yaqin kanal yoki suv havzasigacha bo‘lgan masofa (metrda).
+
+MA’LUMOTLAR VA BAHOLASH NATIJALARI
+Tahlil uchun 2020–2025-yillarning iyul oyidagi bulutsiz kunlarga oid sun’iy yo‘ldosh tasvirlari hamda Toshkent shahrining 12 ta tumani bo‘yicha yer usti meteorologik kuzatuv ma’lumotlari olindi. Hisob-kitoblar shuni ko‘rsatdiki, qurilish zichligi yuqori va daraxtzorlari kam bo‘lgan Sergeli hamda Chilonzor tumanlarining ayrim sanoat-turar joy massivlarida kunduzgi sirt harorati $46,8^\circ\text{C}$ gacha yetgan. Aksincha, Botanika bog‘i, Milliy bog‘ va Bo‘zsuv kanali bo‘yidagi yashil hududlarda ushbu ko‘rsatkich $35,2^\circ\text{C}$ atrofida qayd etildi (farq $11,6^\circ\text{C}$). Regression tahlil $NDVI$ ko‘rsatkichining 0,1 birlikka oshishi yer sirti haroratini o‘rtacha $1,85^\circ\text{C}$ ga pasaytirishini ($R^2 = 0,78; p < 0,001$) isbotladi.
+
+MUHOKAMA
+Olingan natijalar shuni anglatadiki, shahar ichida yagona yirik bog‘ yaratishdan ko‘ra, bir-biri bilan kanallar va daraxtzor xiyobonlar orqali bog‘langan kichik yashil hududlar tarmog‘ini shakllantirish mikroiqlimni yaxshilashda ancha samaraliroqdir. Ayniqsa, Toshkentning tarixiy ariq va kanallar tizimini qayta tiklash suvning bug‘lanishi (evapotranspiratsiya) hisobiga tabiiy sovutish koridorlarini yaratadi. Biroq, amaliyotda ko‘p qavatli uylar orasidagi bo‘sh maydonlarning avtoturargohlarga aylantirilishi va keng bargli mahalliy daraxtlar (chinor, eman, qayrag‘och) o‘rniga soyasi kam manzarali butalarning ekilishi bu samarani pasaytirib yubormoqda.
+
+XULOSA
+Toshkent shahrining bosh rejasini amalga oshirishda "issiqlik oroli" effektini yumshatish asosiy ekologik mezonlardan biri sifatida belgilanishi lozim. Yangi turar joy majmualarini loyihalashda kamida 30% hududni ko‘p yarusli yashil zonalar uchun ajratish, och rangli va issiqlik qaytaruvchi tom qoplamalaridan foydalanish shahar iqlimiy barqarorligini ta’minlashga xizmat qiladi.
+
+ADABIYOTLAR VA QISQARTMALAR
+1. Oke T. R. The energetic basis of the urban heat island // Quarterly Journal of the Royal Meteorological Society. – 1982. – Vol. 108(455). – P. 1–24.
+2. Santamouris M. Recent progress on urban overheating and heat island research // Energy and Buildings. – 2020. – Vol. 207. – P. 109482.
+3. Qodirov A. Sh. Shaharsozlik ekologiyasi va landshaft arxitekturasi asoslari. – Toshkent: TAQI nashriyoti, 2022. – 176 b.
+Qisqartmalar: UHI — Shahar issiqlik oroli; GIS — Geoinformatsion tizimlar; LST — Yer sirti harorati; NDVI — Normallashtirilgan farqli o‘simlik indeksi.
+
+
+===== ARTICLE 10: PSYCHOLOGY & COGNITIVE SCIENCE =====
+
+MAVZU: O‘SMIRLARDA RAQAMLI O‘YINLARGA TOBELIK (GAMING DISORDER) VA KOGNITIV NAZORAT FUNKSIYALARI O‘RTASIDAGI BOG‘LIQLIKNING PSIXODIAGNOSTIK TAHLILI
+
+KIRISH
+Raqamli texnologiyalar va smartfonlarning kundalik hayotga chuqur kirib kelishi o‘smirlarning bo‘sh vaqtini o‘tkazish shakllarini tubdan o‘zgartirib yubordi. Jahon sog‘liqni saqlash tashkiloti (JSST) tomonidan Kasalliklarning xalqaro tasnifi 11-qayta ko‘rib chiqishiga (ICD-11) "O‘yin buzilishi" (Gaming Disorder) mustaqil klinik birlik sifatida kiritilishi ushbu muammoning naqadar jiddiy ekanligini ko‘rsatadi. O‘smirlik davrida bosh miyaning prefrontal korteksi — ya’ni rejalashtirish, impulslarni tiyish va diqqatni taqsimlash uchun mas’ul bo‘lgan ijroiya funksiyalari (Executive Functions) hali to‘liq shakllanib ulgurmagan bo‘ladi. Ko‘p soatlik onlayn o‘yinlar miyaning mukofotlash tizimini (dopaminergik yo‘llarni) haddan tashqari stimulyatsiya qilib, o‘quv motivatsiyasi va kognitiv nazoratning susayishiga olib kelishi mumkin. Ushbu maqolada o‘zbekistonlik o‘smirlar misolida raqamli o‘yinlarga qaramlik darajasi va kognitiv moslashuvchanlik o‘rtasidagi bog‘liqlik empirik jihatdan o‘rganildi.
+
+ADABIYOTLAR SHARHI
+Raqamli o‘yinlarning kognitiv jarayonlarga ta’siri psixologiya fanida ikki xil yondashuv asosida talqin qilinadi. D. Bavelier va S. Grin (2019) harakatli (action) videoo‘yinlar vizual-fazoviy diqqat va reaksiya tezligini oshirishi mumkinligini ta’kidlagan bo‘lsalar-da, M. Griffits va D. Kuss (2021) nazoratsiz o‘yin o‘ynash impulslarni boshqarish (inhibitory control) qobiliyatini izdan chiqarishi va akademik o‘zlashtirishni pasaytirishini isbotlaganlar. Mahalliy psixologlardan G‘. Shoumarov va Z. Nishonova o‘smirlik davri inqirozlari va deviant xulq-atvor psixologiyasini chuqur tadqiq etganlar. Biroq, maktab o‘quvchilarida kompyuter va mobil o‘yinlarga tobelikning ishchi xotira (working memory) hamda diqqat barqarorligiga ta’sirini neyropsixologik testlar yordamida baholash bo‘yicha tadqiqotlar kamchilikni tashkil etadi.
+
+TAKLIF ETILAYOTGAN MODEL
+Tadqiqotda o‘yinlarga qaramlik darajasini aniqlash uchun Lemmensning "O‘yinlarga qaramlik shkalasi" (GAS-7 — Game Addiction Scale) o‘zbek tiliga moslashtirilgan varianti, kognitiv nazoratni baholash uchun esa Stroup testi (Stroop Color and Word Test) va Korci bloklari (Corsi Block-Tapping Task — fazoviy ishchi xotirani o‘lchash uchun) qo‘llanildi. Kognitiv nazorat indeksi ($KNI$) va o‘yin vaqti o‘rtasidagi chiziqli bo‘lmagan bog‘liqlikni tekshirish uchun kvadratik regressiya modeli ishlatildi:
+
+$$KNI_i = \beta_0 + \beta_1 T_{game, i} + \beta_2 T_{game, i}^2 + \beta_3 GAS_i + \beta_4 SEX_i + \varepsilon_i$$
+
+Bu yerda $KNI_i$ — Stroup interferensiya ko‘rsatkichi va ishchi xotira hajmidan tashkil topgan integrallashgan kognitiv ball; $T_{game, i}$ — kunlik o‘yin o‘ynash vaqti (soatlarda); $GAS_i$ — qaramlik shkalasi bali; $SEX_i$ — jins ko‘rsatkichi.
+
+MA’LUMOTLAR VA BAHOLASH NATIJALARI
+Tadqiqotga Toshkent shahri va Toshkent viloyatidagi 4 ta umumta’lim maktabining 8–10-sinflarida tahsil oluvchi 280 nafar o‘smir (14–16 yosh, 152 nafar o‘g‘il bola va 128 nafar qiz bola) jalb qilindi. Diagnostika natijalariga ko‘ra, ishtirokchilarning 14,6% ida (asosan o‘g‘il bolalarda) o‘yinlarga tobelikning yuqori xavfi (GAS-7 > 21 ball) aniqlandi. Tahlil shuni ko‘rsatdiki, kuniga 1–1,5 soatgacha o‘yin o‘ynaydigan o‘smirlarda fazoviy ishchi xotira ko‘rsatkichi o‘ynamaydiganlarga nisbatan biroz yuqori bo‘lgan ($p < 0,05$), biroq kunlik o‘yin vaqti 3,5 soatdan oshganda Stroup testidagi xatolar soni keskin ortib, kognitiv nazorat indeksi 28,4% ga pasaygan ($\beta_2 = -1,42; p < 0,001$).
+
+MUHOKAMA
+Tadqiqotning eng muhim topilmasi shundaki, raqamli o‘yinlar va kognitiv funksiyalar o‘rtasidagi bog‘liqlik to‘g‘ri chiziqli emas, balki teskari U-shaklidagi (inverted-U) egri chiziqqa ega. Ya’ni, me’yoriy va qisqa muddatli o‘yinlar diqqatni jamlashni mashq qildirishi mumkin, ammo o‘yin vaqti nazoratdan chiqib, uyqu rejimini buzganida va virtual olam real muloqot o‘rnini egallaganida miyaning tormozlovchi nazorat mexanizmlari charchaydi. Bu esa o‘smirlarda tez asabiylashish, diqqatning tarqoqligi va o‘quv materiallarini eslab qolish qiyinchiligiga olib keladi.
+
+XULOSA
+O‘smirlarda raqamli o‘yinlarga tobelikning oldini olishda taqiqlash usullaridan ko‘ra, "raqamli gigiyena" madaniyatini shakllantirish va o‘quvchilarning bo‘sh vaqtini sport hamda ijodiy to‘garaklar bilan to‘ldirish samaraliroqdir. Maktab psixologlari amaliyotiga GAS-7 skrining so‘rovnomasini joriy etish xavf guruhidagi o‘smirlarni erta bosqichda aniqlash va ularga manzilli psixokorreksion yordam ko‘rsatish imkonini beradi.
+
+ADABIYOTLAR VA QISQARTMALAR
+1. Bavelier D., Green C. S. Enhancing Attentional Control: Lessons from Action Video Games // Neuron. – 2019. – Vol. 104(1). – P. 147–163.
+2. Kuss D. J., Griffiths M. D. Internet Gaming Addiction: A Systematic Review of Empirical Research // International Journal of Mental Health and Addiction. – 2021. – Vol. 19. – P. 450–472.
+3. Shoumarov G‘. B. Oila psixologiyasi. – Toshkent: Sharq, 2020. – 296 b.
+Qisqartmalar: JSST — Jahon sog‘liqni saqlash tashkiloti; ICD-11 — Kasalliklarning xalqaro tasnifi; GAS — O‘yinlarga qaramlik shkalasi.
+
+
+===== ARTICLE 11: RENEWABLE ENERGY & ELECTRICAL ENGINEERING =====
+
+MAVZU: O‘ZBEKISTONNING JANUBIY HUDUDLARIDA QUYOSH FOTOELEKTR STANSIYALARINING SAMARADORLIGIGA CHANG VA YUQORI HARORAT OMILLARINING TA’SIRINI MODELLASHTIRISH
+
+KIRISH
+O‘zbekiston Respublikasida 2030-yilga qadar qayta tiklanuvchi energiya manbalari (QTEM) ulushini umumiy elektr energiyasi generatsiyasida 40 foizdan oshirish bo‘yicha keng ko‘lamli loyihalar amalga oshirilmoqda. Mamlakatimizning geografik joylashuvi, xususan, Surxondaryo, Qashqadaryo va Navoiy viloyatlarida quyoshli kunlarning yiliga 300 kundan ortiq bo‘lishi yirik quyosh fotoelektr stansiyalarini (QFES) qurish uchun ulkan salohiyat yaratadi. Biroq, keskin kontinental va quruq (arid) iqlim sharoitida fotoelektr modullarning pasport (STC — standart sinov sharoitlari) quvvati real ekspluatatsiya ko‘rsatkichlaridan sezilarli darajada farq qiladi. Bunga yoz oylarida panel sirtining $65–75^\circ\text{C}$ gacha qizib ketishi hamda tez-tez kuzatiladigan chang bo‘ronlari natijasida panellar yuzasida chang qatlamining (soiling) to‘planishi asosiy sabab bo‘lmoqda. Mazkur maqolada ushbu ikki omilning QFES ishlab chiqarish quvvatiga kompleks ta’sirini baholovchi matematik model taklif etiladi.
+
+ADABIYOTLAR SHARHI
+Fotoelektr modullarning harorat va changlanish tufayli quvvat yo‘qotishlari energetika muhandisligida dolzarb mavzulardan biridir. E. Skoplaki va J. Palivos (2009) kremniy asosidagi quyosh elementlari haroratining $25^\circ\text{C}$ dan har bir daraja oshishi uning foydali ish koeffitsientini (FIK) o‘rtacha $0,4\% - 0,5\%$ ga kamaytirishini matematik jihatdan ifodalab bergan. Yaqin Sharq va Shimoliy Afrika mintaqasi bo‘yicha o‘tkazilgan tadqiqotlarda (H. Kazem va boshq., 2020) panellarni bir oy davomida tozalamaslik chang zarrachalari tarkibidagi kvars va loy miqdoriga qarab energiya generatsiyasini 15% dan 32% gacha tushirishi aniqlangan. O‘zbekistonda R. Matchanov va M. Tursunovlar quyosh energiyasidan foydalanishning fizik asoslarini tadqiq etgan bo‘lsalar-da, janubiy hududlarning shamol rejimi va chang tarkibini hisobga olgan holda panellarni tozalashning optimal davriyligini aniqlovchi texnik-iqtisodiy model yetarlicha ishlab chiqilmagan.
+
+TAKLIF ETILAYOTGAN MODEL
+Tadqiqotda monokristall kremniyli fotoelektr modulning real sharoitdagi chiqish quvvatini ($P_{real}$) hisoblash uchun harorat koeffitsienti ($\gamma$) va changlanish yo‘qotish koeffitsientini ($\eta_{dust}$) birlashtiruvchi analitik formula taklif etiladi:
+
+$$P_{real} = P_{STC} \cdot \left(\frac{G}{G_{STC}}\right) \cdot \left[1 + \gamma (T_{cell} - 25)\right] \cdot \left(1 - \alpha \cdot \ln(1 + \rho_{dust})\right)$$
+
+Bu yerda $P_{STC}$ — standart sharoitdagi nominal quvvat (Vt); $G$ — haqiqiy quyosh radiatsiyasi ($\text{Vt/m}^2$); $G_{STC} = 1000\text{ Vt/m}^2$; $\gamma$ — quvvatning harorat koeffitsienti ($-0,0038\text{ }^\circ\text{C}^{-1}$); $T_{cell}$ — fotoelement harorati ($^\circ\text{C}$); $\rho_{dust}$ — panel sirtidagi chang zichligi ($\text{g/m}^2$); $\alpha$ — empirik so‘nish koeffitsienti.
+
+MA’LUMOTLAR VA BAHOLASH NATIJALARI
+Eksperimental o‘lchovlar 2025-yilning may–sentyabr oylarida Surxondaryo viloyatining Sherobod tumanida o‘rnatilgan 550 Vt quvvatli monokristall quyosh panellari poligonida o‘tkazildi. Ikki guruh panellar taqqoslandi: 1-guruh har 7 kunda suv va yumshoq cho‘tka yordamida tozalandi; 2-guruh 45 kun davomida tozalanmasdan qoldirildi. Natijalar shuni ko‘rsatdiki, iyul oyida havo harorati $43^\circ\text{C}$ ga yetganda panel sirti harorati $71,4^\circ\text{C}$ ni tashkil etdi va birgina harorat omili hisobiga quvvat yo‘qotilishi 17,6% ga yetdi. 45 kun tozalanmagan panellar sirtida chang zichligi $\rho_{dust} = 18,4\text{ g/m}^2$ ni tashkil qilib, qo‘shimcha 21,3% energiya yo‘qotilishiga sabab bo‘ldi. Shunday qilib, ikkala omilning birgalikdagi ta’siri tufayli stansiyaning umumiy quvvati nominal ko‘rsatkichdan 35,2% ga kamaydi.
+
+MUHOKAMA
+Tajriba ma’lumotlari shuni ko‘rsatadiki, arid iqlimli hududlarda QFES loyihalashtirishda faqat quyosh insolyatsiyasi xaritalariga tayanish yetarli emas. Changlanish va qizish omillarini inobatga olmaslik loyihaning o‘zini oqlash muddatini (payback period) 1,5–2 yilga cho‘zib yuborishi mumkin. Suv tanqis bo‘lgan janubiy tumanlarda panellarni an’anaviy usulda suv bilan yuvish iqtisodiy va ekologik jihatdan samarasiz bo‘lganligi sababli, suvsiz (dry-cleaning) avtomatlashtirilgan robotlashtirilgan tozalash tizimlarini yoki elektrostatik chang qaytaruvchi qoplamalarni joriy etish maqsadga muvofiqdir.
+
+XULOSA
+Taklif etilgan matematik model O‘zbekistonning janubiy mintaqalarida qurilayotgan quyosh elektr stansiyalarining yillik energiya ishlab chiqarish hajmini yuqori aniqlikda prognozlash imkonini beradi. Texnik-iqtisodiy hisob-kitoblar asosida yozgi changli mavsumda panellarni har 10–12 kunda quruq mexanik usulda tozalash stansiya rentabelligini saqlab qolish uchun eng maqbul davriylik ekanligi aniqlandi.
+
+ADABIYOTLAR VA QISQARTMALAR
+1. Skoplaki E., Palyvos J. A. On the temperature dependence of photovoltaic module electrical performance: A review of efficiency/power correlations // Solar Energy. – 2009. – Vol. 83(5). – P. 614–624.
+2. Kazem H. A. et al. A review of dust accumulation and cleaning methods for solar photovoltaic systems // Journal of Cleaner Production. – 2020. – Vol. 276. – P. 123187.
+3. Matchanov R. D. Quyosh energetikasi asoslari va fotoelektr o‘zgartirgichlar. – Toshkent: Fan va texnologiya, 2021. – 224 b.
+Qisqartmalar: QTEM — Qayta tiklanuvchi energiya manbalari; QFES — Quyosh fotoelektr stansiyasi; STC — Standart sinov sharoitlari; FIK — Foydali ish koeffitsienti.
+
+
+===== ARTICLE 12: LAW & CYBERCRIMINOLOGY =====
+
+MAVZU: KIBERMAKONDA SHAXSGA DOIR MA’LUMOTLARNI HIMOYA QILISH VA RAQAMLI FIRIBGARLIK JINOYATLARINI KVALIFIKATSIYA QILISHNING HUQUQIY MUAMMOLARI
+
+KIRISH
+Raqamli iqtisodiyot va elektron hukumat xizmatlarining kengayishi jamiyat hayotini sezilarli darajada yengillashtirgan bo‘lsa-da, axborot texnologiyalaridan foydalangan holda sodir etilayotgan jinoyatlar sonining keskin ortishiga ham zamin yaratdi. O‘zbekiston Respublikasi Ichki ishlar vazirligi ma’lumotlariga ko‘ra, so‘nggi uch yil ichida kiberjinoyatlar, xususan, fishing (phishing), ijtimoiy injiniring usullari orqali fuqarolarning bank kartalaridan pul mablag‘larini o‘g‘irlash hamda shaxsga doir ma’lumotlarni noqonuniy tarqatish holatlari bir necha barobarga ko‘paygan. Amaldagi Jinoyat kodeksiga kiritilgan o‘zgartish va qo‘shimchalarga qaramay, sud-tergov amaliyotida kibermakondagi o‘g‘rilik va firibgarlik tarkiblarini o‘zaro farqlash, shuningdek, transchegaraviy xususiyatga ega kiberhujumlar bo‘yicha elektron dalillarni rasmiylashtirishda qator huquqiy kolliziyalar yuzaga kelmoqda. Ushbu maqolada milliy qonunchilikdagi bo‘shliqlar va ularni bartaraf etishning huquqiy mexanizmlari tahlil qilinadi.
+
+ADABIYOTLAR SHARHI
+Kiberjinoyatchilikka qarshi kurashishning jinoyat-huquqiy jihatlari xalqaro yurisprudensiyada Budapesht konvensiyasi (2001) tamoyillari asosida keng tadqiq etilgan. S. Brenner (2012) kiberjinoyatlarni an’anaviy jinoyatlarning raqamli muhitga ko‘chgan shakli va sof kompyuter tizimlariga qarshi jinoyatlarga ajratish zarurligini asoslagan. D. Uoll (2017) esa ijtimoiy injiniring usullari qo‘llanilganda jabrlanuvchining o‘z ixtiyori bilan maxfiy kodlarni berishi jinoyatni o‘g‘rilik yoki firibgarlik sifatida malakalashda nazariy murakkablik tug‘dirishini ta’kidlaydi. O‘zbekiston huquqshunoslik fanida M. Rustamboyev va R. Kabulovlar mulkka qarshi jinoyatlar va axborot xavfsizligi huquqiy asoslarini yoritgan bo‘lsalar-da, kriptoaktivlar (kriptovalyutalar) orqali amalga oshiriladigan noqonuniy tranzaksiyalarni protsessual hujjatlashtirish va shaxsga doir ma’lumotlar sizib chiqishi (data breach) uchun yuridik shaxslarning javobgarligi masalalari yetarlicha ochib berilmagan.
+
+TAKLIF ETILAYOTGAN MODEL
+Tadqiqotda qiyosiy-huquqiy, formal-yuridik va tizimli tahlil metodlaridan foydalanildi. Sud-tergov amaliyotidagi malakalash xatolarini kamaytirish uchun kibermakondagi mulkiy tajovuzlarni uch bosqichli huquqiy mezonlar asosida farqlash modeli taklif etiladi: 1) Tajovuz predmeti va usuli (axborot tizimiga ruxsatsiz kirish orqali mablag‘ yechish — JK 169-moddasi, o‘g‘rilik; jabrlanuvchini aldash va ishonchini suiiste’mol qilish orqali SMS-kodni qo‘lga kiritish — JK 168-moddasi, firibgarlik); 2) Subyektiv tomon va qasdning yo‘nalishi; 3) Elektron dalillarning autentifikatsiya zanjiri (Chain of Custody). Tergov samaradorligi ko‘rsatkichi ($E_{inv}$) ochilgan kiberjinoyatlarning umumiy ro‘yxatga olingan jinoyatlarga nisbati orqali baholandi:
+
+$$E_{inv} = \frac{N_{solved} - N_{reclass}}{N_{total}} \times 100\%$$
+
+Bu yerda $N_{solved}$ — sudga oshirilgan kiberjinoyat ishlari soni; $N_{reclass}$ — sud muhokamasida kvalifikatsiyasi o‘zgartirilgan (qayta malakalangan) ishlar soni; $N_{total}$ — ro‘yxatga olingan jami kiberjinoyatlar soni.
+
+MA’LUMOTLAR VA BAHOLASH NATIJALARI
+Tadqiqot doirasida 2022–2025-yillarda jinoyat ishlari bo‘yicha tuman (shahar) sudlarida ko‘rib chiqilgan 310 ta kiberjinoyatga oid sud hukmlari va tergov materiallari o‘rganildi. Tahlil natijalariga ko‘ra, o‘rganilgan ishlarning 62,4% i ijtimoiy injiniring (soxta havolalar, Telegram-botlar orqali pul o‘zlashtirish) bilan bog‘liq bo‘lib, ulardan 24,5% ida dastlabki tergov organlari tomonidan jinoyat tarkibi noto‘g‘ri malakalanganligi (o‘g‘rilik va firibgarlik moddalari o‘rtasida chalkashlik) sababli sud bosqichida qayta malakalashga to‘g‘ri kelgan. Shuningdek, 18,7% holatlarda jinoiy yo‘l bilan qo‘lga kiritilgan mablag‘lar P2P-platformalar orqali kriptoaktivlarga aylantirilib, xorijiy birjalarga chiqarib yuborilgani sababli zararni undirish imkonsiz bo‘lib qolgan.
+
+MUHOKAMA
+Sud amaliyoti tahlili shuni ko‘rsatmoqdaki, amaldagi Jinoyat-protsessual kodeksida "elektron dalil" tushunchasi va uni vaqtinchalik bloklash (muzlatish) mexanizmlari tezkorlik talablariga to‘liq javob bermaydi. Kiberjinoyatchilar o‘g‘irlangan mablag‘larni bir necha daqiqa ichida o‘nlab "drop" (vositachi) kartalar orqali aylantirib yuboradi, an’anaviy tergov so‘rovlari esa kunlab vaqt oladi. Bundan tashqari, "Shaxsga doir ma’lumotlar to‘g‘risida"gi Qonun talablarini buzib, mijozlar bazasining tarqalib ketishiga yo‘l qo‘ygan xususiy kompaniyalar va to‘lov tashkilotlariga nisbatan moliyaviy sanksiyalar miqdori yetarlicha tiyib turuvchi kuchga ega emas.
+
+XULOSA
+Kibermakonda fuqarolarning mulkiy huquqlari va shaxsiy daxlsizligini ishonchli himoya qilish uchun O‘zbekiston Respublikasi Oliy sudi Plenumining kiberjinoyatlarni malakalash amaliyoti bo‘yicha alohida tushuntirishini qabul qilish zarur. Shuningdek, Jinoyat-protsessual kodeksiga bank hisobvaraqlari va kripto-hamyonlardagi shubhali operatsiyalarni sud ajrimisiz 72 soatgacha tezkor bloklash vakolatini beruvchi normalarni kiritish hamda xalqaro huquqiy yordam mexanizmlarini soddalashtirish maqsadga muvofiqdir.
+
+ADABIYOTLAR VA QISQARTMALAR
+1. Brenner S. W. Cybercrime and the Law: Challenges, Issues, and Outcomes. – Boston: Northeastern University Press, 2012. – 248 p.
+2. Wall D. S. Cybercrime: The Transformation of Crime in the Information Age. – Cambridge: Polity Press, 2017. – 272 p.
+3. Rustamboyev M. X. O‘zbekiston Respublikasi Jinoyat huquqi kursi. Maxsus qism. – Toshkent: TDYuU, 2023. – 412 b.
+Qisqartmalar: JK — Jinoyat kodeksi; JPK — Jinoyat-protsessual kodeksi; IIV — Ichki ishlar vazirligi.
