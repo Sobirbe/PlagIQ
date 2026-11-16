@@ -1,6 +1,6 @@
 """Full-length Uzbek AI-text detection: passages of human open-access works 2010-2021 (human_full_uz.json, from
-fetch_fulltext.py) against full-length chatbot text: Gemini's and ChatGPT's answers to prompts-full-uz.txt
-(full_gemini.json, full_chatgpt.json: sections C, polished D, continuations E), the Gemini articles (gemini1.txt,
+fetch_fulltext.py) against full-length chatbot text: the chatbots' answers to prompts-full-uz.txt (full_gemini.json,
+full_claude.json, full_chatgpt.json — sections C, polished D, continuations E; a set may be incomplete), the Gemini articles (gemini1.txt,
 gemini2_humanized.txt) and the ChatGPT dissertation (chatgpt_dissertation.txt).
 
 Short article/dissertation paragraphs are merged into pieces of at least 120 words, so length does not separate the
@@ -15,7 +15,7 @@ from baseline import clean
 from score_articles import paragraphs
 
 Hw = json.load(open("human_full_uz.json")); plan = json.load(open("full_plan.json"))
-BOTS = {"Gemini": json.load(open("full_gemini.json")), "ChatGPT": json.load(open("full_chatgpt.json"))}
+BOTS = {b: json.load(open(f)) for b, f in (("Gemini", "full_gemini.json"), ("Claude", "full_claude.json"), ("ChatGPT", "full_chatgpt.json"))}
 D = {w["id"]: w for w in Hw}
 items = []                                                          # (text, label, category, group)
 orig = {(x["id"], x["chunk"]): x for k in ("d", "e") for x in plan[k]}
@@ -24,10 +24,11 @@ for w in Hw:
         items.append((clean(c), 0, "human originals of D/E" if (w["id"], i) in orig else "human", w["id"]))
 for bot, G in BOTS.items():
     for x in plan["c"]:
-        items.append((clean(G[x["block"]][x["n"] - 1]), 1, f"{bot} sections", x["id"]))
+        if x["block"] in G: items.append((clean(G[x["block"]][x["n"] - 1]), 1, f"{bot} sections", x["id"]))
     for x in plan["d"]:
-        items.append((clean(G[x["block"]][x["n"] - 1]), 1, f"{bot} polished (D)", x["id"]))
+        if x["block"] in G: items.append((clean(G[x["block"]][x["n"] - 1]), 1, f"{bot} polished (D)", x["id"]))
     for x in plan["e"]:
+        if x["block"] not in G: continue
         cont = G[x["block"]][x["n"] - 1]; first = D[x["id"]]["chunks"][x["chunk"]]
         items.append((clean(first + " " + cont), 1, f"human + {bot} continuation (E)", x["id"]))
         items.append((clean(cont), 1, f"{bot} continuation alone (E)", x["id"]))
@@ -48,15 +49,18 @@ for f, cat in (("gemini1.txt", "Gemini articles"), ("gemini2_humanized.txt", "Ge
 
 X = [t for t, *_ in items]; y = np.array([l for _, l, *_ in items]); cat = np.array([c for _, _, c, _ in items])
 fold = np.array([zlib.crc32(g.encode()) % 5 for *_, g in items])
-ORDER = ["Gemini sections", "Gemini articles", "Gemini 'humanized' articles", "ChatGPT sections", "ChatGPT dissertation",
-         "Gemini polished (D)", "ChatGPT polished (D)", "human + Gemini continuation (E)", "human + ChatGPT continuation (E)",
-         "Gemini continuation alone (E)", "ChatGPT continuation alone (E)", "human originals of D/E"]
-GEM = {"Gemini sections", "Gemini articles", "Gemini 'humanized' articles"}; GPT = {"ChatGPT sections", "ChatGPT dissertation"}
-WRITTEN = GEM | GPT
-REGIMES = {"F2 all full-length written": WRITTEN,
-           "F3a written, ChatGPT left out": GEM,
-           "F3b written, Gemini left out": GPT,
-           "F4 written + polished": WRITTEN | {"Gemini polished (D)", "ChatGPT polished (D)"}}
+ORDER = ["Gemini sections", "Claude sections", "ChatGPT sections", "Gemini articles", "Gemini 'humanized' articles",
+         "ChatGPT dissertation", "Gemini polished (D)", "Claude polished (D)", "Gemini continuation alone (E)",
+         "Claude continuation alone (E)", "human + Gemini continuation (E)", "human + Claude continuation (E)", "human originals of D/E"]
+ORDER = [c for c in ORDER if c in set(cat)]
+GEM = {"Gemini sections", "Gemini articles", "Gemini 'humanized' articles"}; CLA = {"Claude sections"}
+GPT = {"ChatGPT sections", "ChatGPT dissertation"}
+WRITTEN = GEM | CLA | GPT
+REGIMES = {"all three chatbots' full-length writing": WRITTEN,
+           "Claude left out": WRITTEN - CLA,
+           "Gemini left out": WRITTEN - GEM,
+           "ChatGPT left out": WRITTEN - GPT,
+           "all writing + polished": WRITTEN | {"Gemini polished (D)", "Claude polished (D)"}}
 
 def run(ai_train):
     trainable = (cat == "human") | np.isin(cat, list(ai_train)); s = np.zeros(len(X))

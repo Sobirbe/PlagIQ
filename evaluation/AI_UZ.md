@@ -23,10 +23,10 @@ very few false alarms on human writing? No detector has been shown to work on Uz
 - **Human full texts:** 250 open-access Uzbek works 2010–2021 (139 Zenodo, 111 inscience.uz), each with a CC BY licence
   confirmed on its own page and fetched as robots.txt allows (`fetch_fulltext.py`); 2,749 Uzbek passages of 120–260
   words, about 369,000 words. Not kept in the repository.
-- **Full-length chatbot answers:** Gemini's and ChatGPT's answers to `prompts-full-uz.txt` (`full_gemini.json`,
-  `full_chatgpt.json`): per chatbot 24 sections, 12 polished and 6 continued passages of the human full texts above; a
-  second ChatGPT run is being collected (`full_chatgpt_run2.json`).
-- **Planned:** recent human-written student texts; the same full-length blocks from Claude.
+- **Full-length chatbot answers:** Gemini's and Claude's answers to `prompts-full-uz.txt` (`full_gemini.json`,
+  `full_claude.json`): per chatbot 24 sections, 12 polished and 6 continued passages of the human full texts above;
+  ChatGPT's are being collected (`full_chatgpt.json`).
+- **Planned:** recent human-written student texts; the rest of ChatGPT's full-length blocks.
 
 ## First feasibility check (`baseline.py`)
 Text is put into one script (Cyrillic → Latin), apostrophes unified and spacing/quotation quirks removed first, and
@@ -136,41 +136,41 @@ plus the classifier are trained (5 epochs, lr 1e-4, inputs cut at 192 tokens; ab
   training data (genres, chatbots, polishing), not the model.
 
 ## Sixth check: full-length text (`full_study.py`)
-Human side: 2,731 passages (120–260 words) of the 250 open-access works. AI side: Gemini's and ChatGPT's answers to
-`prompts-full-uz.txt` (`full_gemini.json`, `full_chatgpt.json`; chatbots confirmed by the owner): per chatbot 24 article
-sections written for titles of those human works (blocks C), 12 polished human passages (D) and 6 continuations of human
-passages (E); plus the earlier Gemini articles, "humanized" Gemini articles and ChatGPT dissertation, their paragraphs
-merged into pieces of at least 120 words. Every text is grouped with its source work and 5-fold cross-validation splits
-by group; polished, partly-AI (human passage + continuation) and the human originals of D/E are test-only unless stated.
-Char n-gram detector; thresholds from held-out human passages.
+Human side: 2,731 passages (120–260 words) of the 250 open-access works. AI side: answers to `prompts-full-uz.txt`
+from Gemini (`full_gemini.json`) and Claude (`full_claude.json`) — per chatbot 24 article sections written for titles
+of those human works (blocks C), 12 polished human passages (D) and 6 continuations of human passages (E) — plus a
+ChatGPT set being collected (`full_chatgpt.json`, so far block C1: 3 sections); and the earlier Gemini articles,
+"humanized" Gemini articles and ChatGPT dissertation, their paragraphs merged into pieces of at least 120 words.
+Chatbots as confirmed by the owner (the Claude set was first given as ChatGPT and corrected). Every text is grouped with
+its source work and 5-fold cross-validation splits by group; polished, partly-AI (human passage + continuation) and the
+human originals of D/E are test-only unless stated. Char n-gram detector; thresholds from held-out human passages.
 
-**Length matters here:** ChatGPT's sections have a median of 315 words, Gemini's 230, the human passages 131. At full
-length ChatGPT's sections are caught 23–24 of 24 *even when ChatGPT is left out of training* — mostly a length effect.
-The table therefore gives the run with **every text cut to its first 120 words** (cutting removes the continuation from
-the partly-AI texts, so those are taken from the full-length run, marked *). Counts: caught at 1 % (5 %) of held-out
-human passages flagged.
+**Length matters here:** Claude's sections have a median of 315 words, Gemini's 230, the human passages 131. At full
+length Claude's sections are caught 23–24 of 24 *even when Claude is left out of training* — mostly a length effect.
+The table therefore gives the run with **every text cut to its first 120 words** (partly-AI texts, whose continuation
+the cut removes, are caught 0 of 6 that way; at full length 0–4 of 6). Counts: caught at 1 % (5 %) of held-out human
+passages flagged.
 
-| Trained on human passages + written by … | Gemini sections (24) | ChatGPT sections (24) | Gemini articles (17) | "Humanized" Gemini (18) | ChatGPT dissertation (12) | Polished: Gemini / ChatGPT (12 each) | Continuation alone: Gemini / ChatGPT (6 each) | Human + continuation*: Gemini / ChatGPT (6 each) | Human originals of D/E (18) |
-|---|---|---|---|---|---|---|---|---|---|
-| both chatbots | 22 (23) | 18 (24) | 14 (16) | 9 (14) | 0 (5) | 1 / 0 (6 / 2) | 2 / 2 (3 / 2) | 0 / 1 (4 / 5) | 1 (2) |
-| Gemini only (ChatGPT unseen) | 22 (24) | **7 (20)** | 13 (16) | 7 (14) | 0 (7) | 3 / 0 (7 / 2) | 3 / 1 (4 / 2) | 2 / 2 (5 / 4) | 0 (2) |
-| ChatGPT only (Gemini unseen) | **12 (19)** | 18 (22) | 8 (12) | 3 (5) | 0 (1) | 0 / 0 (3 / 2) | 0 / 1 (1 / 2) | 0 / 2 (2 / 3) | 0 (1) |
-| both + polished in training | 23 (24) | 17 (24) | 12 (15) | 10 (15) | 0 (3) | 2 / 1 (7 / 3) | 2 / 2 (4 / 2) | 2 / 4 (5 / 4) | 1 (2) |
+| Trained on human passages + writing by … | Gemini sections (24) | Claude sections (24) | Gemini articles (17) | "Humanized" Gemini (18) | ChatGPT dissertation (12) | Polished: Gemini / Claude (12 each) | Continuation alone: Gemini / Claude (6 each) | Human originals of D/E (18) |
+|---|---|---|---|---|---|---|---|---|
+| all three chatbots | 22 (23) | 17 (23) | 14 (16) | 9 (14) | 0 (5) | 1 / 1 (6 / 2) | 2 / 1 (3 / 2) | 1 (2) |
+| Claude left out | 22 (23) | **7 (17)** | 12 (15) | 9 (14) | 0 (5) | 5 / 1 (7 / 2) | 3 / 1 (4 / 1) | 1 (2) |
+| Gemini left out | **11 (19)** | 18 (22) | 9 (11) | 4 (6) | 0 (1) | 0 / 1 (2 / 1) | 1 / 1 (1 / 2) | 1 (1) |
+| ChatGPT left out | 22 (24) | 18 (23) | 14 (16) | 9 (16) | **0 (6)** | 2 / 0 (6 / 2) | 3 / 2 (3 / 2) | 0 (2) |
+| all + polished in training | 23 (24) | 17 (23) | 13 (15) | 10 (15) | 0 (2) | 2 / 2 (6 / 3) | 2 / 1 (5 / 2) | 0 (2) |
 
 - **A chatbot in training is caught in full-length text**, also at equal length: Gemini's sections 22–23 of 24 and
-  ChatGPT's 17–18 of 24 at 1 %. With abstracts-only training the same kinds of text were caught 0 of 93.
-- **An unseen chatbot is caught only partly**: ChatGPT's sections 7 of 24 by a Gemini-trained detector, Gemini's 12 of 24
-  by a ChatGPT-trained one (at 5 %: 20 and 19). Better than with abstracts, but every chatbot students use must be in
-  training.
-- **The ChatGPT dissertation is never caught at 1 %** (0 of 12 at equal length), although ChatGPT's sections are: it was
-  produced in a different session and genre (a full dissertation, mixed with Russian). One chatbot's output varies a lot.
-- **Polished** passages stay out of reach (0–3 of 12 at 1 %), also with polished examples in training.
-- **Partly-AI** documents scored as one text are caught 0–4 of 6, and the continuations alone 0–3 of 6 (Gemini's have a
-  median of 88 words, ChatGPT's 156). Partly-AI work has to be scored passage by passage, highlighting the AI part.
+  Claude's 17–18 of 24 at 1 %. With abstracts-only training the same kinds of text were caught 0 of 93.
+- **An unseen chatbot is caught only partly**: Claude's sections 7 of 24 without Claude in training, Gemini's 11 of 24
+  without Gemini (at 5 %: 17 and 19). Better than with abstracts, but every chatbot students use must be in training.
+- **ChatGPT's full-length writing is barely represented** (one dissertation, 3 sections) and is not caught at 1 %; the
+  ChatGPT set now being collected will show whether that is ChatGPT or too little data.
+- **Polished** passages stay out of reach (0–5 of 12 at 1 %), also with polished examples in training.
+- **Partly-AI** documents scored as one text are caught 0–4 of 6, and the continuations alone 1–3 of 6 (Gemini's have a
+  median of 88 words, Claude's 156). Partly-AI work has to be scored passage by passage, highlighting the AI part.
 - **False alarms on clean human writing:** the 18 human originals of D/E (picked for clean, well-formed text) are flagged
-  0–1 of 18 at the 1 % threshold — about what 1 % predicts, but tidy human prose sits closer to chatbot style, and recent
-  careful student work still has to be measured before any use.
-- Numbers are small (6–24 AI texts per group); one text moves a result by 4–17 points.
+  0–1 of 18 at the 1 % threshold — about what 1 % predicts; recent careful student work still has to be measured.
+- Numbers are small (3–24 AI texts per group); one text moves a result by 4–17 points.
 
 ## Russian (`ru_study.py`, started November 2026)
 The site checks Russian as well as Uzbek (Russian is currently sent to Pangram). Same method: 780 Russian abstracts
