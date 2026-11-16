@@ -1,8 +1,8 @@
 """Train PlagIQ's Uzbek AI-writing indicator (uzai.py) and set its threshold.
 
-Training data (see AI_UZ.md): human Uzbek academic text published 2010-2021 — abstracts (human_uz.json) and passages of
-open-access works (human_full_uz.json) — and 2021-2026 journal papers the owner confirmed as human-written and may use
-(human_recent_uz.json; JMMF's 2026 issues held out, see HOLD_OUT); chatbot text — abstracts written by Claude, ChatGPT (three runs) and Gemini, and
+Training data (see AI_UZ.md): human Uzbek academic text published before ChatGPT — abstracts 2010-2021 (human_uz.json),
+passages of open-access works 2010-2021 (human_full_uz.json) and journal issues 2021-2022 the owner may use
+(human_recent_uz.json; later issues are only scored, by year); chatbot text — abstracts written by Claude, ChatGPT (three runs) and Gemini, and
 full-length sections, continuations, articles and a dissertation by Gemini, Claude and ChatGPT. Polished texts are left
 out (training on them did not help and they sit closest to human writing). The features are uzai.features, the code the
 website runs, so training and serving cannot drift apart.
@@ -14,7 +14,7 @@ Writes ../../models/uz_ai_v1.npz and prints the cross-validated catch and false-
 
     python3 train_uzai.py          (needs human_uz.json and human_full_uz.json, which are not in the repository)
 """
-import os, sys, time, zlib, numpy as np
+import sys, time, zlib, numpy as np
 from pathlib import Path
 from scipy import sparse
 from sklearn.linear_model import LogisticRegression
@@ -23,7 +23,7 @@ import uzai
 import combined as A                      # abstracts: texts, labels, categories, topic groups
 import full_study as F                    # full-length: texts, labels, categories, source-work groups
 
-HUMAN = {"human", "human (polished originals)", "human originals of D/E", "human journals 2021-26 (owner-confirmed)"}
+HUMAN = {"human", "human (polished originals)", "human originals of D/E", "human journals 2021-22"}
 SKIP = {"Claude polished", "ChatGPT run 1 polished", "ChatGPT run 2 polished", "Gemini polished",
         "Gemini polished (D)", "Claude polished (D)", "ChatGPT polished (D)",
         "human + Gemini continuation (E)", "human + Claude continuation (E)", "human + ChatGPT continuation (E)"}
@@ -32,26 +32,29 @@ for X, Y, C, G, u in ((A.X, A.y, A.cat, [g for *_, g in A.items], "abstract"), (
     for t, l, c, g in zip(X, Y, C, G):
         if c in SKIP: continue
         texts.append(t); y.append(0 if c in HUMAN else 1); cat.append(c); group.append(f"{u}:{g}"); unit.append(u)
-# Recent journal papers (2021-2026) that the owner confirmed as human-written and has permission to use
-# (human_recent_uz.json, built by build_recent.py; not in the repository): grouped by article, so each is held out from
-# the model that scores it.
+# Journal issues the owner may use (human_recent_uz.json, built by build_recent.py; not in the repository). Only issues
+# published before ChatGPT (30 November 2022) are trained on as human: the owner reports that most Uzbek publications
+# since then are partly AI-generated, so later issues cannot be labelled human. They are scored at the end, by year.
+ISSUE_YEAR = {**{str(i): 2021 for i in (8, 10, 11, 12, 13)}, **{str(i): 2022 for i in (14, 15, 16, 17, 18)},
+              **{str(i): 2023 for i in (19, 20, 21, 23, 24)}, **{str(i): 2024 for i in (25, 26, 27, 28)},
+              **{str(i): 2025 for i in (29, 30, 31, 32)}, **{str(i): 2026 for i in (33, 34)},          # IMRS issue ids
+              "agrobiznes_2023_2": 2023, "mmf_1_1_owner": 2024, "mmf_1_1": 2024, "2-son-MMM-v5_1": 2024,
+              "MMM-3-son-v1": 2024, "MMM_4-son_v1": 2024, "MMF-Volume-2-Issue1.v1": 2025, "MMF_Volume_2_Issue_2.v1": 2025,
+              "MMF-Volume-2-Issue-3": 2025, "MMF-Volume-2-Issue-4": 2025, "MMF-Volume-2-Issue-5": 2025,
+              "MMF-Volume-2-Issue-6": 2025, "volume_1784811238_253": 2025, "volume_1784811344_316": 2025,
+              "volume_1784811409_327": 2025, "volume_1784811619_721": 2026, "volume_1784811656_423": 2026,
+              "volume_1784811736_454": 2026, "volume_1790679567_129": 2026, "MMF-Volume-3-Issue-1_JAN-FEB_2026": 2026,
+              "MMF-Volume-3-Issue-2_mart-2026": 2026, "MMF-Volume-3-Issue-3_aprel-2026": 2026}
+held_out_test = []                                       # (source, year, passages) scored at the end
 recent = Path(__file__).with_name("human_recent_uz.json")
-# JMMF 2026 issues: some articles read as chatbot-written (with the earlier model, flags rose from ~0 % in 2024 to 2-9 %
-# of passages in 2026, clustered in whole articles), so by the owner's decision they are not trained on as human.
-HOLD_OUT = {"MMF-Volume-3-Issue-1_JAN-FEB_2026", "MMF-Volume-3-Issue-2_mart-2026", "MMF-Volume-3-Issue-3_aprel-2026",
-            "volume_1784811619_721", "volume_1784811656_423", "volume_1784811736_454", "volume_1790679567_129"}
-held_out_test = []
-# The whole JMMF journal is kept out of training and used as a real-world test set: with its 2024-2025 issues trained on
-# as human, ChatGPT sections were caught less (13 of 24 against 17) with no fewer false alarms (0 either way).
-# HOLD_SOURCE="" trains on JMMF 2024-2025 as well (2026 stays held out).
-HOLD_SOURCE = os.environ.get("HOLD_SOURCE", "Management")
 if recent.is_file():
     import json
     for d in json.load(open(recent)):
-        if d.get("issue") in HOLD_OUT or (HOLD_SOURCE and d.get("source", "").startswith(HOLD_SOURCE)):                   # kept out of training; only scored at the end
-            held_out_test.append((d["issue"], d["chunks"])); continue
+        year = ISSUE_YEAR.get(d.get("issue"))
+        if year is None or year >= 2023:
+            held_out_test.append((d["source"].split(" (")[0], year, d["chunks"])); continue
         for c in d["chunks"]:
-            texts.append(uzai.clean(c)); y.append(0); cat.append("human journals 2021-26 (owner-confirmed)")
+            texts.append(uzai.clean(c)); y.append(0); cat.append("human journals 2021-22")
             group.append(f"recent:{d['id']}"); unit.append("passage")
 y, cat, unit = np.array(y), np.array(cat), np.array(unit)
 fold = np.array([zlib.crc32(g.encode()) % 5 for g in group])
@@ -84,8 +87,8 @@ thr = float(max(np.quantile(hp, 0.99), np.quantile(ha, 0.99)))
 print(f"\nthreshold (1 % of held-out human passages and of human abstracts, the higher): {thr:.4f}")
 print(f"held-out human above it: passages {np.mean(hp > thr):.2%} ({int((hp > thr).sum())}/{len(hp)}), "
       f"abstracts {np.mean(ha > thr):.2%} ({int((ha > thr).sum())}/{len(ha)})")
-hr = held[cat == "human journals 2021-26 (owner-confirmed)"]
-if len(hr): print(f"held-out human journal passages (2021-26) above it: {int((hr > thr).sum())}/{len(hr)}")
+hr = held[cat == "human journals 2021-22"]
+if len(hr): print(f"held-out human journal passages (2021-22) above it: {int((hr > thr).sum())}/{len(hr)}")
 for c in sorted(set(cat[y == 1])):
     m = cat == c; print(f"  {c}: {int((held[m] > thr).sum())}/{int(m.sum())} caught (held out)")
 
@@ -99,11 +102,13 @@ np.savez_compressed(out, coef_idx=keep.astype(np.int32), coef_val=coef[keep].ast
                                     f"{time.strftime('%Y-%m-%d')})"))
 print(f"\nwrote {out} ({out.stat().st_size // 1024} KB)")
 if held_out_test:
-    rows = [TFX for TFX in ([(issue, c) for issue, ch in held_out_test for c in ch])]
-    Xh = sparse.vstack([sparse.csr_matrix((uzai.features(c)[1], (np.zeros(len(uzai.features(c)[0]), int), uzai.features(c)[0])),
-                                          shape=(1, uzai.BUCKETS)) for _, c in rows]).tocsr()
-    Xh = Xh.multiply(idf).tocsr(); Xh = sparse.diags(1 / np.maximum(sparse.linalg.norm(Xh, axis=1), 1e-12)) @ Xh
-    sh = clf.predict_proba(Xh)[:, 1]; issues = np.array([i for i, _ in rows])
-    print(f"held-out journal issues (never trained on): {int((sh > thr).sum())}/{len(sh)} passages flagged")
-    for i in dict.fromkeys(issues):
-        m = issues == i; print(f"   {i}: {int((sh[m] > thr).sum())}/{int(m.sum())}")
+    from collections import defaultdict
+    tally = defaultdict(lambda: [0, 0])
+    for source, year, chunks_ in held_out_test:
+        for c in chunks_:
+            idx, tf = uzai.features(c); v = tf * idf[idx]; nrm = np.linalg.norm(v)
+            p = 1 / (1 + np.exp(-(clf.intercept_[0] + (v @ coef[idx]) / nrm))) if nrm else 0.0
+            tally[(source, year)][0] += p > thr; tally[(source, year)][1] += 1
+    print("2023+ journal passages (not trained on), flagged by year:")
+    for (source, year), (f, n) in sorted(tally.items(), key=lambda x: (x[0][0], x[0][1] or 0)):
+        print(f"   {source[:40]:40s} {year}: {f}/{n} ({f / n:.1%})")
