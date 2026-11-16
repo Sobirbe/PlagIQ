@@ -45,10 +45,38 @@ ISSUE_YEAR = {**{str(i): 2021 for i in (8, 10, 11, 12, 13)}, **{str(i): 2022 for
               "volume_1784811409_327": 2025, "volume_1784811619_721": 2026, "volume_1784811656_423": 2026,
               "volume_1784811736_454": 2026, "volume_1790679567_129": 2026, "MMF-Volume-3-Issue-1_JAN-FEB_2026": 2026,
               "MMF-Volume-3-Issue-2_mart-2026": 2026, "MMF-Volume-3-Issue-3_aprel-2026": 2026}
+# Options (to measure each change; the model is written only without --no-write):
+#   --keep-late-zenodo  keep open-access works whose Zenodo record was uploaded after ChatGPT (zenodo_created.json)
+#   --no-ilmiz          leave out the ilmiz.uz abstracts (ilmiz_abstracts_uz.json, from fetch_ilmiz.py)
+ARGS = set(sys.argv[1:])
+import json, re
+if "--keep-late-zenodo" not in ARGS and Path(__file__).with_name("zenodo_created.json").is_file():
+    # 60 of 139 Zenodo records in human_full_uz.json were uploaded after 30 Nov 2022 although they claim earlier years:
+    # their passages cannot be counted as human for certain, so they are left out of training and testing.
+    zc = json.load(open(Path(__file__).with_name("zenodo_created.json")))
+    url = {w["id"]: w.get("url") or "" for w in json.load(open(Path(__file__).with_name("human_full_uz.json")))}
+    def late(work_id):
+        m = re.search(r"zenodo\.org/records?/(\d+)", url.get(work_id, ""))
+        return bool(m) and zc.get(m.group(1), "9999") >= "2022-11-30"
+    drop = [i for i, (c, g, u) in enumerate(zip(cat, group, unit)) if u == "passage" and c in HUMAN and late(g.split(":", 1)[1])]
+    for i in reversed(drop):
+        del texts[i], y[i], cat[i], group[i], unit[i]
+    print(f"left out {len(drop)} passages of Zenodo works uploaded after ChatGPT", flush=True)
+ilmiz = Path(__file__).with_name("ilmiz_abstracts_uz.json")
+if "--no-ilmiz" not in ARGS and ilmiz.is_file():
+    # Uzbek abstracts from OAK journals published before 30 Nov 2022 (ilmiz.uz index), grouped by journal so a journal's
+    # house style never sits on both sides of a fold.
+    n0 = len(texts)
+    for a in json.load(open(ilmiz)).values():
+        t = uzai.clean(a["abstract"])
+        if len(t.split()) >= 40:
+            texts.append(t); y.append(0); cat.append("human abstracts ilmiz.uz 2010-22")
+            group.append(f"ilmiz:{a['journal']}"); unit.append("abstract")
+    HUMAN = HUMAN | {"human abstracts ilmiz.uz 2010-22"}
+    print(f"added {len(texts) - n0} ilmiz.uz abstracts", flush=True)
 held_out_test = []                                       # (source, year, passages) scored at the end
 recent = Path(__file__).with_name("human_recent_uz.json")
 if recent.is_file():
-    import json
     for d in json.load(open(recent)):
         year = ISSUE_YEAR.get(d.get("issue"))
         if year is None or year >= 2023:
@@ -87,11 +115,14 @@ thr = float(max(np.quantile(hp, 0.99), np.quantile(ha, 0.99)))
 print(f"\nthreshold (1 % of held-out human passages and of human abstracts, the higher): {thr:.4f}")
 print(f"held-out human above it: passages {np.mean(hp > thr):.2%} ({int((hp > thr).sum())}/{len(hp)}), "
       f"abstracts {np.mean(ha > thr):.2%} ({int((ha > thr).sum())}/{len(ha)})")
+for c in sorted(set(cat[y == 0])):
+    m = cat == c; print(f"  {c}: {int((held[m] > thr).sum())}/{int(m.sum())} wrongly flagged (held out)")
 hr = held[cat == "human journals 2021-22"]
 if len(hr): print(f"held-out human journal passages (2021-22) above it: {int((hr > thr).sum())}/{len(hr)}")
 for c in sorted(set(cat[y == 1])):
     m = cat == c; print(f"  {c}: {int((held[m] > thr).sum())}/{int(m.sum())} caught (held out)")
 
+if "--no-write" in ARGS: raise SystemExit
 idf, df, clf = fit(np.arange(len(texts)))
 coef = clf.coef_[0]; keep = np.where(np.abs(coef) > 1e-7)[0]; seen = np.where(df > 0)[0]
 out = ROOT / "models" / "uz_ai_v1.npz"; out.parent.mkdir(exist_ok=True)
