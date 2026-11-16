@@ -66,10 +66,13 @@ ilmiz = Path(__file__).with_name("ilmiz_abstracts_uz.json")
 if "--no-ilmiz" not in ARGS and ilmiz.is_file():
     # Uzbek abstracts from OAK journals published before 30 Nov 2022 (ilmiz.uz index), grouped by journal so a journal's
     # house style never sits on both sides of a fold.
+    # ilmiz.uz marks many English and Karakalpak abstracts as Uzbek: only those the site's own language check reads as
+    # Uzbek are kept (660 of 1,538 in November 2026).
+    import corpus
     n0 = len(texts)
     for a in json.load(open(ilmiz)).values():
         t = uzai.clean(a["abstract"])
-        if len(t.split()) >= 40:
+        if len(t.split()) >= 40 and corpus.detect_language(a["abstract"]) == "uz":
             texts.append(t); y.append(0); cat.append("human abstracts ilmiz.uz 2010-22")
             group.append(f"ilmiz:{a['journal']}"); unit.append("abstract")
     HUMAN = HUMAN | {"human abstracts ilmiz.uz 2010-22"}
