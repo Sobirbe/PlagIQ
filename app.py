@@ -563,7 +563,9 @@ async def me(request: Request):
     return {"auth": auth.public_config(), "user": user,
             "email": await run_in_threadpool(auth.email_status, user) if user else None,
             "methods": await run_in_threadpool(auth.methods, user) if user else {},
-            "history": await run_in_threadpool(auth.history, user) if user else []}
+            "history": await run_in_threadpool(auth.history, user) if user else [],
+            # Whether this account gets the Uzbek AI-writing indicator (preview: owners and pilot testers).
+            "uz_ai_indicator": await run_in_threadpool(uz_ai_for, user) if user else False}
 
 
 def _origin(request):

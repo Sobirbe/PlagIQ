@@ -182,9 +182,20 @@ def marker_key():
 
 
 def is_owner(user):
-    """Site owners (OWNER_TELEGRAM_IDS, comma-separated Telegram user IDs) see /admin."""
+    """Site owners (OWNER_TELEGRAM_IDS, comma-separated Telegram user IDs) see /admin. An account counts as the
+    owner's when any Telegram identity on it is listed: an account first opened by e-mail keeps the e-mail account's
+    id after Telegram is linked to it, so its own id alone would not match."""
     ids = {x.strip() for x in os.environ.get("OWNER_TELEGRAM_IDS", "").split(",") if x.strip().isdigit()}
-    return bool(user) and str(user["id"]) in ids
+    if not user or not ids:
+        return False
+    if str(user["id"]) in ids:
+        return True
+    try:
+        with _lock, _connect() as db:
+            linked = [r[0] for r in db.execute("SELECT alias FROM account_links WHERE account=?", (int(user["id"]),))]
+    except (sqlite3.Error, ValueError, TypeError):
+        return False
+    return any(str(alias) in ids for alias in linked if alias >= 0)
 
 
 def stats():
