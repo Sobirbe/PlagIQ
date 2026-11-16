@@ -1,0 +1,292 @@
+{
+ "f": [
+  {
+   "block": "F1",
+   "n": 1,
+   "kind": "polish",
+   "id": "https://openalex.org/W3167327238",
+   "chunk": 3,
+   "words": 132
+  },
+  {
+   "block": "F1",
+   "n": 2,
+   "kind": "polish",
+   "id": "https://openalex.org/W3174518021",
+   "chunk": 5,
+   "words": 136
+  },
+  {
+   "block": "F1",
+   "n": 3,
+   "kind": "polish",
+   "id": "https://openalex.org/W3133828526",
+   "chunk": 2,
+   "words": 135
+  },
+  {
+   "block": "F2",
+   "n": 1,
+   "kind": "polish",
+   "id": "https://openalex.org/W3211124553",
+   "chunk": 1,
+   "words": 142
+  },
+  {
+   "block": "F2",
+   "n": 2,
+   "kind": "polish",
+   "id": "https://openalex.org/W3133745100",
+   "chunk": 3,
+   "words": 132
+  },
+  {
+   "block": "F2",
+   "n": 3,
+   "kind": "polish",
+   "id": "https://openalex.org/W3202041852",
+   "chunk": 3,
+   "words": 146
+  },
+  {
+   "block": "F3",
+   "n": 1,
+   "kind": "polish",
+   "id": "https://openalex.org/W4226098971",
+   "chunk": 2,
+   "words": 137
+  },
+  {
+   "block": "F3",
+   "n": 2,
+   "kind": "polish",
+   "id": "https://openalex.org/W3169625323",
+   "chunk": 2,
+   "words": 131
+  },
+  {
+   "block": "F3",
+   "n": 3,
+   "kind": "polish",
+   "id": "https://openalex.org/W3170144797",
+   "chunk": 7,
+   "words": 139
+  },
+  {
+   "block": "F4",
+   "n": 1,
+   "kind": "paraphrase",
+   "id": "https://openalex.org/W3135904080",
+   "chunk": 8,
+   "words": 130
+  },
+  {
+   "block": "F4",
+   "n": 2,
+   "kind": "paraphrase",
+   "id": "https://openalex.org/W4226113945",
+   "chunk": 2,
+   "words": 138
+  },
+  {
+   "block": "F4",
+   "n": 3,
+   "kind": "paraphrase",
+   "id": "https://openalex.org/W3180993072",
+   "chunk": 6,
+   "words": 131
+  },
+  {
+   "block": "F5",
+   "n": 1,
+   "kind": "paraphrase",
+   "id": "https://openalex.org/W4307008982",
+   "chunk": 5,
+   "words": 131
+  },
+  {
+   "block": "F5",
+   "n": 2,
+   "kind": "paraphrase",
+   "id": "https://openalex.org/W3181889018",
+   "chunk": 7,
+   "words": 147
+  },
+  {
+   "block": "F5",
+   "n": 3,
+   "kind": "paraphrase",
+   "id": "https://openalex.org/W3134265484",
+   "chunk": 5,
+   "words": 133
+  },
+  {
+   "block": "F6",
+   "n": 1,
+   "kind": "paraphrase",
+   "id": "https://openalex.org/W3169313894",
+   "chunk": 8,
+   "words": 133
+  },
+  {
+   "block": "F6",
+   "n": 2,
+   "kind": "paraphrase",
+   "id": "https://openalex.org/W4226143486",
+   "chunk": 6,
+   "words": 137
+  },
+  {
+   "block": "F6",
+   "n": 3,
+   "kind": "paraphrase",
+   "id": "https://openalex.org/W4226117684",
+   "chunk": 2,
+   "words": 133
+  },
+  {
+   "block": "F7",
+   "n": 1,
+   "kind": "expand",
+   "id": "https://openalex.org/W4226156756",
+   "chunk": 18,
+   "words": 146
+  },
+  {
+   "block": "F7",
+   "n": 2,
+   "kind": "expand",
+   "id": "https://openalex.org/W4297892164",
+   "chunk": 10,
+   "words": 157
+  },
+  {
+   "block": "F7",
+   "n": 3,
+   "kind": "expand",
+   "id": "https://openalex.org/W3210846068",
+   "chunk": 4,
+   "words": 130
+  },
+  {
+   "block": "F8",
+   "n": 1,
+   "kind": "expand",
+   "id": "https://openalex.org/W4287022802",
+   "chunk": 12,
+   "words": 136
+  },
+  {
+   "block": "F8",
+   "n": 2,
+   "kind": "expand",
+   "id": "https://openalex.org/W3158798798",
+   "chunk": 13,
+   "words": 148
+  },
+  {
+   "block": "F8",
+   "n": 3,
+   "kind": "expand",
+   "id": "https://openalex.org/W4213052658",
+   "chunk": 1,
+   "words": 134
+  },
+  {
+   "block": "F9",
+   "n": 1,
+   "kind": "shorten",
+   "id": "https://openalex.org/W3174656251",
+   "chunk": 5,
+   "words": 175
+  },
+  {
+   "block": "F9",
+   "n": 2,
+   "kind": "shorten",
+   "id": "https://openalex.org/W4226530718",
+   "chunk": 2,
+   "words": 134
+  },
+  {
+   "block": "F9",
+   "n": 3,
+   "kind": "shorten",
+   "id": "https://openalex.org/W3168928049",
+   "chunk": 2,
+   "words": 130
+  },
+  {
+   "block": "F10",
+   "n": 1,
+   "kind": "shorten",
+   "id": "https://openalex.org/W3163126957",
+   "chunk": 3,
+   "words": 142
+  },
+  {
+   "block": "F10",
+   "n": 2,
+   "kind": "shorten",
+   "id": "https://openalex.org/W3167921951",
+   "chunk": 5,
+   "words": 137
+  },
+  {
+   "block": "F10",
+   "n": 3,
+   "kind": "shorten",
+   "id": "https://openalex.org/W4226124571",
+   "chunk": 3,
+   "words": 176
+  },
+  {
+   "block": "F11",
+   "n": 1,
+   "kind": "correct",
+   "id": "https://openalex.org/W4226208564",
+   "chunk": 6,
+   "words": 134
+  },
+  {
+   "block": "F11",
+   "n": 2,
+   "kind": "correct",
+   "id": "https://openalex.org/W3169541320",
+   "chunk": 6,
+   "words": 132
+  },
+  {
+   "block": "F11",
+   "n": 3,
+   "kind": "correct",
+   "id": "https://openalex.org/W4225832363",
+   "chunk": 2,
+   "words": 131
+  },
+  {
+   "block": "F12",
+   "n": 1,
+   "kind": "correct",
+   "id": "https://openalex.org/W3209958554",
+   "chunk": 3,
+   "words": 145
+  },
+  {
+   "block": "F12",
+   "n": 2,
+   "kind": "correct",
+   "id": "https://openalex.org/W3162884864",
+   "chunk": 2,
+   "words": 149
+  },
+  {
+   "block": "F12",
+   "n": 3,
+   "kind": "correct",
+   "id": "https://openalex.org/W3122649557",
+   "chunk": 7,
+   "words": 135
+  }
+ ]
+}
