@@ -22,6 +22,7 @@ import fulltext
 import websearch
 import integrity
 import aidetect
+import uzai
 import auth
 import institutions
 import admin
@@ -381,7 +382,7 @@ def verify_page(request: Request, ui: str = ""):
 def health():
     return {"status":"ok","version":VERSION,"corpus_engine_configured":corpus_configured(),
             "web_search":websearch.settings()[0],"web_providers":websearch.providers(),"web_max_excerpts":websearch.max_queries(),
-            "ocr":extract.ocr_available(),"fulltext":fulltext.settings()[0],"login":auth.public_config(),"ai_detector":aidetect.settings(),"archive":corpus_configured() and auth.enabled(),
+            "ocr":extract.ocr_available(),"fulltext":fulltext.settings()[0],"login":auth.public_config(),"ai_detector":aidetect.settings(),"uz_ai_indicator":uzai.settings(),"archive":corpus_configured() and auth.enabled(),
             "payments":{"enabled":payments.enabled(),"mode":payments.mode() if payments.enabled() else ""}}
 
 
@@ -1499,7 +1500,7 @@ async def _run_entitled_check(request, user, submission, reference, reference_te
             if charge_id:
                 await run_in_threadpool(reports_store.charged, job, charge_id, total)
         result = await analyse(submission, reference, reference_text, language, mode, options, web_search, ai_check,
-                               auth.owner_id(user), deposit, original)
+                               auth.owner_id(user), deposit, original, uz_ai_for(user))
     except BaseException:
         await run_in_threadpool(entitlements.release, job)
         if charge_id:
@@ -1573,7 +1574,7 @@ async def _run_check(request, user, anonymous, submission, reference, reference_
             await run_in_threadpool(reports_store.charged, job, charge_id, price)
     try:
         result = await analyse(submission, reference, reference_text, language, mode, options, web_search, ai_check,
-                               auth.owner_id(user), deposit, original)
+                               auth.owner_id(user), deposit, original, uz_ai_for(user))
     except BaseException:
         if charge_id:
             await run_in_threadpool(payments.refund, user, charge_id, price, "check failed")
@@ -1662,6 +1663,15 @@ def ai_highlight(text, passages):
     return "".join(out).replace("\n", "<br>")
 
 
+def uz_ai_for(user):
+    """Whether the Uzbek AI-writing indicator runs for this account (uzai.visible_to: everyone when UZ_AI_DETECT=on;
+    in the default preview only site owners and accounts with a pilot allowance)."""
+    try:
+        return uzai.visible_to(user, lambda u: entitlements.grants_for(u["id"]))
+    except Exception:
+        return False
+
+
 def own_translated(items, owner, original):
     """Possible translated reuse for the result: the user's own archived works are labelled, and the manuscript side of
     each sentence pair is added (shown on the page only, like other excerpts)."""
@@ -1696,7 +1706,7 @@ def mark_own(source, owner):
 
 
 async def analyse(submission, reference, reference_text, language, mode, options=None, web_search=False, ai_check=False,
-                  owner="", archive=None, original=None):
+                  owner="", archive=None, original=None, uz_ai=False):
     if original is None:
         original = await read_file(submission)
     # The menu defaults to Uzbek; when the text clearly is another language, use that
@@ -1868,6 +1878,13 @@ async def analyse(submission, reference, reference_text, language, mode, options
             # The whole document with Pangram's AI and AI-assisted passages marked, for the page only (like the
             # flagged passages it is never cached, stored or put in the PDF).
             result["ai_highlight_html"] = ai_highlight(original, result["ai_passages"])
+    if uz_ai and language == "uz":
+        # PlagIQ's own Uzbek AI-writing indicator (experimental; uzai.py). Runs on this server, so no consent or
+        # third party is involved; like Pangram's passages it is shown on the page only, never cached, stored or in the PDF.
+        progress.step("ai")
+        result["ai_uz"], flagged = await run_in_threadpool(uzai.assess, original)
+        if flagged:
+            result["ai_uz_html"] = ai_highlight(original, flagged)
     for source in result.get("sources") or []:
         for passage in source.get("passages") or []:
             qs, qe = passage.get("query_start"), passage.get("query_end")
@@ -1933,7 +1950,8 @@ def highlight(text, segments, sources=None, marks=None):
 # Shown to the user once and never kept with the report. The manuscript itself ("_text", "_marks") is kept with
 # the report for REPORT_HOURS (24 h, reports_store.py) for the PDF appendix and for reopening the report from
 # "My checks"; it is deleted with the report.
-PRIVATE_FIELDS = ("highlight_html", "search_phrases", "integrity_examples", "ai_passages", "ai_highlight_html")
+PRIVATE_FIELDS = ("highlight_html", "search_phrases", "integrity_examples", "ai_passages", "ai_highlight_html",
+                  "ai_uz", "ai_uz_html")
 
 
 def finish(request, result, identifier=None, session=None):

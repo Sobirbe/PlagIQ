@@ -1,0 +1,260 @@
+{
+ "c": [
+  {
+   "block": "C1",
+   "n": 1,
+   "id": "https://openalex.org/W3137362955",
+   "section": "Kirish"
+  },
+  {
+   "block": "C1",
+   "n": 2,
+   "id": "https://openalex.org/W4212949555",
+   "section": "Kirish"
+  },
+  {
+   "block": "C1",
+   "n": 3,
+   "id": "https://openalex.org/W4226242365",
+   "section": "Kirish"
+  },
+  {
+   "block": "C2",
+   "n": 1,
+   "id": "https://openalex.org/W7166371099",
+   "section": "Adabiyotlar tahlili"
+  },
+  {
+   "block": "C2",
+   "n": 2,
+   "id": "https://openalex.org/W4387355293",
+   "section": "Adabiyotlar tahlili"
+  },
+  {
+   "block": "C2",
+   "n": 3,
+   "id": "https://openalex.org/W4212889514",
+   "section": "Adabiyotlar tahlili"
+  },
+  {
+   "block": "C3",
+   "n": 1,
+   "id": "https://openalex.org/W3169856770",
+   "section": "Natijalar va muhokama"
+  },
+  {
+   "block": "C3",
+   "n": 2,
+   "id": "https://openalex.org/W3190842868",
+   "section": "Natijalar va muhokama"
+  },
+  {
+   "block": "C3",
+   "n": 3,
+   "id": "https://openalex.org/W3160022482",
+   "section": "Natijalar va muhokama"
+  },
+  {
+   "block": "C4",
+   "n": 1,
+   "id": "https://openalex.org/W3203158758",
+   "section": "Kirish"
+  },
+  {
+   "block": "C4",
+   "n": 2,
+   "id": "https://openalex.org/W3170391420",
+   "section": "Kirish"
+  },
+  {
+   "block": "C4",
+   "n": 3,
+   "id": "https://openalex.org/W3203451877",
+   "section": "Kirish"
+  },
+  {
+   "block": "C5",
+   "n": 1,
+   "id": "https://openalex.org/W4226143994",
+   "section": "Adabiyotlar tahlili"
+  },
+  {
+   "block": "C5",
+   "n": 2,
+   "id": "https://openalex.org/W4304099532",
+   "section": "Adabiyotlar tahlili"
+  },
+  {
+   "block": "C5",
+   "n": 3,
+   "id": "https://openalex.org/W3202915789",
+   "section": "Adabiyotlar tahlili"
+  },
+  {
+   "block": "C6",
+   "n": 1,
+   "id": "https://openalex.org/W4226329067",
+   "section": "Natijalar va muhokama"
+  },
+  {
+   "block": "C6",
+   "n": 2,
+   "id": "https://openalex.org/W3168420801",
+   "section": "Natijalar va muhokama"
+  },
+  {
+   "block": "C6",
+   "n": 3,
+   "id": "https://openalex.org/W3175571704",
+   "section": "Natijalar va muhokama"
+  },
+  {
+   "block": "C7",
+   "n": 1,
+   "id": "https://openalex.org/W7114990287",
+   "section": "Kirish"
+  },
+  {
+   "block": "C7",
+   "n": 2,
+   "id": "https://openalex.org/W4226206069",
+   "section": "Kirish"
+  },
+  {
+   "block": "C7",
+   "n": 3,
+   "id": "https://openalex.org/W4386406074",
+   "section": "Kirish"
+  },
+  {
+   "block": "C8",
+   "n": 1,
+   "id": "https://openalex.org/W3162519421",
+   "section": "Adabiyotlar tahlili"
+  },
+  {
+   "block": "C8",
+   "n": 2,
+   "id": "https://openalex.org/W3177736805",
+   "section": "Adabiyotlar tahlili"
+  },
+  {
+   "block": "C8",
+   "n": 3,
+   "id": "https://openalex.org/W7167682779",
+   "section": "Adabiyotlar tahlili"
+  }
+ ],
+ "d": [
+  {
+   "block": "D1",
+   "n": 1,
+   "id": "https://openalex.org/W3161031395",
+   "chunk": 0
+  },
+  {
+   "block": "D1",
+   "n": 2,
+   "id": "https://openalex.org/W3145241826",
+   "chunk": 2
+  },
+  {
+   "block": "D1",
+   "n": 3,
+   "id": "https://openalex.org/W3168069548",
+   "chunk": 7
+  },
+  {
+   "block": "D2",
+   "n": 1,
+   "id": "https://openalex.org/W3134140783",
+   "chunk": 6
+  },
+  {
+   "block": "D2",
+   "n": 2,
+   "id": "https://openalex.org/W4213292805",
+   "chunk": 3
+  },
+  {
+   "block": "D2",
+   "n": 3,
+   "id": "https://openalex.org/W4213050742",
+   "chunk": 6
+  },
+  {
+   "block": "D3",
+   "n": 1,
+   "id": "https://openalex.org/W3182721800",
+   "chunk": 10
+  },
+  {
+   "block": "D3",
+   "n": 2,
+   "id": "https://openalex.org/W3217647817",
+   "chunk": 5
+  },
+  {
+   "block": "D3",
+   "n": 3,
+   "id": "https://openalex.org/W3171076183",
+   "chunk": 7
+  },
+  {
+   "block": "D4",
+   "n": 1,
+   "id": "https://openalex.org/W4226329773",
+   "chunk": 2
+  },
+  {
+   "block": "D4",
+   "n": 2,
+   "id": "https://openalex.org/W3197738427",
+   "chunk": 13
+  },
+  {
+   "block": "D4",
+   "n": 3,
+   "id": "https://openalex.org/W3208172614",
+   "chunk": 6
+  }
+ ],
+ "e": [
+  {
+   "block": "E1",
+   "n": 1,
+   "id": "https://openalex.org/W3197422224",
+   "chunk": 0
+  },
+  {
+   "block": "E1",
+   "n": 2,
+   "id": "https://openalex.org/W4225679464",
+   "chunk": 3
+  },
+  {
+   "block": "E1",
+   "n": 3,
+   "id": "https://openalex.org/W3196901526",
+   "chunk": 6
+  },
+  {
+   "block": "E2",
+   "n": 1,
+   "id": "https://openalex.org/W4226424901",
+   "chunk": 9
+  },
+  {
+   "block": "E2",
+   "n": 2,
+   "id": "https://openalex.org/W7166727425",
+   "chunk": 7
+  },
+  {
+   "block": "E2",
+   "n": 3,
+   "id": "https://openalex.org/W7104032810",
+   "chunk": 11
+  }
+ ]
+}

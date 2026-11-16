@@ -278,6 +278,7 @@ The **AI detector** mode, plus an optional "Also check with the AI detector" box
 | Name | Default | Meaning |
 |---|---|---|
 | `PANGRAM_API_KEY` | — | secret; turns the AI detector on |
+| `UZ_AI_DETECT` | `preview` | PlagIQ's own Uzbek AI-writing indicator (experimental, no key, runs on the website): `off`, `preview` (site owners and pilot testers only), `on` (everyone). Keep `preview` until its false-alarm rate on recent student writing has been measured (evaluation/AI_UZ.md). |
 | `AI_MAX_WORDS` | `15000` | longest document sent (cost cap; one 15,000-word check costs about $7.50 at the list price) |
 | `AI_SECONDS` | `90` | time limit per check |
 | `PANGRAM_MODEL` | `pangram-4` | model selector |
