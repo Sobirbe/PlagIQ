@@ -258,3 +258,20 @@ and 15 polished per chatbot; 15 polished originals).
 - An unseen chatbot is mostly missed (20–35 % at 1 %); polished text is not caught (0–13 %).
 - ChatGPT wrote one word with a Latin letter inside Cyrillic ("многoантенных"), the same kind of slip seen in Gemini's
   Uzbek polishes.
+
+## Next round: AI-edited text (`edit_prompts.py`, prepared 16 November 2026)
+
+The indicator misses most text that a person wrote and a chatbot then edited, and that is how most people use chatbots.
+The polished passages of blocks D (12 per chatbot) were too few to learn from. `prompts-edit-uz.txt` gives each chatbot
+36 real pre-ChatGPT passages (CC BY, 80 usable works, at most two far-apart passages per work) with five kinds of
+request: polish (F1–F3), paraphrase to pass a plagiarism check (F4–F6), expand (F7–F8), shorten (F9–F10) and correct
+spelling and grammar only (F11–F12, kept as a separate category). `edit_plan.json` records each passage's work and chunk,
+so an original and its edits stay in the same cross-validation group. No results yet: the answers are still to be
+collected.
+
+**Data-quality finding.** 60 of the 139 Zenodo records in `human_full_uz.json` were uploaded after ChatGPT came out
+(30 November 2022, upload dates from the Zenodo API in `zenodo_created.json`), although their metadata gives a publication
+year of 2021 or earlier. They hold 923 of the 2,749 open-access passages that the current model (uz_ai_v1) was trained on
+as human. They may be genuine earlier papers uploaded late, but this can't be confirmed, so the next training round will
+leave them out of the human class and report how that changes the results. The new prompt file uses only works put
+online before 30 November 2022.
