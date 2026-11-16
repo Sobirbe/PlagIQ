@@ -175,8 +175,8 @@ held-out human passages flagged.
 - Numbers are small (6–24 AI texts per group); one text moves a result by 4–17 points.
 
 ## On the website: the experimental indicator (`uzai.py`, `train_uzai.py`)
-`evaluation/ai_uz/train_uzai.py` trains one model on everything above except polished texts (human: 412 abstracts,
-2,749 passages of 2010–21 works and 5,592 passages of 2021–26 journals; chatbot: 337 abstracts, sections, continuations, articles and the dissertation) with `uzai.features`, the
+`evaluation/ai_uz/train_uzai.py` trains one model on everything above except polished texts (human, all written before
+ChatGPT: 412 abstracts, 2,749 passages of 2010–21 works and 2,992 passages of 2021–22 journal issues; chatbot: 337 abstracts, sections, continuations, articles and the dissertation) with `uzai.features`, the
 code the website runs, and writes `models/uz_ai_v1.npz` (1.2 MB; numpy only at run time). The website scores a document
 passage by passage (120–260 words, sentence-aligned; Uzbek passages only) and marks passages above one threshold.
 
@@ -200,29 +200,28 @@ human-written; a flag is a reason to look closer, not proof.
 allowance get it. It stays in preview until its false-alarm rate on recent (2023+) human student writing has been
 measured. The result is shown on the page only: never cached, stored, put in the PDF or on the certificate.
 
-**Recent journals (2021–2026), owner-confirmed human, used with permission.** Built by `build_recent.py` (texts not
-in the repository): *Agrobiznes, fan va texnologiyalar* 2023 No. 2 (169 Uzbek passages), all 25 issues of IMRS's
-*Iqtisodiyot: tahlillar va prognozlar* 2021–2026 (imrs.uz, 5,423) and 20 issues of *Management, Marketing and Finance*
-2024–2026 (jmmf.uz, 3,294); robots.txt allowed both sites, and the owner confirmed permission and human authorship.
+**Recent journals, and why only pre-ChatGPT text is trained on as human.** The owner supplied, or gave permission to
+use, *Agrobiznes, fan va texnologiyalar* 2023 No. 2, all 25 issues of IMRS's *Iqtisodiyot: tahlillar va prognozlar*
+2021–2026 (imrs.uz) and 20 issues of *Management, Marketing and Finance* 2024–2026 (jmmf.uz); `build_recent.py` turns
+them into 8,886 Uzbek passages (texts not in the repository; robots.txt allowed both sites). The owner reports that most
+Uzbek publications since ChatGPT (30 November 2022) are partly AI-generated, so **only issues published before it
+(IMRS 2021–2022: 2,992 passages) are trained on as human**; later issues are scored only, by year.
 
-Scored by the model trained before these journals, 92 of 8,886 passages (1.0 %) were flagged — 0 in Agrobiznes,
-7 of 5,423 in IMRS, but 85 of 3,294 in JMMF, rising from ~0 % in its 2024 issues to 2–9 % in its 2026 issues and
-clustered in whole articles (12 of 18 passages in one April 2026 article). By the owner's decision JMMF 2026 was not
-trained on as human. Then:
+Training on 2023–2026 journals as human had cost detection — the model learned chatbot-assisted writing as human
+(e.g. Claude sections 5 of 24 caught, ChatGPT 17). With the pre-ChatGPT rule, cross-validated (grouped as above):
 
-| Trained on (human journals added) | Journal passages flagged, held out | JMMF flagged, never trained on | ChatGPT / Claude / Gemini sections caught | Gemini abstracts caught |
-|---|---|---|---|---|
-| Agrobiznes only (169) | 0 of 169 | 85 of 3,294 | 19 / 6 / 14 of 24 | 32 of 60 |
-| + IMRS + JMMF 2024–25 | 0 of 7,563 | 1 of 1,323 (2026) | 13 / 3 / 13 of 24 | 42 of 60 |
-| **+ IMRS (JMMF all held out) — shipped** | **0 of 5,592** | **7 of 3,294** | **17 / 5 / 13 of 24** | **38 of 60** |
+| | Caught / flagged |
+|---|---|
+| ChatGPT abstracts (3 runs) / sections | 90 of 120 / 20 of 24 |
+| Gemini abstracts / sections / articles / "humanized" | 41 of 60 / 15 of 24 / 1 of 17 / 0 of 18 |
+| Claude abstracts / sections | 12 of 20 / 11 of 24 |
+| Continuations alone (6 per chatbot) / ChatGPT dissertation | 2 of 18 / 0 of 12 |
+| **Human passages / of which journal 2021–22 / human abstracts, wrongly flagged** | **0 of 5,741 / 0 of 2,992 / 5 of 412** |
 
-Adding IMRS's economics writing removed most JMMF flags without training on JMMF: the earlier model had seen little
-Uzbek economics and management prose, so most of the 85 were probably subject-matter false alarms. The 7 that remain
-still sit in recent issues (0 of ~1,000 passages in 2024, 1 of ~1,100 in 2025, 6 of ~1,300 in 2026) — consistent with
-some chatbot-assisted writing in 2026, but a few passages, not whole issues. Training on JMMF 2024–25 as human made
-ChatGPT sections harder to catch (17 → 13 of 24) for no gain in false alarms, so the shipped model keeps the whole of
-JMMF as an independent real-world test set (`train_uzai.py`, `HOLD_SOURCE`). Shipped threshold 0.916; human passages
-flagged held out 0 of 8,341, human abstracts 5 of 412; ChatGPT abstracts 84 of 120, Claude 10 of 20.
+Threshold 0.875. 2023+ journal passages (never trained on) flagged: IMRS 0 of 967 (2023), 0 of 625 (2024), 0 of 490
+(2025), 1 of 349 (2026); Agrobiznes 0 of 132 (2023); JMMF 1 of 473 (2024), 4 of 1,535 (2025), **36 of 1,323 (2026)**.
+The indicator flags only text very close to the chatbot writing it learned, so these are lower bounds on chatbot use,
+not estimates of it.
 
 **Prompt files with others' abstracts.** `chatgpt-prompts.txt`, `gemini-prompts.txt` and `prompts-ru.txt` (on the
 `development/uz-ai-study` branch) quote human abstracts from OpenAlex whose licences were not checked, so they are not
