@@ -1,7 +1,8 @@
 """Train PlagIQ's Uzbek AI-writing indicator (uzai.py) and set its threshold.
 
 Training data (see AI_UZ.md): human Uzbek academic text published 2010-2021 — abstracts (human_uz.json) and passages of
-open-access works (human_full_uz.json); chatbot text — abstracts written by Claude, ChatGPT (three runs) and Gemini, and
+open-access works (human_full_uz.json) — and 2023-2024 journal papers the owner confirmed as human-written
+(human_recent_uz.json); chatbot text — abstracts written by Claude, ChatGPT (three runs) and Gemini, and
 full-length sections, continuations, articles and a dissertation by Gemini, Claude and ChatGPT. Polished texts are left
 out (training on them did not help and they sit closest to human writing). The features are uzai.features, the code the
 website runs, so training and serving cannot drift apart.
@@ -22,7 +23,7 @@ import uzai
 import combined as A                      # abstracts: texts, labels, categories, topic groups
 import full_study as F                    # full-length: texts, labels, categories, source-work groups
 
-HUMAN = {"human", "human (polished originals)", "human originals of D/E"}
+HUMAN = {"human", "human (polished originals)", "human originals of D/E", "human 2023-24 (owner-confirmed)"}
 SKIP = {"Claude polished", "ChatGPT run 1 polished", "ChatGPT run 2 polished", "Gemini polished",
         "Gemini polished (D)", "Claude polished (D)", "ChatGPT polished (D)",
         "human + Gemini continuation (E)", "human + Claude continuation (E)", "human + ChatGPT continuation (E)"}
@@ -31,6 +32,15 @@ for X, Y, C, G, u in ((A.X, A.y, A.cat, [g for *_, g in A.items], "abstract"), (
     for t, l, c, g in zip(X, Y, C, G):
         if c in SKIP: continue
         texts.append(t); y.append(0 if c in HUMAN else 1); cat.append(c); group.append(f"{u}:{g}"); unit.append(u)
+# Recent journal papers (2023-2024) that the owner confirmed as human-written (human_recent_uz.json, built from the PDFs
+# the owner supplied; not in the repository): grouped by article, so each is held out from the model that scores it.
+recent = Path(__file__).with_name("human_recent_uz.json")
+if recent.is_file():
+    import json
+    for d in json.load(open(recent)):
+        for c in d["chunks"]:
+            texts.append(uzai.clean(c)); y.append(0); cat.append("human 2023-24 (owner-confirmed)")
+            group.append(f"recent:{d['id']}"); unit.append("passage")
 y, cat, unit = np.array(y), np.array(cat), np.array(unit)
 fold = np.array([zlib.crc32(g.encode()) % 5 for g in group])
 print(f"{len(texts)} texts: {int((y == 0).sum())} human, {int((y == 1).sum())} chatbot", flush=True)
@@ -62,6 +72,8 @@ thr = float(max(np.quantile(hp, 0.99), np.quantile(ha, 0.99)))
 print(f"\nthreshold (1 % of held-out human passages and of human abstracts, the higher): {thr:.4f}")
 print(f"held-out human above it: passages {np.mean(hp > thr):.2%} ({int((hp > thr).sum())}/{len(hp)}), "
       f"abstracts {np.mean(ha > thr):.2%} ({int((ha > thr).sum())}/{len(ha)})")
+hr = held[cat == "human 2023-24 (owner-confirmed)"]
+if len(hr): print(f"held-out human 2023-24 passages above it: {int((hr > thr).sum())}/{len(hr)}")
 for c in sorted(set(cat[y == 1])):
     m = cat == c; print(f"  {c}: {int((held[m] > thr).sum())}/{int(m.sum())} caught (held out)")
 

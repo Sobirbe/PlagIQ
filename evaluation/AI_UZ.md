@@ -175,8 +175,8 @@ held-out human passages flagged.
 - Numbers are small (6–24 AI texts per group); one text moves a result by 4–17 points.
 
 ## On the website: the experimental indicator (`uzai.py`, `train_uzai.py`)
-`evaluation/ai_uz/train_uzai.py` trains one model on everything above except polished texts (human: 412 abstracts and
-2,749 passages; chatbot: 337 abstracts, sections, continuations, articles and the dissertation) with `uzai.features`, the
+`evaluation/ai_uz/train_uzai.py` trains one model on everything above except polished texts (human: 412 abstracts,
+2,749 passages and 169 passages of 2023–24 papers; chatbot: 337 abstracts, sections, continuations, articles and the dissertation) with `uzai.features`, the
 code the website runs, and writes `models/uz_ai_v1.npz` (1.2 MB; numpy only at run time). The website scores a document
 passage by passage (120–260 words, sentence-aligned; Uzbek passages only) and marks passages above one threshold.
 
@@ -200,14 +200,15 @@ human-written; a flag is a reason to look closer, not proof.
 allowance get it. It stays in preview until its false-alarm rate on recent (2023+) human student writing has been
 measured. The result is shown on the page only: never cached, stored, put in the PDF or on the certificate.
 
-**First look at recent papers (`score_pdfs.py`).** Papers from 2023 on cannot be labelled human (their authors may
-have used a chatbot), so they are not training data; scored, they give an upper bound on false alarms. Two journal issues
-supplied by the owner — *Agrobiznes, fan va texnologiyalar* 2023 No. 2 (Tashkent State Agrarian University) and
-*Management, Marketing and Finance* 2024 Vol. 1 No. 1 — gave 169 Uzbek passages (132 and 37; references dropped,
-Cyrillic Uzbek included): **none flagged** at the website threshold (median score 0.04 against 0.880), 3 above the looser
-passages-only threshold (0.314). If these papers are human-written, the false-alarm rate is low (0 of 169: under about 2 %
-with 95 % confidence); if some contain chatbot text, the indicator missed it — the data cannot tell which. The papers'
-text is not stored. More issues, and student work whose authorship is known, are still needed.
+**Recent papers (2023–2024), owner-confirmed human.** The owner supplied two journal issues and confirmed them as
+human-written: *Agrobiznes, fan va texnologiyalar* 2023 No. 2 (Tashkent State Agrarian University) and *Management,
+Marketing and Finance* 2024 Vol. 1 No. 1 — 169 Uzbek passages in 17 article groups (references dropped, Cyrillic Uzbek
+included; `human_recent_uz.json`, not in the repository). Scored first by the model trained without them
+(`score_pdfs.py`): none flagged (median score 0.04 against the 0.88 threshold). They are now in training as a separate
+human category, grouped by article; held out, **0 of 169** are flagged, and the other figures hardly change (threshold
+0.879; ChatGPT abstracts 79 of 120, sections 19 of 24; Gemini 32 of 60 and 14 of 24; Claude 10 of 20 and 6 of 24; human
+passages 0 of 2,918, abstracts 5 of 412). 169 passages bound the false-alarm rate on recent papers at under about 2 %
+(95 % confidence); more recent issues and student work are still needed before the indicator is shown to students.
 
 **Prompt files with others' abstracts.** `chatgpt-prompts.txt`, `gemini-prompts.txt` and `prompts-ru.txt` (on the
 `development/uz-ai-study` branch) quote human abstracts from OpenAlex whose licences were not checked, so they are not
