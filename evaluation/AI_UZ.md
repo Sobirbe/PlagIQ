@@ -275,3 +275,40 @@ year of 2021 or earlier. They hold 923 of the 2,749 open-access passages that th
 as human. They may be genuine earlier papers uploaded late, but this can't be confirmed, so the next training round will
 leave them out of the human class and report how that changes the results. The new prompt file uses only works put
 online before 30 November 2022.
+
+## Retrained with ilmiz.uz abstracts (16 November 2026)
+
+**Data.** `fetch_ilmiz.py` read the public ilmiz.uz article listing for 2010–2022 (2 s between requests; robots.txt
+allows it; ilmiz.uz keeps metadata only and its terms make metadata free to use; the owner asked for it to be used).
+It kept 1,538 abstracts that ilmiz.uz marks Uzbek and dates before 30 November 2022, from 33 journals (none before 2016).
+ilmiz.uz's language label is unreliable: by `corpus.detect_language`, 511 were English and 351 undetermined (mostly
+English and Karakalpak). Only the 660 read as Uzbek (about half of them in Cyrillic) were used. They are human abstracts
+grouped by journal in cross-validation. The 923 passages of late Zenodo uploads are now left out.
+
+**Effect of each change** (5-fold grouped cross-validation, held-out texts; threshold set as before):
+
+| | current model | without late Zenodo | + ilmiz.uz abstracts (new model) |
+|---|---|---|---|
+| threshold | 0.875 | 0.865 | 0.785 |
+| human passages wrongly flagged | 0/5,741 | 0/4,818 | 0/4,818 |
+| human abstracts wrongly flagged | 5/412 | 5/412 | 11/1,072 (1.0 %) |
+| of which ilmiz.uz abstracts | – | – | 5/660 |
+| IMRS journals 2021–22 wrongly flagged | 0/2,992 | 0/2,992 | 0/2,992 |
+| ChatGPT abstracts (runs 1–3) | 90/120 | 91/120 | 97/120 |
+| Gemini abstracts | 41/60 | 43/60 | 39/60 |
+| Claude abstracts | 12/20 | 13/20 | 12/20 |
+| ChatGPT sections | 20/24 | 20/24 | 23/24 |
+| Gemini sections | 15/24 | 15/24 | 18/24 |
+| Claude sections | 11/24 | 11/24 | 16/24 |
+| Gemini articles | 1/17 | 1/17 | 5/17 |
+| ChatGPT continuations alone | 2/6 | 1/6 | 4/6 |
+| all chatbot texts | 192/337 | 195/337 | 214/337 |
+
+Still not caught: the ChatGPT dissertation (0/12), Gemini "humanized" articles (0/18), Claude and Gemini continuations
+(0/6 each). The model still misses most edited and humanized text; the AI-edited prompt round (above) is meant for that.
+
+Journal issues from 2023 on (never trained on; their status is unknown, so these are not error rates) flagged by the new
+model: Agrobiznes 2023–24 0/169; Iqtisodiyot: tahlillar va prognozlar 2023 0/967, 2024 0/625, 2025 2/490, 2026 2/349;
+Management, Marketing and Finance 2024 1/436, 2025 6/1,535, 2026 62/1,323 (4.7 %; the current model flagged 36).
+
+The new model replaces `models/uz_ai_v1.npz` (same name, so `uzai.py` is unchanged).
