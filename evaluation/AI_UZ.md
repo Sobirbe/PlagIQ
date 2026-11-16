@@ -23,7 +23,9 @@ very few false alarms on human writing? No detector has been shown to work on Uz
 - **Human full texts:** 250 open-access Uzbek works 2010–2021 (139 Zenodo, 111 inscience.uz), each with a CC BY licence
   confirmed on its own page and fetched as robots.txt allows (`fetch_fulltext.py`); 2,749 Uzbek passages of 120–260
   words, about 369,000 words. Not kept in the repository.
-- **Planned:** recent human-written student texts; full-length texts (chapters, essays) from each chatbot.
+- **Gemini full-length:** Gemini's answers to `prompts-full-uz.txt` (`full_gemini.json`): 24 sections, 12 polished and
+  6 continued passages of the human full texts above.
+- **Planned:** recent human-written student texts; the same full-length blocks from ChatGPT and Claude.
 
 ## First feasibility check (`baseline.py`)
 Text is put into one script (Cyrillic → Latin), apostrophes unified and spacing/quotation quirks removed first, and
@@ -131,6 +133,39 @@ plus the classifier are trained (5 epochs, lr 1e-4, inputs cut at 192 tokens; ab
   scores low whatever its source; full-length AI examples must be in training.
 - So a stronger model adds a modest gain on abstracts and nothing on polished or full-length text: the limit is the
   training data (genres, chatbots, polishing), not the model.
+
+## Sixth check: full-length text (`full_study.py`)
+Human side: 2,731 passages (120–260 words) of the 250 open-access works. AI side: Gemini's answers to
+`prompts-full-uz.txt` (`full_gemini.json`, confirmed by the owner as Gemini): 24 article sections written for titles of
+those human works (blocks C), 12 polished human passages (D) and 6 continuations of human passages (E); plus the earlier
+Gemini articles, "humanized" Gemini articles and ChatGPT dissertation, their paragraphs merged into pieces of at least
+120 words. Every text is grouped with its source work and 5-fold cross-validation splits by group; polished, partly-AI
+(human passage + Gemini continuation) and the human originals of D/E are test-only unless stated. Char n-gram detector;
+thresholds from held-out human passages. Counts are texts caught at 1 % (5 %) human passages flagged.
+
+| Trained on human passages + … | Gemini sections (24) | Gemini articles (17) | "Humanized" Gemini (18) | ChatGPT dissertation (12) | Gemini polished (12) | Human + Gemini continuation (6) | Continuation alone (6) | Human originals of D/E (18) |
+|---|---|---|---|---|---|---|---|---|
+| Gemini sections | 24 (24) | 3 (6) | 0 (5) | 0 (1) | 2 (7) | 3 (5) | 1 (6) | 0 (5) |
+| all full-length written | 24 (24) | 13 (15) | 13 (16) | 4 (8) | 3 (7) | 1 (4) | 1 (4) | 1 (2) |
+| written, ChatGPT left out | 24 (24) | 14 (15) | 14 (16) | 4 (9) | 2 (7) | 2 (5) | 3 (4) | 2 (4) |
+| written + polished | 24 (24) | 13 (16) | 15 (17) | 5 (10) | 4 (9) | 3 (5) | 1 (5) | 2 (3) |
+| *every text cut to its first 120 words:* | | | | | | | | |
+| all full-length written | 22 (23) | 12 (16) | 7 (14) | 0 (7) | 3 (7) | — | 3 (4) | 1 (2) |
+| written + polished | 23 (24) | 12 (16) | 11 (14) | 0 (6) | 4 (7) | — | 3 (5) | 0 (2) |
+
+- **Full-length text written by a chatbot that is in training is now caught**: Gemini's sections 22–24 of 24 at 1 %,
+  also with every text cut to the same 120 words (so not a length effect), and the Gemini articles 12–14 of 17. With
+  abstracts-only training the same kinds of text were caught 0 of 93: full-length training data was the missing piece.
+- **Other kinds of Gemini output** carry over only partly ("humanized" articles 7–15 of 18), and **another chatbot not**:
+  the ChatGPT dissertation 0 of 12 at 1 % once length is equalised.
+- **Polished** passages stay hard (2–4 of 12 at 1 %), and adding polished examples hardly helps.
+- **Partly-AI** documents (human passage + Gemini continuation scored as one text) are caught 1–3 of 6: the human part
+  dilutes the signal. Scored alone, the continuation is caught 1–3 of 6 (median 88 words: short). Partly-AI work has to
+  be scored passage by passage, highlighting the AI part, not as one document.
+- **False alarms on clean human writing:** the 18 human originals of D/E were picked for clean, well-formed text and are
+  flagged 0–2 of 18 at the 1 % threshold — more than 1 % would predict. Tidy human prose is closer to chatbot style; the
+  false-alarm rate on recent, carefully written student work still has to be measured before any use.
+- Numbers are small (6–24 AI texts per group); one text moves a result by 4–17 points.
 
 ## Russian (`ru_study.py`, started November 2026)
 The site checks Russian as well as Uzbek (Russian is currently sent to Pangram). Same method: 780 Russian abstracts
