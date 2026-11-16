@@ -73,8 +73,13 @@ def text(limit):
     log_path = HERE / "inlibrary_log.json"
     log = json.load(open(log_path)) if log_path.exists() else {}
     have = {d["id"] for d in done}
-    cands = [r for r in rows if any(l.startswith(("uz", "uzb")) for l in r["language"]) and r["id"] not in have
-             and r["id"] not in log]
+    uz = [r for r in rows if any(l.startswith(("uz", "uzb")) for l in r["language"])]
+    # Round-robin over journals (sets), so a limited run samples every journal rather than the largest one.
+    by_set = {}
+    for r in uz:
+        by_set.setdefault(r["set"].split(":")[0], []).append(r)
+    order = [r for i in range(max(map(len, by_set.values()), default=0)) for g in by_set.values() if i < len(g) for r in [g[i]]]
+    cands = [r for r in order if r["id"] not in have and r["id"] not in log]
     print(len(cands), "Uzbek candidates left", flush=True)
     for r in cands[:limit]:
         try:
