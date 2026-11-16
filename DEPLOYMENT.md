@@ -313,6 +313,8 @@ Many Uzbek journals publish on Open Journal Systems, which has an OAI-PMH feed, 
 Two articles were then harvested and imported as a live test.
 
 **Automatic on the engine:** add `AUTO_IMPORT_UZ_JOURNALS=1` (and optionally `UZ_JOURNALS_BATCH=50`, articles per journal per run).
+
+**Journal list (November 2026): OpenAlex plus the OAK list.** Besides OpenAlex's 252 Uzbek journals, the survey now also reads the Higher Attestation Commission (OAK) list as indexed by **ilmiz.uz** (467 journals, each with a link to its official site; in a live sample of 50, 35 run Open Journal Systems). Journals found in both are surveyed once. Choose with `UZ_JOURNALS_SOURCES` (default `openalex,ilmiz`; `openalex` alone restores the old list). An engine that already has `journals.csv` surveys **only the journals it has not seen yet** on its next run and appends them, so status edits you made are kept; a `source` column says where each journal came from. The licence rules are unchanged: only journals and articles that state CC BY, CC BY-SA or CC0 are imported. The first run with ilmiz takes about 25 minutes longer (ilmiz.uz is read at one page per 3 seconds).
 1. The first run surveys every journal and writes `staging/uz-journals/journals.csv`, with status, licence share and languages for each.
 2. Every run then harvests a batch from each journal marked `ok`: at least half of its records state CC BY, CC BY-SA or CC0.
 
