@@ -2,8 +2,11 @@
 
 Step 1, survey (writes journals.csv):
     python uz_journals.py survey --out staging/uz-journals
+    python uz_journals.py extend --out staging/uz-journals     (adds only journals not surveyed yet)
   * the journal list comes from OpenAlex (sources with country_code UZ: 252 in November 2026,
-    about 203,000 articles); most run Open Journal Systems, whose feed is <homepage>/oai;
+    about 203,000 articles) and from the Higher Attestation Commission (OAK) list as indexed by ilmiz.uz
+    (467 journals, each with its official site); UZ_JOURNALS_SOURCES chooses (default "openalex,ilmiz").
+    Most run Open Journal Systems, whose feed is <homepage>/oai;
   * each feed's first page is read (robots.txt respected) and its records' licences counted
     with harvest.classify_licence. A journal is "ok" when at least half of the sample states
     CC BY, CC BY-SA or CC0, and "no_licence" otherwise.
@@ -32,7 +35,7 @@ import harvest
 from harvest import Fetcher, HarvestError, classify_licence, parse_records, MAX_XML
 
 OPENALEX = "https://api.openalex.org/sources"
-FIELDS = ["name", "endpoint", "works", "sample", "open_licence", "share", "licences", "languages", "status", "reason"]
+FIELDS = ["name", "endpoint", "works", "sample", "open_licence", "share", "licences", "languages", "status", "reason", "source"]
 
 
 def openalex_journals(fetch=None, country="UZ"):
@@ -60,11 +63,65 @@ def openalex_journals(fetch=None, country="UZ"):
     return out
 
 
+ILMIZ = "https://ilmiz.uz"
+
+
+def ilmiz_journals(fetcher=None, max_pages=40):
+    """[(name, official site, works)] for the journals on the Higher Attestation Commission (OAK) list, from the
+    ilmiz.uz index (467 journals in November 2026): its list pages give each journal's page, and each journal page
+    links the journal's official site ("rasmiy sayti"). robots.txt and a crawl delay are respected (Fetcher)."""
+    from html import unescape
+    fetcher = fetcher or Fetcher(delay=3.0, timeout=30)
+    slugs = []
+    for page in range(1, max_pages + 1):
+        body, _ = fetcher.get(f"{ILMIZ}/jurnallar" + (f"?sahifa={page}" if page > 1 else ""), MAX_XML)
+        found = [s for s in dict.fromkeys(re.findall(r'href="/jurnal/([A-Za-z0-9-]+)"', body.decode("utf-8", "replace")))
+                 if s not in slugs]
+        if not found:
+            break
+        slugs += found
+    out = []
+    for slug in slugs:
+        try:
+            html = fetcher.get(f"{ILMIZ}/jurnal/{slug}", MAX_XML)[0].decode("utf-8", "replace")
+        except (HarvestError, OSError, ValueError):
+            continue
+        site = re.search(r'<a href="(https?://[^"]+)"[^>]*>([^<]{0,300}?)\s*[—-]\s*rasmiy sayti</a>', html)
+        text = re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", html))
+        works = re.search(r"Maqolalar indeksda (\d[\d ]*)", text) or re.search(r"(\d[\d ]*) ta maqola", text)
+        if site:
+            out.append((unescape(site.group(2)).strip() or slug, unescape(site.group(1)).rstrip("/"),
+                        int(re.sub(r"\D", "", works.group(1)) or 0) if works else 0))
+    return out
+
+
+def journal_sources():
+    """Where the journal list comes from: UZ_JOURNALS_SOURCES, default "openalex,ilmiz"."""
+    names = [s.strip() for s in os.environ.get("UZ_JOURNALS_SOURCES", "openalex,ilmiz").split(",") if s.strip()]
+    return [s for s in names if s in ("openalex", "ilmiz")] or ["openalex"]
+
+
+def all_journals(sources=None, fetch=None, fetcher=None):
+    """[(name, homepage, works, source)] from every source, one entry per journal feed (first source wins)."""
+    out, seen = [], set()
+    for source in sources or journal_sources():
+        try:
+            items = openalex_journals(fetch) if source == "openalex" else ilmiz_journals(fetcher)
+        except (HarvestError, OSError, ValueError):
+            continue                                   # one source down: survey with the other
+        for name, homepage, works in items:
+            key = endpoint_for(homepage) or homepage.lower().rstrip("/")
+            if key not in seen:
+                seen.add(key)
+                out.append((name, homepage, works, source))
+    return out
+
+
 def endpoint_for(homepage, keep_http=False):
     """OJS feed address for a journal homepage (…/index.php/<journal>/oai), or None.
     Always HTTPS (keep_http only for tests against a local server)."""
     parts = urlsplit(homepage)
-    match = re.match(r"(/index\.php/[^/]+)", parts.path)
+    match = re.match(r"((?:/[^/]+)*?/index\.php/[^/]+)", parts.path)     # OJS may sit in a subfolder
     if not match:
         return None
     scheme = parts.scheme if keep_http else "https"
@@ -85,15 +142,45 @@ def probe(endpoint, fetcher):
     return len(records), accepted, licences, languages
 
 
-def survey(out, journals=None, fetcher=None, keep_http=False):
+def _write(out, rows):
+    with open(Path(out) / "journals.csv", "w", newline="", encoding="utf-8-sig") as handle:
+        writer = csv.DictWriter(handle, fieldnames=FIELDS, extrasaction="ignore")
+        writer.writeheader()
+        writer.writerows([{k: row.get(k, "") for k in FIELDS} for row in rows])
+
+
+def _read(out):
+    path = Path(out) / "journals.csv"
+    if not path.exists():
+        return []
+    with open(path, newline="", encoding="utf-8-sig") as handle:
+        return list(csv.DictReader(handle))
+
+
+def extend(out, journals=None, fetcher=None, keep_http=False):
+    """Survey only journals whose feed is not in journals.csv yet and append them; rows already there (and the
+    owner's edits to their status) are kept as they are. Returns the new rows."""
+    existing = _read(out)
+    known = {row.get("endpoint") for row in existing if row.get("endpoint")} | \
+            {row.get("name", "").strip().lower() for row in existing if not row.get("endpoint")}
+    fresh = [j for j in (journals if journals is not None else all_journals())
+             if (endpoint_for(j[1], keep_http) or j[0].strip().lower()) not in known]
+    new_rows = survey(out, fresh, fetcher, keep_http, write=False)
+    _write(out, existing + new_rows)
+    return new_rows
+
+
+def survey(out, journals=None, fetcher=None, keep_http=False, write=True):
     out = Path(out)
     out.mkdir(parents=True, exist_ok=True)
     fetcher = fetcher or Fetcher(delay=1.0, timeout=30)
     rows = []
-    for name, homepage, works in journals if journals is not None else openalex_journals():
+    for item in journals if journals is not None else all_journals():
+        name, homepage, works = item[:3]
         endpoint = endpoint_for(homepage, keep_http)
         row = {"name": name[:120], "endpoint": endpoint or "", "works": works, "sample": 0, "open_licence": 0,
-               "share": 0.0, "licences": "", "languages": "", "status": "", "reason": ""}
+               "share": 0.0, "licences": "", "languages": "", "status": "", "reason": "",
+               "source": item[3] if len(item) > 3 else ""}
         rows.append(row)
         if not endpoint:
             row.update(status="no_oai", reason=f"homepage is not an Open Journal Systems address: {homepage}")
@@ -112,10 +199,8 @@ def survey(out, journals=None, fetcher=None, keep_http=False):
                    languages="; ".join(f"{k} {v}" for k, v in sorted(languages.items())),
                    status="ok" if sample and share >= 0.5 else "no_licence",
                    reason="" if share >= 0.5 else "fewer than half of the sampled records state an open licence")
-    with open(out / "journals.csv", "w", newline="", encoding="utf-8-sig") as handle:
-        writer = csv.DictWriter(handle, fieldnames=FIELDS)
-        writer.writeheader()
-        writer.writerows(rows)
+    if write:
+        _write(out, rows)
     return rows
 
 
@@ -176,10 +261,20 @@ def run(batch=50, db_path=None, root=None):
     out = root / "uz-journals"
     status = {"started": date.today().isoformat(), "error": None}
     try:
+        marker = out / "sources.json"
+        sources = journal_sources()
+        done = json.loads(marker.read_text("utf-8")) if marker.exists() else []
         if not (out / "journals.csv").exists():
-            rows = survey(out)
+            rows = survey(out, all_journals(sources))
             status["surveyed"] = len(rows)
             status["approved"] = sum(r["status"] == "ok" for r in rows)
+            marker.write_text(json.dumps(sources), "utf-8")
+        elif any(s not in done for s in sources):
+            # A journal list added later (e.g. the OAK list from ilmiz.uz): survey only its new journals.
+            rows = extend(out, all_journals(sources))
+            status["surveyed"] = len(rows)
+            status["approved"] = sum(r["status"] == "ok" for r in rows)
+            marker.write_text(json.dumps(sorted(set(done) | set(sources))), "utf-8")
         totals = harvest_all(out, batch, True, db_path)
         status.update({k: v for k, v in totals.items() if k != "stopped"})
         if totals.get("stopped"):
@@ -193,14 +288,14 @@ def run(batch=50, db_path=None, root=None):
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Survey and harvest open-licence Uzbek journals (OAI-PMH).")
-    parser.add_argument("action", choices=["survey", "harvest"])
+    parser.add_argument("action", choices=["survey", "extend", "harvest"])
     parser.add_argument("--out", required=True, type=Path)
     parser.add_argument("--batch", type=int, default=50, help="articles per journal in one harvest run")
     parser.add_argument("--import", dest="do_import", action="store_true")
     parser.add_argument("--db", default=os.environ.get("CORPUS_DB", "corpus.sqlite3"))
     args = parser.parse_args(argv)
-    if args.action == "survey":
-        rows = survey(args.out)
+    if args.action in ("survey", "extend"):
+        rows = survey(args.out) if args.action == "survey" else extend(args.out)
         counts = {}
         for row in rows:
             counts[row["status"]] = counts.get(row["status"], 0) + 1
