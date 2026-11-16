@@ -75,7 +75,7 @@ def test_who_sees_it(monkeypatch):
     assert uzai.mode() == "preview"
 
 
-def test_pilot_tester_gets_it_on_the_page_only(login, monkeypatch):
+def test_pilot_tester_gets_it_on_the_page_and_its_counts_in_the_report(login, monkeypatch):
     monkeypatch.delenv("UZ_AI_DETECT", raising=False)
     pilot_tester(login)
     text = chatbot_section()
@@ -84,9 +84,18 @@ def test_pilot_tester_gets_it_on_the_page_only(login, monkeypatch):
     ai = data["ai_uz"]
     assert ai["status"] == "done" and ai["provider"] == "PlagIQ" and ai["passages_flagged"] >= 1
     assert data["ai_uz_html"].count('<mark class="ai-a">') == ai["passages_flagged"] and "<script" not in data["ai_uz_html"]
-    cached = repr(web.results[data["report_id"]])
-    # never cached or stored; the PDF and certificate are built from this cached result
-    assert "ai_uz" not in cached and "ai-a" not in cached
+    cached = web.results[data["report_id"]]["result"]
+    # the counts are kept with the report (for the PDF); the highlighted document is never cached or stored
+    assert cached["ai_uz"] == ai and "ai_uz_html" not in cached and "ai-a" not in repr(cached)
+    import io
+    from pypdf import PdfReader
+    for kind in ("", "?full=1"):
+        pdf = login.get(f"/api/report/{data['report_id']}.pdf{kind}")
+        assert pdf.status_code == 200, pdf.text[:200]
+        pages = [p.extract_text() for p in PdfReader(io.BytesIO(pdf.content)).pages]
+        text = " ".join(" ".join(pages).split())
+        assert "PlagIQ, experimental" in text and str(ai["passages_flagged"]) in text
+        assert "experimental" not in " ".join(pages[0].split())                # not on the certificate page
 
 
 def test_others_do_not_get_it_in_preview(login, monkeypatch):

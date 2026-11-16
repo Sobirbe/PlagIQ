@@ -348,6 +348,50 @@ def ai_section(data, lang, st, table):
     return [Paragraph(html.escape(t["title"]), st["h"]), table(rows), Paragraph(html.escape(t["note"]), st["small"])]
 
 
+# PlagIQ's own Uzbek AI-writing indicator (uzai.py; experimental preview for owners and pilot testers). The report
+# carries its counts and caution only; the flagged passages are shown on the results page, never in the PDF.
+UZAI_T = {
+    "en": dict(title="Uzbek AI-writing indicator (PlagIQ, experimental)", passages="Uzbek passages scored",
+               flagged="Read like chatbot-written text", words="Words in flagged passages", model="Model",
+               none="Too little Uzbek text for the indicator.",
+               note="Preview for site owners and pilot testers; not on the certificate. PlagIQ's own model, trained on "
+                    "Uzbek academic texts written before ChatGPT and on text by ChatGPT, Gemini and Claude. It flags a "
+                    "passage only when its writing is very close to the chatbot text it learned from, and misses much "
+                    "AI-assisted or polished text: a result without flags does not show that a text is human-written. "
+                    "A reason to look closer, not proof. The flagged passages are highlighted on the results page."),
+    "uz": dict(title="O‘zbekcha sun’iy intellekt matni ko‘rsatkichi (PlagIQ, sinov)", passages="Tekshirilgan o‘zbekcha parchalar",
+               flagged="Chatbot yozgan matnga o‘xshaydi", words="Belgilangan parchalardagi so‘zlar", model="Model",
+               none="Ko‘rsatkich uchun o‘zbekcha matn yetarli emas.",
+               note="Faqat sayt egalari va sinovchilar uchun; sertifikatga kiritilmaydi. PlagIQning o‘z modeli: ChatGPT "
+                    "paydo bo‘lishidan oldingi o‘zbek ilmiy matnlari hamda ChatGPT, Gemini va Claude yozgan matnlar "
+                    "asosida o‘rgatilgan. U parchani faqat uslubi o‘rgatilgan chatbot matniga juda yaqin bo‘lsagina "
+                    "belgilaydi va sun’iy intellekt yordamida tahrirlangan matnning ko‘p qismini sezmaydi: belgisiz natija "
+                    "matnni inson yozganini anglatmaydi. Bu dalil emas, balki diqqat bilan qarash uchun sabab. Belgilangan "
+                    "parchalar natija sahifasida ajratib ko‘rsatiladi."),
+    "ru": dict(title="Индикатор ИИ-текста для узбекского языка (PlagIQ, эксперимент)", passages="Проверено узбекских фрагментов",
+               flagged="Похожи на текст чат-бота", words="Слов в отмеченных фрагментах", model="Модель",
+               none="Слишком мало узбекского текста для индикатора.",
+               note="Предварительная версия для владельцев сайта и тестировщиков; в сертификат не входит. Собственная модель "
+                    "PlagIQ, обученная на узбекских научных текстах, написанных до появления ChatGPT, и на текстах ChatGPT, "
+                    "Gemini и Claude. Отмечает фрагмент, только если его стиль очень близок к текстам чат-ботов из обучения; "
+                    "значительную часть текста, отредактированного с помощью ИИ, не замечает: отсутствие отметок не означает, "
+                    "что текст написан человеком. Повод присмотреться, а не доказательство. Отмеченные фрагменты выделены "
+                    "на странице результата."),
+}
+
+
+def uz_section(data, lang, st, table):
+    if not data:
+        return []
+    t = UZAI_T.get(lang, UZAI_T["en"])
+    if data.get("status") != "done":
+        rows = [(t["passages"], t["none"])]
+    else:
+        rows = [(t["passages"], str(data.get("passages", 0))), (t["flagged"], str(data.get("passages_flagged", 0))),
+                (t["words"], str(data.get("words_flagged", 0))), (t["model"], str(data.get("model") or "").split(" (")[0])]
+    return [Paragraph(html.escape(t["title"]), st["h"]), table(rows), Paragraph(html.escape(t["note"]), st["small"])]
+
+
 TRANSLATED_T = {
     "en": dict(title="Possible translated reuse (review)", note="Sentences of the document that closely match sentences of a "
                "text in another language in the PlagIQ library (a translation, possibly edited), found by sentence similarity "
@@ -472,6 +516,7 @@ def _plagiarism_sections(result, mode, t, st, table, esc, headline, basis, lang)
 
     story += integrity_section(result.get("integrity"), lang, st, table)
     story += ai_section(result.get("ai"), lang, st, table)
+    story += uz_section(result.get("ai_uz"), lang, st, table)
     story += translated_section(result, lang, st, table)
 
     story.append(Paragraph(t["s_sources"], st["h"]))
@@ -748,6 +793,7 @@ def build_short_pdf(result, identifier, lang="en", verify_url=None):
     story += excerpts_section(result, lang, st, esc)
     if mode == "ai":
         story += ai_section(result.get("ai"), lang, st, lambda rows: Paragraph(" · ".join(f"{k}: {x}" for k, x in rows), st["cell"]))
+    story += uz_section(result.get("ai_uz"), lang, st, lambda rows: Paragraph(" · ".join(f"{html.escape(k)}: {html.escape(x)}" for k, x in rows), st["cell"]))
     story += [Spacer(1, 8), Paragraph(f"<b>{esc(v['searched'])}:</b> {esc(_scope(t, mode, result))}", st["small"]),
               Paragraph(esc(t["disclaimer"]), st["small"]), Paragraph(esc(v["short_note"]), st["small"])]
     out = io.BytesIO()
@@ -839,6 +885,7 @@ def build_pdf(result, identifier, lang="en", minutes_left=15, verify_url=None):
     if mode == "ai":
         story += integrity_section(result.get("integrity"), lang, st, table)
         story += ai_section(result.get("ai"), lang, st, table)
+        story += uz_section(result.get("ai_uz"), lang, st, table)
     else:
         story += _plagiarism_sections(result, mode, t, st, table, esc, headline, basis, lang)
 
@@ -861,5 +908,5 @@ def build_pdf(result, identifier, lang="en", minutes_left=15, verify_url=None):
 
 
 import uzcyr  # noqa: E402  (Uzbek Cyrillic texts, generated from the Uzbek Latin ones)
-for _table in (T, VIEW_T, INTEGRITY_T, AI_T, EDITED_T, EXCLUDED_T, TRANSLATED_T):
+for _table in (T, VIEW_T, INTEGRITY_T, AI_T, EDITED_T, EXCLUDED_T, TRANSLATED_T, UZAI_T):
     uzcyr.add_to(_table)
