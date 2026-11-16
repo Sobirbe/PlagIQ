@@ -1,6 +1,7 @@
 """Full-length Uzbek AI-text detection: passages of human open-access works 2010-2021 (human_full_uz.json, from
-fetch_fulltext.py) against full-length chatbot text: Gemini article sections (full_gemini.json, blocks C), the Gemini
-articles (gemini1.txt, gemini2_humanized.txt) and the ChatGPT dissertation (chatgpt_dissertation.txt).
+fetch_fulltext.py) against full-length chatbot text: Gemini's and ChatGPT's answers to prompts-full-uz.txt
+(full_gemini.json, full_chatgpt.json: sections C, polished D, continuations E), the Gemini articles (gemini1.txt,
+gemini2_humanized.txt) and the ChatGPT dissertation (chatgpt_dissertation.txt).
 
 Short article/dissertation paragraphs are merged into pieces of at least 120 words, so length does not separate the
 classes. Every text belongs to a group (its source work: a human work, the work whose title a section was written for,
@@ -13,21 +14,23 @@ from sklearn.linear_model import LogisticRegression
 from baseline import clean
 from score_articles import paragraphs
 
-Hw = json.load(open("human_full_uz.json")); plan = json.load(open("full_plan.json")); G = json.load(open("full_gemini.json"))
+Hw = json.load(open("human_full_uz.json")); plan = json.load(open("full_plan.json"))
+BOTS = {"Gemini": json.load(open("full_gemini.json")), "ChatGPT": json.load(open("full_chatgpt.json"))}
 D = {w["id"]: w for w in Hw}
 items = []                                                          # (text, label, category, group)
 orig = {(x["id"], x["chunk"]): x for k in ("d", "e") for x in plan[k]}
 for w in Hw:
     for i, c in enumerate(w["chunks"]):
         items.append((clean(c), 0, "human originals of D/E" if (w["id"], i) in orig else "human", w["id"]))
-for x in plan["c"]:
-    items.append((clean(G[x["block"]][x["n"] - 1]), 1, "Gemini sections", x["id"]))
-for x in plan["d"]:
-    items.append((clean(G[x["block"]][x["n"] - 1]), 1, "Gemini polished (D)", x["id"]))
-for x in plan["e"]:
-    cont = G[x["block"]][x["n"] - 1]; first = D[x["id"]]["chunks"][x["chunk"]]
-    items.append((clean(first + " " + cont), 1, "partly AI: human + Gemini continuation (E)", x["id"]))
-    items.append((clean(cont), 1, "Gemini continuation alone (E)", x["id"]))
+for bot, G in BOTS.items():
+    for x in plan["c"]:
+        items.append((clean(G[x["block"]][x["n"] - 1]), 1, f"{bot} sections", x["id"]))
+    for x in plan["d"]:
+        items.append((clean(G[x["block"]][x["n"] - 1]), 1, f"{bot} polished (D)", x["id"]))
+    for x in plan["e"]:
+        cont = G[x["block"]][x["n"] - 1]; first = D[x["id"]]["chunks"][x["chunk"]]
+        items.append((clean(first + " " + cont), 1, f"human + {bot} continuation (E)", x["id"]))
+        items.append((clean(cont), 1, f"{bot} continuation alone (E)", x["id"]))
 
 def merged(paras, owner, minw=120):
     out, cur, own = [], [], None
@@ -45,13 +48,15 @@ for f, cat in (("gemini1.txt", "Gemini articles"), ("gemini2_humanized.txt", "Ge
 
 X = [t for t, *_ in items]; y = np.array([l for _, l, *_ in items]); cat = np.array([c for _, _, c, _ in items])
 fold = np.array([zlib.crc32(g.encode()) % 5 for *_, g in items])
-ORDER = ["Gemini sections", "Gemini articles", "Gemini 'humanized' articles", "ChatGPT dissertation",
-         "Gemini polished (D)", "partly AI: human + Gemini continuation (E)", "Gemini continuation alone (E)", "human originals of D/E"]
-WRITTEN = {"Gemini sections", "Gemini articles", "Gemini 'humanized' articles", "ChatGPT dissertation"}
-REGIMES = {"F1 Gemini sections only": {"Gemini sections"},
-           "F2 all full-length written": WRITTEN,
-           "F3 written, ChatGPT left out": WRITTEN - {"ChatGPT dissertation"},
-           "F4 written + polished": WRITTEN | {"Gemini polished (D)"}}
+ORDER = ["Gemini sections", "Gemini articles", "Gemini 'humanized' articles", "ChatGPT sections", "ChatGPT dissertation",
+         "Gemini polished (D)", "ChatGPT polished (D)", "human + Gemini continuation (E)", "human + ChatGPT continuation (E)",
+         "Gemini continuation alone (E)", "ChatGPT continuation alone (E)", "human originals of D/E"]
+GEM = {"Gemini sections", "Gemini articles", "Gemini 'humanized' articles"}; GPT = {"ChatGPT sections", "ChatGPT dissertation"}
+WRITTEN = GEM | GPT
+REGIMES = {"F2 all full-length written": WRITTEN,
+           "F3a written, ChatGPT left out": GEM,
+           "F3b written, Gemini left out": GPT,
+           "F4 written + polished": WRITTEN | {"Gemini polished (D)", "ChatGPT polished (D)"}}
 
 def run(ai_train):
     trainable = (cat == "human") | np.isin(cat, list(ai_train)); s = np.zeros(len(X))
@@ -63,6 +68,9 @@ def run(ai_train):
     return s
 
 if __name__ == "__main__":
+    import sys
+    if "--cut" in sys.argv:                                  # length control: every text cut to its first 120 words
+        X = [" ".join(t.split()[:120]) for t in X]; print("all texts cut to their first 120 words")
     print("texts:", {c: int((cat == c).sum()) for c in ["human"] + ORDER})
     print("median words:", {c: int(np.median([len(X[i].split()) for i in np.where(cat == c)[0]])) for c in ["human"] + ORDER})
     for name, ai in REGIMES.items():
