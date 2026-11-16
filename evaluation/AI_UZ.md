@@ -200,6 +200,15 @@ human-written; a flag is a reason to look closer, not proof.
 allowance get it. It stays in preview until its false-alarm rate on recent (2023+) human student writing has been
 measured. The result is shown on the page only: never cached, stored, put in the PDF or on the certificate.
 
+**First look at recent papers (`score_pdfs.py`).** Papers from 2023 on cannot be labelled human (their authors may
+have used a chatbot), so they are not training data; scored, they give an upper bound on false alarms. Two journal issues
+supplied by the owner — *Agrobiznes, fan va texnologiyalar* 2023 No. 2 (Tashkent State Agrarian University) and
+*Management, Marketing and Finance* 2024 Vol. 1 No. 1 — gave 169 Uzbek passages (132 and 37; references dropped,
+Cyrillic Uzbek included): **none flagged** at the website threshold (median score 0.04 against 0.880), 3 above the looser
+passages-only threshold (0.314). If these papers are human-written, the false-alarm rate is low (0 of 169: under about 2 %
+with 95 % confidence); if some contain chatbot text, the indicator missed it — the data cannot tell which. The papers'
+text is not stored. More issues, and student work whose authorship is known, are still needed.
+
 **Prompt files with others' abstracts.** `chatgpt-prompts.txt`, `gemini-prompts.txt` and `prompts-ru.txt` (on the
 `development/uz-ai-study` branch) quote human abstracts from OpenAlex whose licences were not checked, so they are not
 on the main branch; `prompts-full-uz.txt` quotes only passages whose CC BY licence was confirmed, with their sources.
