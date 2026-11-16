@@ -2,7 +2,10 @@
 
 Journals: the ilmiz.uz list of OAK journals with a working OAI-PMH feed (/api/journals?oai_only=true), leaving out
 those founded in 2023 or later. Records: each journal's OAI-PMH feed with until=2022-11-30, so only records that
-existed and were last changed before ChatGPT's release (30 November 2022) are seen, whatever date they print.
+existed and were last changed before ChatGPT's release (30 November 2022) are seen, whatever date they print
+(basis "datestamp"). Many feeds have had every change date reset since (a software upgrade or re-indexing) and return
+nothing; for those the article's own publication date (dc:date) must be before 30 November 2022 (basis "dc:date", a
+weaker test: an article added to an old issue later would pass). Each kept article records its basis.
 Kept: records that state Creative Commons BY / BY-SA / CC0 (harvest.classify_licence, "accept" only), are marked
 Uzbek, and have an article page on the journal's own host. Full text: the article page must state the same licence;
 the PDF is the one it declares (citation_pdf_url) on the same host. harvest.Fetcher enforces HTTPS, robots.txt, a crawl
@@ -23,6 +26,7 @@ HERE = Path(__file__).parent
 ROOT = HERE.parents[1]
 sys.path.insert(0, str(ROOT)); sys.path.insert(0, str(HERE))
 import harvest                                                    # noqa: E402
+from xml.etree import ElementTree                                 # noqa: E402
 from fetch_fulltext import chunks                                 # noqa: E402
 
 UNTIL = "2022-11-30"
@@ -45,25 +49,32 @@ def survey():
     print(len(js), "journals to survey", flush=True)
     for j in js:
         endpoint, host, kept, seen, note = j["oaiBaseUrl"], urlsplit(j["oaiBaseUrl"]).hostname, [], 0, ""
-        token = None
+        basis = "datestamp"
         try:
-            for _ in range(MAX_PAGES):
-                params = {"verb": "ListRecords", "resumptionToken": token} if token else \
-                    {"verb": "ListRecords", "metadataPrefix": "oai_dc", "until": UNTIL}
-                body, _ = fetcher.get(endpoint + "?" + urlencode(params), harvest.MAX_XML)
-                records, token = harvest.parse_records(body)
-                for r in records:
-                    seen += 1
-                    decision, _, label = harvest.classify_licence(r["rights"])
-                    url = harvest.article_url(r, host)
-                    if decision == "accept" and harvest.language_of(r) == "uz" and url and r["title"]:
-                        kept.append({"oai_id": r["oai_id"], "datestamp": r["datestamp"], "title": r["title"][:300],
-                                     "year": harvest.year_of(r), "licence": label, "url": url})
-                if not token:
-                    break
-        except (harvest.HarvestError, urllib.error.URLError, OSError, ValueError) as exc:
+            for basis in ("datestamp", "dc:date"):
+                token = None
+                for _ in range(MAX_PAGES if basis == "datestamp" else 4 * MAX_PAGES):
+                    params = {"verb": "ListRecords", "resumptionToken": token} if token else \
+                        {"verb": "ListRecords", "metadataPrefix": "oai_dc", **({"until": UNTIL} if basis == "datestamp" else {})}
+                    body, _ = fetcher.get(endpoint + "?" + urlencode(params), harvest.MAX_XML)
+                    records, token = harvest.parse_records(body)
+                    for r in records:
+                        seen += 1
+                        decision, _, label = harvest.classify_licence(r["rights"])
+                        url = harvest.article_url(r, host)
+                        published = min((d[:10] for d in r["dates"] if d[:4].isdigit()), default="9999")
+                        if (decision == "accept" and harvest.language_of(r) == "uz" and url and r["title"]
+                                and (basis == "datestamp" or published < UNTIL)):
+                            kept.append({"oai_id": r["oai_id"], "datestamp": r["datestamp"], "published": published,
+                                         "basis": basis, "title": r["title"][:300], "year": harvest.year_of(r),
+                                         "licence": label, "url": url})
+                    if not token:
+                        break
+                if seen:
+                    break        # the feed's change dates reach back before ChatGPT: use them, the stronger test
+        except (harvest.HarvestError, urllib.error.URLError, OSError, ValueError, ElementTree.ParseError) as exc:
             note = str(exc)[:160]
-        done[j["id"]] = {"journal": j["name"], "endpoint": endpoint, "seen": seen, "kept": kept, "note": note}
+        done[j["id"]] = {"journal": j["name"], "endpoint": endpoint, "seen": seen, "kept": kept, "note": note, "basis": basis}
         json.dump(done, open(CAND, "w"), ensure_ascii=False)
         print(f"{j['id'][:45]:45s} seen {seen:5d}  open-licence Uzbek {len(kept):4d}  {note[:60]}", flush=True)
     print(sum(len(v["kept"]) for v in done.values()), "candidates from",
@@ -97,7 +108,8 @@ def text(per_journal=40):
                 ch = chunks(t)
                 if ch:
                     out.append({"oai_id": c["oai_id"], "journal": jid, "title": c["title"], "year": c["year"],
-                                "datestamp": c["datestamp"], "license": c["licence"], "url": c["url"], "chunks": ch})
+                                "datestamp": c["datestamp"], "published": c.get("published"),
+                                "basis": c.get("basis", "datestamp"), "license": c["licence"], "url": c["url"], "chunks": ch})
                     json.dump(out, open(FULL, "w"), ensure_ascii=False)
                 result = f"{len(ch)} passages"
             except (harvest.HarvestError, urllib.error.URLError, OSError, ValueError, subprocess.SubprocessError) as exc:
