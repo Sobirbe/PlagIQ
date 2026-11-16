@@ -96,3 +96,25 @@ def test_others_do_not_get_it_in_preview(login, monkeypatch):
                       files={"submission": ("m.txt", "O‘zbek tilidagi oddiy matn bu yerda. ".encode() * 30)}).json()
     assert "ai_uz" not in data and "ai_uz_html" not in data
     assert web.health()["uz_ai_indicator"]["mode"] == "preview"
+
+
+def test_owner_is_recognised_through_a_linked_telegram_id(login, monkeypatch):
+    """An account first opened by e-mail keeps the e-mail account's id after Telegram is linked to it; the owner's
+    Telegram id must still make it the owner's account (for /admin and the indicator)."""
+    import auth
+    monkeypatch.setenv("OWNER_TELEGRAM_IDS", "7777")
+    with auth._lock, auth._connect() as db:
+        db.execute("INSERT INTO account_links (alias, account, created) VALUES (?, ?, ?)", (7777, -5, 0))
+    assert auth.is_owner({"id": -5}) and auth.is_owner({"id": 7777})
+    assert not auth.is_owner({"id": -6}) and not auth.is_owner(None)
+    monkeypatch.setenv("OWNER_TELEGRAM_IDS", "")
+    assert not auth.is_owner({"id": -5})
+
+
+def test_api_me_says_whether_the_indicator_is_on(login, monkeypatch):
+    monkeypatch.delenv("UZ_AI_DETECT", raising=False)
+    monkeypatch.setenv("OWNER_TELEGRAM_IDS", "42")
+    sign_in(login, 42)
+    assert login.get("/api/me").json()["uz_ai_indicator"] is True
+    sign_in(login, 43)
+    assert login.get("/api/me").json()["uz_ai_indicator"] is False
