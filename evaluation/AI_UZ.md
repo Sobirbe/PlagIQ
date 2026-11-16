@@ -176,7 +176,7 @@ held-out human passages flagged.
 
 ## On the website: the experimental indicator (`uzai.py`, `train_uzai.py`)
 `evaluation/ai_uz/train_uzai.py` trains one model on everything above except polished texts (human: 412 abstracts,
-2,749 passages and 169 passages of 2023–24 papers; chatbot: 337 abstracts, sections, continuations, articles and the dissertation) with `uzai.features`, the
+2,749 passages of 2010–21 works and 5,592 passages of 2021–26 journals; chatbot: 337 abstracts, sections, continuations, articles and the dissertation) with `uzai.features`, the
 code the website runs, and writes `models/uz_ai_v1.npz` (1.2 MB; numpy only at run time). The website scores a document
 passage by passage (120–260 words, sentence-aligned; Uzbek passages only) and marks passages above one threshold.
 
@@ -200,15 +200,29 @@ human-written; a flag is a reason to look closer, not proof.
 allowance get it. It stays in preview until its false-alarm rate on recent (2023+) human student writing has been
 measured. The result is shown on the page only: never cached, stored, put in the PDF or on the certificate.
 
-**Recent papers (2023–2024), owner-confirmed human.** The owner supplied two journal issues and confirmed them as
-human-written: *Agrobiznes, fan va texnologiyalar* 2023 No. 2 (Tashkent State Agrarian University) and *Management,
-Marketing and Finance* 2024 Vol. 1 No. 1 — 169 Uzbek passages in 17 article groups (references dropped, Cyrillic Uzbek
-included; `human_recent_uz.json`, not in the repository). Scored first by the model trained without them
-(`score_pdfs.py`): none flagged (median score 0.04 against the 0.88 threshold). They are now in training as a separate
-human category, grouped by article; held out, **0 of 169** are flagged, and the other figures hardly change (threshold
-0.879; ChatGPT abstracts 79 of 120, sections 19 of 24; Gemini 32 of 60 and 14 of 24; Claude 10 of 20 and 6 of 24; human
-passages 0 of 2,918, abstracts 5 of 412). 169 passages bound the false-alarm rate on recent papers at under about 2 %
-(95 % confidence); more recent issues and student work are still needed before the indicator is shown to students.
+**Recent journals (2021–2026), owner-confirmed human, used with permission.** Built by `build_recent.py` (texts not
+in the repository): *Agrobiznes, fan va texnologiyalar* 2023 No. 2 (169 Uzbek passages), all 25 issues of IMRS's
+*Iqtisodiyot: tahlillar va prognozlar* 2021–2026 (imrs.uz, 5,423) and 20 issues of *Management, Marketing and Finance*
+2024–2026 (jmmf.uz, 3,294); robots.txt allowed both sites, and the owner confirmed permission and human authorship.
+
+Scored by the model trained before these journals, 92 of 8,886 passages (1.0 %) were flagged — 0 in Agrobiznes,
+7 of 5,423 in IMRS, but 85 of 3,294 in JMMF, rising from ~0 % in its 2024 issues to 2–9 % in its 2026 issues and
+clustered in whole articles (12 of 18 passages in one April 2026 article). By the owner's decision JMMF 2026 was not
+trained on as human. Then:
+
+| Trained on (human journals added) | Journal passages flagged, held out | JMMF flagged, never trained on | ChatGPT / Claude / Gemini sections caught | Gemini abstracts caught |
+|---|---|---|---|---|
+| Agrobiznes only (169) | 0 of 169 | 85 of 3,294 | 19 / 6 / 14 of 24 | 32 of 60 |
+| + IMRS + JMMF 2024–25 | 0 of 7,563 | 1 of 1,323 (2026) | 13 / 3 / 13 of 24 | 42 of 60 |
+| **+ IMRS (JMMF all held out) — shipped** | **0 of 5,592** | **7 of 3,294** | **17 / 5 / 13 of 24** | **38 of 60** |
+
+Adding IMRS's economics writing removed most JMMF flags without training on JMMF: the earlier model had seen little
+Uzbek economics and management prose, so most of the 85 were probably subject-matter false alarms. The 7 that remain
+still sit in recent issues (0 of ~1,000 passages in 2024, 1 of ~1,100 in 2025, 6 of ~1,300 in 2026) — consistent with
+some chatbot-assisted writing in 2026, but a few passages, not whole issues. Training on JMMF 2024–25 as human made
+ChatGPT sections harder to catch (17 → 13 of 24) for no gain in false alarms, so the shipped model keeps the whole of
+JMMF as an independent real-world test set (`train_uzai.py`, `HOLD_SOURCE`). Shipped threshold 0.916; human passages
+flagged held out 0 of 8,341, human abstracts 5 of 412; ChatGPT abstracts 84 of 120, Claude 10 of 20.
 
 **Prompt files with others' abstracts.** `chatgpt-prompts.txt`, `gemini-prompts.txt` and `prompts-ru.txt` (on the
 `development/uz-ai-study` branch) quote human abstracts from OpenAlex whose licences were not checked, so they are not

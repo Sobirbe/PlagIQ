@@ -1,8 +1,8 @@
 """Train PlagIQ's Uzbek AI-writing indicator (uzai.py) and set its threshold.
 
 Training data (see AI_UZ.md): human Uzbek academic text published 2010-2021 — abstracts (human_uz.json) and passages of
-open-access works (human_full_uz.json) — and 2023-2024 journal papers the owner confirmed as human-written
-(human_recent_uz.json); chatbot text — abstracts written by Claude, ChatGPT (three runs) and Gemini, and
+open-access works (human_full_uz.json) — and 2021-2026 journal papers the owner confirmed as human-written and may use
+(human_recent_uz.json; JMMF's 2026 issues held out, see HOLD_OUT); chatbot text — abstracts written by Claude, ChatGPT (three runs) and Gemini, and
 full-length sections, continuations, articles and a dissertation by Gemini, Claude and ChatGPT. Polished texts are left
 out (training on them did not help and they sit closest to human writing). The features are uzai.features, the code the
 website runs, so training and serving cannot drift apart.
@@ -14,7 +14,7 @@ Writes ../../models/uz_ai_v1.npz and prints the cross-validated catch and false-
 
     python3 train_uzai.py          (needs human_uz.json and human_full_uz.json, which are not in the repository)
 """
-import sys, time, zlib, numpy as np
+import os, sys, time, zlib, numpy as np
 from pathlib import Path
 from scipy import sparse
 from sklearn.linear_model import LogisticRegression
@@ -23,7 +23,7 @@ import uzai
 import combined as A                      # abstracts: texts, labels, categories, topic groups
 import full_study as F                    # full-length: texts, labels, categories, source-work groups
 
-HUMAN = {"human", "human (polished originals)", "human originals of D/E", "human 2023-24 (owner-confirmed)"}
+HUMAN = {"human", "human (polished originals)", "human originals of D/E", "human journals 2021-26 (owner-confirmed)"}
 SKIP = {"Claude polished", "ChatGPT run 1 polished", "ChatGPT run 2 polished", "Gemini polished",
         "Gemini polished (D)", "Claude polished (D)", "ChatGPT polished (D)",
         "human + Gemini continuation (E)", "human + Claude continuation (E)", "human + ChatGPT continuation (E)"}
@@ -32,14 +32,26 @@ for X, Y, C, G, u in ((A.X, A.y, A.cat, [g for *_, g in A.items], "abstract"), (
     for t, l, c, g in zip(X, Y, C, G):
         if c in SKIP: continue
         texts.append(t); y.append(0 if c in HUMAN else 1); cat.append(c); group.append(f"{u}:{g}"); unit.append(u)
-# Recent journal papers (2023-2024) that the owner confirmed as human-written (human_recent_uz.json, built from the PDFs
-# the owner supplied; not in the repository): grouped by article, so each is held out from the model that scores it.
+# Recent journal papers (2021-2026) that the owner confirmed as human-written and has permission to use
+# (human_recent_uz.json, built by build_recent.py; not in the repository): grouped by article, so each is held out from
+# the model that scores it.
 recent = Path(__file__).with_name("human_recent_uz.json")
+# JMMF 2026 issues: some articles read as chatbot-written (with the earlier model, flags rose from ~0 % in 2024 to 2-9 %
+# of passages in 2026, clustered in whole articles), so by the owner's decision they are not trained on as human.
+HOLD_OUT = {"MMF-Volume-3-Issue-1_JAN-FEB_2026", "MMF-Volume-3-Issue-2_mart-2026", "MMF-Volume-3-Issue-3_aprel-2026",
+            "volume_1784811619_721", "volume_1784811656_423", "volume_1784811736_454", "volume_1790679567_129"}
+held_out_test = []
+# The whole JMMF journal is kept out of training and used as a real-world test set: with its 2024-2025 issues trained on
+# as human, ChatGPT sections were caught less (13 of 24 against 17) with no fewer false alarms (0 either way).
+# HOLD_SOURCE="" trains on JMMF 2024-2025 as well (2026 stays held out).
+HOLD_SOURCE = os.environ.get("HOLD_SOURCE", "Management")
 if recent.is_file():
     import json
     for d in json.load(open(recent)):
+        if d.get("issue") in HOLD_OUT or (HOLD_SOURCE and d.get("source", "").startswith(HOLD_SOURCE)):                   # kept out of training; only scored at the end
+            held_out_test.append((d["issue"], d["chunks"])); continue
         for c in d["chunks"]:
-            texts.append(uzai.clean(c)); y.append(0); cat.append("human 2023-24 (owner-confirmed)")
+            texts.append(uzai.clean(c)); y.append(0); cat.append("human journals 2021-26 (owner-confirmed)")
             group.append(f"recent:{d['id']}"); unit.append("passage")
 y, cat, unit = np.array(y), np.array(cat), np.array(unit)
 fold = np.array([zlib.crc32(g.encode()) % 5 for g in group])
@@ -72,8 +84,8 @@ thr = float(max(np.quantile(hp, 0.99), np.quantile(ha, 0.99)))
 print(f"\nthreshold (1 % of held-out human passages and of human abstracts, the higher): {thr:.4f}")
 print(f"held-out human above it: passages {np.mean(hp > thr):.2%} ({int((hp > thr).sum())}/{len(hp)}), "
       f"abstracts {np.mean(ha > thr):.2%} ({int((ha > thr).sum())}/{len(ha)})")
-hr = held[cat == "human 2023-24 (owner-confirmed)"]
-if len(hr): print(f"held-out human 2023-24 passages above it: {int((hr > thr).sum())}/{len(hr)}")
+hr = held[cat == "human journals 2021-26 (owner-confirmed)"]
+if len(hr): print(f"held-out human journal passages (2021-26) above it: {int((hr > thr).sum())}/{len(hr)}")
 for c in sorted(set(cat[y == 1])):
     m = cat == c; print(f"  {c}: {int((held[m] > thr).sum())}/{int(m.sum())} caught (held out)")
 
@@ -86,3 +98,12 @@ np.savez_compressed(out, coef_idx=keep.astype(np.int32), coef_val=coef[keep].ast
                     version=np.str_(f"uz-ai-v1 ({int((y == 0).sum())} human / {int((y == 1).sum())} chatbot texts, "
                                     f"{time.strftime('%Y-%m-%d')})"))
 print(f"\nwrote {out} ({out.stat().st_size // 1024} KB)")
+if held_out_test:
+    rows = [TFX for TFX in ([(issue, c) for issue, ch in held_out_test for c in ch])]
+    Xh = sparse.vstack([sparse.csr_matrix((uzai.features(c)[1], (np.zeros(len(uzai.features(c)[0]), int), uzai.features(c)[0])),
+                                          shape=(1, uzai.BUCKETS)) for _, c in rows]).tocsr()
+    Xh = Xh.multiply(idf).tocsr(); Xh = sparse.diags(1 / np.maximum(sparse.linalg.norm(Xh, axis=1), 1e-12)) @ Xh
+    sh = clf.predict_proba(Xh)[:, 1]; issues = np.array([i for i, _ in rows])
+    print(f"held-out journal issues (never trained on): {int((sh > thr).sum())}/{len(sh)} passages flagged")
+    for i in dict.fromkeys(issues):
+        m = issues == i; print(f"   {i}: {int((sh[m] > thr).sum())}/{int(m.sum())}")
