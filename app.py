@@ -1882,7 +1882,8 @@ async def analyse(submission, reference, reference_text, language, mode, options
             result["ai_highlight_html"] = ai_highlight(original, result["ai_passages"])
     if uz_ai and language == "uz":
         # PlagIQ's own Uzbek AI-writing indicator (experimental; uzai.py). Runs on this server, so no consent or
-        # third party is involved; like Pangram's passages it is shown on the page only, never cached, stored or in the PDF.
+        # third party is involved. Its counts go into the report (PDF, not the certificate); the highlighted document
+        # is shown on the page only, never cached or stored.
         progress.step("ai")
         result["ai_uz"], flagged = await run_in_threadpool(uzai.assess, original)
         if flagged:
@@ -1952,8 +1953,9 @@ def highlight(text, segments, sources=None, marks=None):
 # Shown to the user once and never kept with the report. The manuscript itself ("_text", "_marks") is kept with
 # the report for REPORT_HOURS (24 h, reports_store.py) for the PDF appendix and for reopening the report from
 # "My checks"; it is deleted with the report.
+# The Uzbek indicator's counts (ai_uz) are kept with the report for the PDF; its highlighted document stays page-only.
 PRIVATE_FIELDS = ("highlight_html", "search_phrases", "integrity_examples", "ai_passages", "ai_highlight_html",
-                  "ai_uz", "ai_uz_html")
+                  "ai_uz_html")
 
 
 def finish(request, result, identifier=None, session=None):
