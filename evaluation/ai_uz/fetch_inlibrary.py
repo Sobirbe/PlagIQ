@@ -9,7 +9,7 @@ authors' work: they stay out of the repository (inlibrary_*.json are gitignored)
     python3 fetch_inlibrary.py meta            # resumable; writes inlibrary_meta.json
     python3 fetch_inlibrary.py text [limit]    # resumable; writes inlibrary_full_uz.json (passages, like human_full_uz)
 """
-import json, os, re, sys, time, urllib.parse, urllib.request
+import json, os, re, sys, time, urllib.error, urllib.parse, urllib.request
 from html import unescape
 from pathlib import Path
 
@@ -22,12 +22,18 @@ META, STATE, FULL = HERE / "inlibrary_meta.json", HERE / "inlibrary_state.json",
 _last = [0.0]
 
 
-def get(url, binary=False, limit=25_000_000):
-    wait = _last[0] + DELAY - time.time()
-    if wait > 0:
-        time.sleep(wait)
-    _last[0] = time.time()
-    data = urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=120).read(limit + 1)
+def get(url, binary=False, limit=25_000_000, tries=4):
+    for attempt in range(tries):
+        wait = _last[0] + DELAY * (1 + 2 * attempt) - time.time()   # a dropped connection: back off, then retry
+        if wait > 0:
+            time.sleep(wait)
+        _last[0] = time.time()
+        try:
+            data = urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=120).read(limit + 1)
+            break
+        except (ConnectionError, TimeoutError, urllib.error.URLError) as exc:
+            if attempt == tries - 1 or getattr(exc, "code", 0) in (403, 404, 410):
+                raise
     if len(data) > limit:
         raise ValueError("file too large")
     return data if binary else data.decode("utf-8", "replace")
