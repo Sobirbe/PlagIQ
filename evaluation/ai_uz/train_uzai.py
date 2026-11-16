@@ -48,6 +48,7 @@ ISSUE_YEAR = {**{str(i): 2021 for i in (8, 10, 11, 12, 13)}, **{str(i): 2022 for
 # Options (to measure each change; the model is written only without --no-write):
 #   --keep-late-zenodo  keep open-access works whose Zenodo record was uploaded after ChatGPT (zenodo_created.json)
 #   --no-ilmiz          leave out the ilmiz.uz abstracts (ilmiz_abstracts_uz.json, from fetch_ilmiz.py)
+#   --no-oak            leave out the OAK journal full texts (oak_full_uz.json, from fetch_oak_fulltext.py)
 ARGS = set(sys.argv[1:])
 import json, re
 if "--keep-late-zenodo" not in ARGS and Path(__file__).with_name("zenodo_created.json").is_file():
@@ -77,6 +78,27 @@ if "--no-ilmiz" not in ARGS and ilmiz.is_file():
             group.append(f"ilmiz:{a['journal']}"); unit.append("abstract")
     HUMAN = HUMAN | {"human abstracts ilmiz.uz 2010-22"}
     print(f"added {len(texts) - n0} ilmiz.uz abstracts", flush=True)
+def refs_like(p):
+    """Reference lists and bylines: the passage cutter only stops at Latin and Russian headings, not at the Cyrillic
+    Uzbek «Адабиётлар», so such passages are dropped here."""
+    if re.search(r"(?i)адабиётлар|foydalanilgan adabiyot|список литературы|references", p): return True
+    cites = len(re.findall(r"(?:^|\s)\d{1,3}\.\s*[A-ZА-ЯЎҚҒҲ][a-zа-яўқғҳʼ’']+\s+[A-ZА-ЯЎҚҒҲ]\.", p))
+    marks = len(re.findall(r"(?:\b[ТT]\.\s?:|\bС\.\s?\d|\bб\.\s?\d|\bp\.\s?\d|\bpp\.|\bБ\.\s?\d|//|№\s?\d)", p))
+    return cites >= 2 or marks >= 3
+oak = Path(__file__).with_name("oak_full_uz.json")
+if "--no-oak" not in ARGS and oak.is_file():
+    # Full texts of open-licence OAK journal articles from before ChatGPT (fetch_oak_fulltext.py), grouped by journal.
+    # "datestamp": the record existed unchanged before 30 Nov 2022; "dc:date": only its publication date says so.
+    have = {(w.get("url") or "").rstrip("/") for w in json.load(open(Path(__file__).with_name("human_full_uz.json")))}
+    n0, dup = len(texts), 0
+    for a in json.load(open(oak)):
+        if a["url"].rstrip("/") in have: dup += 1; continue
+        c = f"human OAK journals ({a.get('basis', 'datestamp')})"
+        for t in a["chunks"]:
+            if refs_like(t): continue
+            texts.append(uzai.clean(t)); y.append(0); cat.append(c); group.append(f"oak:{a['journal']}"); unit.append("passage")
+        HUMAN = HUMAN | {c}
+    print(f"added {len(texts) - n0} OAK journal passages ({dup} articles already in human_full_uz.json skipped)", flush=True)
 held_out_test = []                                       # (source, year, passages) scored at the end
 recent = Path(__file__).with_name("human_recent_uz.json")
 if recent.is_file():

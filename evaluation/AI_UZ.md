@@ -312,3 +312,32 @@ model: Agrobiznes 2023–24 0/169; Iqtisodiyot: tahlillar va prognozlar 2023 0/9
 Management, Marketing and Finance 2024 1/436, 2025 6/1,535, 2026 62/1,323 (4.7 %; the current model flagged 36).
 
 The new model replaces `models/uz_ai_v1.npz` (same name, so `uzai.py` is unchanged).
+
+## Full texts from OAK journals (`fetch_oak_fulltext.py`, 16–17 November 2026)
+
+**Data.** OAK journals with an OAI-PMH feed (366, from ilmiz.uz) whose sites this environment may reach (inscience.uz
+and 15 of the largest journal hosts). Kept articles state CC BY / BY-SA / CC0 in the record and on the article page,
+are marked Uzbek, and predate ChatGPT. Two date tests:
+- **change date (datestamp):** the record existed unchanged before 30 Nov 2022 (`until=2022-11-30`). inscience.uz only.
+- **publication date (dc:date):** most feeds have had every change date reset since, so only the article's own date
+  can be used. FarDU ilmiy xabarlari, Agrokimyo himoya va o‘simliklar karantini, Research Focus. This is weaker: an article
+  added to an old issue later would pass.
+
+The other surveyed journals state no open licence in their records, or their robots.txt, rate limits or broken feeds
+stop an automated reader; none of that was worked around. Up to 300 articles per journal: 925 articles, 10,315
+passages. 53 articles were already in `human_full_uz.json`, and 1,253 passages were dropped as reference lists or bylines
+(the passage cutter does not stop at the Cyrillic heading «Адабиётлар»). That leaves 8,472 passages: 3,261 by change
+date and 5,211 by publication date. The texts stay out of the repository (`oak_*.json`).
+
+**Independent check of the live model (uz_ai_v1 from PR #86, never trained on these journals):** it flags **1 of 8,472**
+passages (1 of 872 articles): inscience.uz 1/3,261, Agrokimyo 0/2,183, FarDU 0/2,466, Research Focus 0/562. This is
+the largest held-out test of human text so far, covering fields the model had not seen (agriculture, mathematics,
+engineering, medicine).
+
+**Retraining with them** (5-fold grouped cross-validation, `train_uzai.py --no-write`): the threshold rises to 0.848.
+Held-out human passages flagged: 0/13,290, with 0/3,261 by change date and 0/5,211 by publication date. Human abstracts
+flagged: 11/1,072, the same as before. Chatbot texts caught: 214/337, the same total as the live model; categories move
+by one or two (ChatGPT run 3 9/10 vs 8/10, Claude sections 15/24 vs 16/24, ChatGPT continuations 2/6 vs 4/6).
+Detection does not improve, so **the live model was not replaced**. `train_uzai.py` uses the texts when
+`oak_full_uz.json` is present (`--no-oak` leaves them out), so they will be in the next model that does improve
+detection, such as one trained on the AI-edited answers.
