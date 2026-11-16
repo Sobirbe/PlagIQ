@@ -50,8 +50,9 @@ for f, cat in (("gemini1.txt", "Gemini articles"), ("gemini2_humanized.txt", "Ge
 X = [t for t, *_ in items]; y = np.array([l for _, l, *_ in items]); cat = np.array([c for _, _, c, _ in items])
 fold = np.array([zlib.crc32(g.encode()) % 5 for *_, g in items])
 ORDER = ["Gemini sections", "Claude sections", "ChatGPT sections", "Gemini articles", "Gemini 'humanized' articles",
-         "ChatGPT dissertation", "Gemini polished (D)", "Claude polished (D)", "Gemini continuation alone (E)",
-         "Claude continuation alone (E)", "human + Gemini continuation (E)", "human + Claude continuation (E)", "human originals of D/E"]
+         "ChatGPT dissertation", "Gemini polished (D)", "Claude polished (D)", "ChatGPT polished (D)", "Gemini continuation alone (E)",
+         "Claude continuation alone (E)", "ChatGPT continuation alone (E)", "human + Gemini continuation (E)",
+         "human + Claude continuation (E)", "human + ChatGPT continuation (E)", "human originals of D/E"]
 ORDER = [c for c in ORDER if c in set(cat)]
 GEM = {"Gemini sections", "Gemini articles", "Gemini 'humanized' articles"}; CLA = {"Claude sections"}
 GPT = {"ChatGPT sections", "ChatGPT dissertation"}
@@ -60,7 +61,7 @@ REGIMES = {"all three chatbots' full-length writing": WRITTEN,
            "Claude left out": WRITTEN - CLA,
            "Gemini left out": WRITTEN - GEM,
            "ChatGPT left out": WRITTEN - GPT,
-           "all writing + polished": WRITTEN | {"Gemini polished (D)", "Claude polished (D)"}}
+           "all writing + polished": WRITTEN | {"Gemini polished (D)", "Claude polished (D)", "ChatGPT polished (D)"}}
 
 def run(ai_train):
     trainable = (cat == "human") | np.isin(cat, list(ai_train)); s = np.zeros(len(X))
