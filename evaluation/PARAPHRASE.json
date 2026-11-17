@@ -1,0 +1,113 @@
+{
+ "library_texts": 336,
+ "library_sentences": 24625,
+ "negatives": 500,
+ "negative_sentences": 3112,
+ "min_sentences": 2,
+ "results": {
+  "0.75": {
+   "found": {
+    "polish": [
+     27,
+     27
+    ],
+    "paraphrase": [
+     24,
+     27
+    ],
+    "expand": [
+     17,
+     18
+    ],
+    "shorten": [
+     13,
+     18
+    ],
+    "correct": [
+     17,
+     17
+    ]
+   },
+   "other_library_texts_flagged_by_edits": 12,
+   "unrelated_passages_flagged": 43
+  },
+  "0.8": {
+   "found": {
+    "polish": [
+     26,
+     27
+    ],
+    "paraphrase": [
+     20,
+     27
+    ],
+    "expand": [
+     16,
+     18
+    ],
+    "shorten": [
+     7,
+     18
+    ],
+    "correct": [
+     17,
+     17
+    ]
+   },
+   "other_library_texts_flagged_by_edits": 9,
+   "unrelated_passages_flagged": 35
+  },
+  "0.85": {
+   "found": {
+    "polish": [
+     23,
+     27
+    ],
+    "paraphrase": [
+     13,
+     27
+    ],
+    "expand": [
+     10,
+     18
+    ],
+    "shorten": [
+     3,
+     18
+    ],
+    "correct": [
+     17,
+     17
+    ]
+   },
+   "other_library_texts_flagged_by_edits": 9,
+   "unrelated_passages_flagged": 32
+  },
+  "0.9": {
+   "found": {
+    "polish": [
+     18,
+     27
+    ],
+    "paraphrase": [
+     8,
+     27
+    ],
+    "expand": [
+     7,
+     18
+    ],
+    "shorten": [
+     2,
+     18
+    ],
+    "correct": [
+     17,
+     17
+    ]
+   },
+   "other_library_texts_flagged_by_edits": 6,
+   "unrelated_passages_flagged": 31
+  }
+ }
+}
