@@ -48,6 +48,7 @@ try:
             page.locator('#consent').check()
             page.locator('button[type=submit]').click()
             page.wait_for_selector('#source-list .source-item')
+            assert page.locator('#originality').inner_text().startswith('Originality: 41.7%')   # 100 % minus every match
             first = page.locator('#source-list .source-item').first
             assert first.locator('.swatch.s0').count() == 1 and page.locator('#source-list .swatch.s1').count() == 1
             pair = first.locator('.pair').inner_text()
@@ -66,6 +67,7 @@ try:
             page.locator('.hl-tools button', has_text='Colour by source').click()
             page.locator('[data-lang=uz]').click()
             assert 'Sizning matningiz' in page.locator('#source-list').inner_text()
+            assert page.locator('#originality').inner_text().startswith('Originallik: 41.7%')
             page.locator('[data-lang=ru]').click()
             assert 'Ваш текст' in page.locator('#source-list').inner_text()
             page.locator('[data-lang=en]').click()
@@ -76,7 +78,7 @@ try:
             assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), (width, 'overflow')
             assert not errors, errors
             page.context.close()
-            print(f'PASS {width}px: colours by source, matching swatches, show-only filter, type toggle, side-by-side, UZ/RU/EN')
+            print(f'PASS {width}px: originality, colours by source, matching swatches, show-only filter, type toggle, side-by-side, UZ/RU/EN')
         browser.close()
 finally:
     web.terminate(); web.wait(timeout=10)
