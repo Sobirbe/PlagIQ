@@ -1,3 +1,4 @@
+from urllib.parse import urlencode
 import asyncio
 from contextlib import asynccontextmanager
 import hashlib
@@ -365,7 +366,9 @@ def verify_page(request: Request, ui: str = ""):
             (t["rid"], f["r"]), (t["date"], when), (t["hash"], f["h"]), (t["mode"], t["modes"][f["m"]]),
             (t["result"], result), (t["words"], f["w"]), (t["sources"], f["n"]), (t["lang"], f["l"].upper()))
             + (((t["ai"], f["x"] + "%"),) if "x" in f else ()) + (((t["ex"], f["e"]),) if "e" in f else ()))
-    links = " · ".join(f'<a href="?{html.escape(str(request.query_params))}&amp;ui={l}">{VERIFY_LANGS.get(l, l.upper())}</a>' for l in VERIFY_TEXT)
+    keep = [(k, v) for k, v in request.query_params.multi_items() if k != "ui"]   # switching language replaces ui
+    links = " · ".join(f'<a href="?{html.escape(urlencode(keep + [("ui", l)]))}">{VERIFY_LANGS.get(l, l.upper())}</a>'
+                       for l in VERIFY_TEXT)
     colour = "#0b6a64" if valid else "#9b2c16"
     page = (f'<!doctype html><html lang="{"uz-Cyrl" if lang == "uzc" else lang}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
             f'<title>{html.escape(t["title"])}</title><style>body{{font-family:system-ui,sans-serif;margin:0;background:#f7f9f7;color:#122a32}}'

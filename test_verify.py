@@ -77,3 +77,22 @@ def test_verify_page_open_during_private_pilot(monkeypatch):
     assert client.get('/').status_code == 401
     assert client.get('/verify?r=x&ui=en').status_code == 200            # supervisors can scan without the login
     assert 'Not valid' in client.get('/verify?r=x&ui=en').text
+
+
+def test_language_links_replace_ui_and_keep_the_link_valid(monkeypatch):
+    """Switching the verify page's language replaces ui= instead of adding another one each time."""
+    import re
+    from html import unescape
+    client = TestClient(web.app)
+    data = make_report(client, monkeypatch)
+    pdf = client.get(f"/api/report/{data['report_id']}.pdf?full=1&lang=uz").content
+    with fitz.open(stream=pdf, filetype='pdf') as doc:
+        url = next(l['uri'] for l in doc[0].get_links() if '/verify?' in l.get('uri', '')).replace('http://testserver', '')
+    path = url
+    for lang in ('ru', 'en', 'uzc', 'uz'):
+        page_html = client.get(path).text
+        href = unescape(re.search(rf'href="(\?[^"]*ui={lang})"', page_html).group(1))
+        assert href.count('ui=') == 1
+        path = '/verify' + href
+    page_html = client.get(path).text
+    assert path.count('ui=') == 1 and 'Haqiqiy' in page_html and 'emas' not in page_html.split('Haqiqiy')[1][:40]
