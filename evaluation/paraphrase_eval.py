@@ -50,7 +50,9 @@ def main(folder):
     lib_sents, owner = [], []
     for k, (name, text) in enumerate(library):
         s = sents(text); lib_sents += s; owner += [k] * len(s)
-    L = enc.encode(lib_sents); owner = np.array(owner)
+    cache = Path(folder).parent / "paraphrase_library.npy"
+    L = np.load(cache) if cache.is_file() else enc.encode(lib_sents)
+    np.save(cache, L); owner = np.array(owner)
     print(f"library: {len(library)} texts, {len(lib_sents)} sentences encoded in {time.time() - t0:.0f}s", flush=True)
 
     def matches(text):
@@ -72,12 +74,18 @@ def main(folder):
             found[c][kind][0] += bool(hits[own]); found[c][kind][1] += 1
             wrong[c] += int(hits.sum() - hits[own])
     print(f"edits done in {time.time() - t0:.0f}s", flush=True)
-    false = {c: 0 for c in CUTOFFS}; nsent = 0
+    false = {c: 0 for c in CUTOFFS}; nsent = 0; examples = []
     for p in negatives:
         best, n = matches(p); nsent += n
         if best is None: continue
         for c in CUTOFFS:
             false[c] += bool(((best >= c).sum(axis=1) >= MIN_SENTENCES).any())
+        hit = np.where((best >= 0.80).sum(axis=1) >= MIN_SENTENCES)[0]
+        if len(hit):                                  # what an unrelated passage matched, for reading (0.80)
+            q = sents(p); qv = enc.encode(q); k = int(hit[0]); rows = np.where(owner == k)[0]
+            sim = qv @ L[rows].T
+            pairs_ = [(float(sim[i].max()), q[i], lib_sents[rows[int(sim[i].argmax())]]) for i in range(len(q)) if sim[i].max() >= 0.80]
+            examples.append({"library": library[k][0], "pairs": pairs_})
     out = {"library_texts": len(library), "library_sentences": len(lib_sents), "negatives": len(negatives),
            "negative_sentences": nsent, "min_sentences": MIN_SENTENCES, "results": {}}
     for c in CUTOFFS:
@@ -87,6 +95,7 @@ def main(folder):
         cells = "  ".join(f"{k} {v[0]}/{v[1]}" for k, v in found[c].items())
         print(f"cut-off {c:.2f}: {cells}  | wrong sources {wrong[c]} | unrelated passages flagged {false[c]}/{len(negatives)}")
     json.dump(out, open(HERE / "PARAPHRASE.json", "w"), indent=1)
+    json.dump(examples, open(Path(folder).parent / "paraphrase_false.json", "w"), ensure_ascii=False, indent=1)
 
 
 if __name__ == "__main__":
