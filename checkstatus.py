@@ -32,6 +32,7 @@ T = {
         completed_matches="Completed: matches found", completed_no_matches="Completed: no matches found",
         incomplete_coverage="Incomplete: part of the sources could not be searched", failed_search="Failed: source search",
         ai_only="AI-detector check", at_least="at least {p}%",
+        originality="Originality: {p}", originality_note="share of the document with no match in the checked sources", at_most="at most {p}%",
         incomplete_note="The percentage covers only the sources that were compared; the missing ones could contain more "
                         "matching text. Run the check again later for full coverage.",
         issues=dict(search_partial="{n} of the search queries failed", downloads_cut_off="{n} full text(s) could not be downloaded in time",
@@ -43,6 +44,7 @@ T = {
         completed_matches="Завершено: совпадения найдены", completed_no_matches="Завершено: совпадений не найдено",
         incomplete_coverage="Не полностью: часть источников не удалось проверить", failed_search="Ошибка: поиск источников",
         ai_only="Проверка ИИ-детектором", at_least="не менее {p}%",
+        originality="Оригинальность: {p}", originality_note="доля документа без совпадений в проверенных источниках", at_most="не более {p}%",
         incomplete_note="Процент относится только к сравнённым источникам; в непроверенных может быть ещё совпадающий текст. "
                         "Повторите проверку позже для полного охвата.",
         issues=dict(search_partial="не выполнено поисковых запросов: {n}", downloads_cut_off="полных текстов не скачано вовремя: {n}",
@@ -54,6 +56,7 @@ T = {
         completed_matches="Yakunlandi: mosliklar topildi", completed_no_matches="Yakunlandi: moslik topilmadi",
         incomplete_coverage="To‘liq emas: manbalarning bir qismi tekshirilmadi", failed_search="Xato: manbalarni qidirish",
         ai_only="AI detektor tekshiruvi", at_least="kamida {p}%",
+        originality="Originallik: {p}", originality_note="hujjatning tekshirilgan manbalarda moslik topilmagan qismi", at_most="ko‘pi bilan {p}%",
         incomplete_note="Foiz faqat solishtirilgan manbalarga tegishli; tekshirilmaganlarida yana mos matn bo‘lishi mumkin. "
                         "To‘liq qamrov uchun keyinroq qayta tekshiring.",
         issues=dict(search_partial="qidiruv so‘rovlaridan {n} tasi bajarilmadi", downloads_cut_off="{n} ta to‘liq matn vaqtida yuklab olinmadi",
@@ -145,6 +148,19 @@ def headline(result, lang):
     if result.get("status") == "incomplete_coverage":
         return texts(lang)["at_least"].format(p=percent)
     return f"{percent}%"
+
+
+def originality(result, lang):
+    """Originality as Uzbek checkers report it: the share of the document's words with no match in the checked sources
+    (100 % minus every match, counted or excluded). "at most" when part of the sources could not be searched. None when
+    no percentage was computed (AI-only checks, failed searches)."""
+    percent = result.get("percent")
+    if percent is None or result.get("mode") == "ai":
+        return None
+    matched = float((result.get("citation") or {}).get("percent_all", percent) or 0)
+    value = f"{max(0.0, 100.0 - matched):.2f}".rstrip("0").rstrip(".")
+    t = texts(lang)
+    return t["originality"].format(p=t["at_most"].format(p=value) if result.get("status") == "incomplete_coverage" else value + "%")
 
 
 def rows(result, lang):

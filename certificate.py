@@ -273,17 +273,35 @@ class CertificatePage(Flowable):
         label = t["not_evaluated"] if percent is None else (f"{percent}%" if ai_mode else checkstatus.headline(r, self.lang))
         c.setFont(self.bold, 12 if percent is None else 22 if label.endswith("%") and label[0].isdigit() else 13)
         c.drawCentredString(cx, cy - 7, label)
-        self._para(esc(t["ai_ring"] if ai_mode else t["result"]), cx - ring - 4 * mm, cy - ring - 6 * mm, 2 * ring + 8 * mm, 8.5, self.bold, align=1)
+        label_end = self._para(esc(t["ai_ring"] if ai_mode else t["result"]), cx - ring - 4 * mm, cy - ring - 6 * mm,
+                               2 * ring + 8 * mm, 8.5, self.bold, align=1)
         citation = r.get("citation") or {}
+        below = min(cy - ring - 13 * mm, label_end - 2 * mm)
         if percent is not None and citation.get("percent_all") not in (None, percent):
-            self._para(esc(t["before"].format(p=citation["percent_all"])), cx - ring - 4 * mm, cy - ring - 13 * mm,
+            self._para(esc(t["before"].format(p=citation["percent_all"])), cx - ring - 4 * mm, below,
                        2 * ring + 8 * mm, 7.5, color=MUTED, align=1)
+            below -= 5 * mm
+        original = None if ai_mode else checkstatus.originality(r, self.lang)
+        if original:                                # as Uzbek checkers report it, next to the match figure
+            self._para(esc(original), cx - ring - 6 * mm, below, 2 * ring + 12 * mm, 9.5, self.bold, color=TEAL, align=1)
+            below -= 5 * mm
         fx = cx + ring + 12 * mm
         fy = y + 2
-        for k, v in facts(r, self.lang):
-            fy = self._para(esc(k), fx, fy, w - pad - fx, 7.5, color=MUTED)
-            fy = self._para(esc(v), fx, fy - 1, w - pad - fx, 9.5, self.bold) - 7
-        y = min(cy - ring - 20 * mm, fy - 6 * mm)
+        rows_ = facts(r, self.lang)
+        # The facts must end above the verification block (drawn below from the page bottom up). A long status note
+        # (incomplete checks, Uzbek and Russian wording) could run into it: step the type down until they fit.
+        notice_h0 = Paragraph(esc(t["notice"]), self._style(7.5)).wrap(inner, 1000)[1]
+        floor = pad + notice_h0 + 22 * mm + 34 * mm + 11 * mm
+        fw = w - pad - fx
+        def height(ks, vs, gap):
+            return sum(Paragraph(esc(k), self._style(ks)).wrap(fw, 1000)[1] + 1 +
+                       Paragraph(esc(v), self._style(vs, self.bold)).wrap(fw, 1000)[1] + gap for k, v in rows_)
+        ks, vs, gap = next(((a, b, g) for a, b, g in ((7.5, 9.5, 7), (7, 8.5, 5), (6.5, 7.5, 3.5))
+                            if fy - height(a, b, g) >= floor), (6.5, 7.5, 3.5))
+        for k, v in rows_:
+            fy = self._para(esc(k), fx, fy, fw, ks, color=MUTED)
+            fy = self._para(esc(v), fx, fy - 1, fw, vs, self.bold) - gap
+        y = min(below - 7 * mm, fy - 6 * mm)
 
         # bottom: notice, issued line, then the verification block above them
         notice_h = Paragraph(esc(t["notice"]), self._style(7.5)).wrap(inner, 1000)[1]

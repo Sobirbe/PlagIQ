@@ -580,8 +580,8 @@ COUNTED, EXCLUDED, ORIGINAL = "#E4572E", "#8FB8DE", "#9FD8CF"
 
 VIEW_T = {
     "en": dict(overview="Overview", counted="Matched and counted", excluded="Matched but excluded (quotations, bibliography)",
-               original="No match found in the searched scope", ocr="{n} scanned page(s) were read by OCR (text recognition). Recognition errors can hide a match, so a copied passage may be under-counted, never over-counted.", bar_note="The three parts add up to 100% of the document's words. "
-               "“No match found” describes only the scope searched; it is not a certificate of originality.",
+               original="Originality: no match found in the searched scope", ocr="{n} scanned page(s) were read by OCR (text recognition). Recognition errors can hide a match, so a copied passage may be under-counted, never over-counted.", bar_note="The three parts add up to 100% of the document's words. "
+               "Originality describes only the scope searched; it is not a certificate of originality.",
                src_title="Sources by share of the document", no="№", source="Source", coverage="Coverage",
                share="Share of document", share_note="A source's share counts the document's words found in it; "
                "several sources can contain the same words, so shares may add up to more than the total.",
@@ -597,8 +597,8 @@ VIEW_T = {
                passage="Passage (matched words highlighted)", searched="Searched", short_note="Short report. Download the "
                "full report from the results page while it is available (15 minutes).", no_matches="No matched passages were found in the searched scope."),
     "ru": dict(overview="Обзор", counted="Совпадения (учтены)", excluded="Совпадения, исключённые (цитаты, список литературы)",
-               original="Совпадений в проверенном охвате не найдено", ocr="Страниц-сканов, прочитанных OCR (распознавание текста): {n}. Ошибки распознавания могут скрыть совпадение: заимствование может быть занижено, но не завышено.", bar_note="Три части в сумме дают 100% слов документа. "
-               "«Совпадений не найдено» относится только к проверенному охвату и не является сертификатом оригинальности.",
+               original="Оригинальность: совпадений в проверенном охвате не найдено", ocr="Страниц-сканов, прочитанных OCR (распознавание текста): {n}. Ошибки распознавания могут скрыть совпадение: заимствование может быть занижено, но не завышено.", bar_note="Три части в сумме дают 100% слов документа. "
+               "Оригинальность относится только к проверенному охвату и не является сертификатом оригинальности.",
                src_title="Источники по доле в документе", no="№", source="Источник", coverage="Охват",
                share="Доля в документе", share_note="Доля источника — слова документа, найденные в нём; одни и те же слова могут "
                "встречаться в нескольких источниках, поэтому сумма долей может превышать итог.",
@@ -614,8 +614,8 @@ VIEW_T = {
                passage="Фрагмент (совпавшие слова выделены)", searched="Проверено", short_note="Краткий отчёт. Полный отчёт можно "
                "скачать на странице результата, пока он доступен (15 минут).", no_matches="В проверенном охвате совпадений не найдено."),
     "uz": dict(overview="Umumiy ko‘rinish", counted="Moslik (hisobga olingan)", excluded="Moslik, chiqarib tashlangan (iqtiboslar, adabiyotlar)",
-               original="Tekshirilgan doirada moslik topilmadi", ocr="OCR (matnni tanib olish) orqali o‘qilgan skanerlangan sahifalar: {n}. Tanib olish xatolari moslikni yashirishi mumkin: o‘zlashtirish kamroq ko‘rsatilishi mumkin, lekin ko‘proq emas.", bar_note="Uch qism birga hujjat so‘zlarining 100% ini tashkil etadi. "
-               "«Moslik topilmadi» faqat tekshirilgan doiraga tegishli; bu originallik sertifikati emas.",
+               original="Originallik: tekshirilgan doirada moslik topilmadi", ocr="OCR (matnni tanib olish) orqali o‘qilgan skanerlangan sahifalar: {n}. Tanib olish xatolari moslikni yashirishi mumkin: o‘zlashtirish kamroq ko‘rsatilishi mumkin, lekin ko‘proq emas.", bar_note="Uch qism birga hujjat so‘zlarining 100% ini tashkil etadi. "
+               "Originallik faqat tekshirilgan doiraga tegishli; bu originallik sertifikati emas.",
                src_title="Manbalar hujjatdagi ulushi bo‘yicha", no="№", source="Manba", coverage="Qamrov",
                share="Hujjatdagi ulushi", share_note="Manba ulushi — hujjatning shu manbada topilgan so‘zlari; bir xil so‘zlar bir nechta "
                "manbada bo‘lishi mumkin, shuning uchun ulushlar yig‘indisi umumiy natijadan katta bo‘lishi mumkin.",
