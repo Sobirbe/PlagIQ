@@ -341,3 +341,27 @@ by one or two (ChatGPT run 3 9/10 vs 8/10, Claude sections 15/24 vs 16/24, ChatG
 Detection does not improve, so **the live model was not replaced**. `train_uzai.py` uses the texts when
 `oak_full_uz.json` is present (`--no-oak` leaves them out), so they will be in the next model that does improve
 detection, such as one trained on the AI-edited answers.
+
+## AI-edited text (`edit_study.py`, answers collected 17 November 2026)
+
+The owner ran `prompts-edit-uz.txt` in ChatGPT, Gemini and Claude: 107 answers (`edit_chatgpt.json`, `edit_gemini.json`,
+`edit_claude.json`; Claude did not answer the poem in F12). The answers keep little of the original wording (share of
+the original's word 3-grams still present): polish 17 %, paraphrase 4 %, expand 13 %, shorten 4 %, correct 76 %.
+
+**Live model** (`python3 edit_study.py`, threshold 0.785): it flags 3 of 107 edited passages (ChatGPT expand 2/6,
+Gemini shorten 1/6, all others 0) and 0 of the 36 human originals. Measured against 5,022 unseen human journal passages,
+the edits still score higher than human text: above the human median, polish 26/27, paraphrase 25/27, expand 18/18,
+shorten 18/18, correct 17/17; above the score only 5 % of human passages reach, polish 16/27, paraphrase 15/27,
+expand 14/18, shorten 10/18, correct 5/17.
+
+**Retrained with the edits** (polish, paraphrase, expand and shorten as chatbot text; corrections scored only; each
+edit in its original's fold): 5 of 96 edits caught at the 1 % threshold (0.862), and about half above the 5 % human mark.
+Other results stay as before (human passages 1/13,290, chatbot-written texts about the same). Training on 96 edits does
+not move them past the threshold, so **the live model was not replaced**.
+
+**What this means.** The character n-gram model does see AI editing: edited passages rank above typical human
+writing. But they overlap with the top few percent of human writing. Flagging most of them would mean flagging about
+1 human passage in 20, which is not acceptable for a tool whose results may be used against authors. With these
+features, AI-edited Uzbek text cannot be detected at a safe false-alarm rate. More edit examples of the same kind are
+unlikely to change that. A different kind of model (for example the XLM-R combination tested earlier) would have to show
+it on these same 107 texts before it is worth deploying.
