@@ -48,6 +48,7 @@ ISSUE_YEAR = {**{str(i): 2021 for i in (8, 10, 11, 12, 13)}, **{str(i): 2022 for
 # Options (to measure each change; the model is written only without --no-write):
 #   --keep-late-zenodo  keep open-access works whose Zenodo record was uploaded after ChatGPT (zenodo_created.json)
 #   --no-ilmiz          leave out the ilmiz.uz abstracts (ilmiz_abstracts_uz.json, from fetch_ilmiz.py)
+#   --no-edits          leave out the chatbot-edited passages (edit_<bot>.json)
 #   --no-oak            leave out the OAK journal full texts (oak_full_uz.json, from fetch_oak_fulltext.py)
 ARGS = set(sys.argv[1:])
 import json, re
@@ -99,6 +100,23 @@ if "--no-oak" not in ARGS and oak.is_file():
             texts.append(uzai.clean(t)); y.append(0); cat.append(c); group.append(f"oak:{a['journal']}"); unit.append("passage")
         HUMAN = HUMAN | {c}
     print(f"added {len(texts) - n0} OAK journal passages ({dup} articles already in human_full_uz.json skipped)", flush=True)
+if "--no-edits" not in ARGS and Path(__file__).with_name("edit_plan.json").is_file():
+    # Chatbot edits of real pre-ChatGPT passages (prompts-edit-uz.txt; edit_<bot>.json): polished, paraphrased,
+    # expanded and shortened texts are chatbot text. Each shares its human original's group, so an original and its
+    # edits always fall in the same fold. Spelling/grammar corrections keep most of the author's wording: they are
+    # scored but never trained on (category ending "(test only)").
+    plan = json.load(open(Path(__file__).with_name("edit_plan.json")))["f"]
+    n0 = len(texts)
+    for bot, name in (("chatgpt", "ChatGPT"), ("gemini", "Gemini"), ("claude", "Claude")):
+        f = Path(__file__).with_name(f"edit_{bot}.json")
+        if not f.is_file(): continue
+        answers = json.load(open(f))
+        for x in plan:
+            t = (answers.get(x["block"]) or [None] * 3)[x["n"] - 1]
+            if not t: continue
+            texts.append(uzai.clean(t)); y.append(1); group.append(f"passage:{x['id']}"); unit.append("passage")
+            cat.append(f"{name} edited: {x['kind']}" + (" (test only)" if x["kind"] == "correct" else ""))
+    print(f"added {len(texts) - n0} chatbot-edited passages", flush=True)
 held_out_test = []                                       # (source, year, passages) scored at the end
 recent = Path(__file__).with_name("human_recent_uz.json")
 if recent.is_file():
@@ -111,6 +129,7 @@ if recent.is_file():
             group.append(f"recent:{d['id']}"); unit.append("passage")
 y, cat, unit = np.array(y), np.array(cat), np.array(unit)
 fold = np.array([zlib.crc32(g.encode()) % 5 for g in group])
+trainable = np.array([not c.endswith("(test only)") for c in cat])
 print(f"{len(texts)} texts: {int((y == 0).sum())} human, {int((y == 1).sum())} chatbot", flush=True)
 
 t0 = time.time(); rows, cols, vals = [], [], []
@@ -132,7 +151,7 @@ def predict(idf, clf, rows_idx):
 
 held = np.zeros(len(texts))
 for f in range(5):
-    tr, te = np.where(fold != f)[0], np.where(fold == f)[0]
+    tr, te = np.where((fold != f) & trainable)[0], np.where(fold == f)[0]
     idf, _, clf = fit(tr); held[te] = predict(idf, clf, te)
     print(f"fold {f} done", flush=True)
 hp = held[(y == 0) & (unit == "passage")]; ha = held[(y == 0) & (unit == "abstract")]
@@ -144,11 +163,14 @@ for c in sorted(set(cat[y == 0])):
     m = cat == c; print(f"  {c}: {int((held[m] > thr).sum())}/{int(m.sum())} wrongly flagged (held out)")
 hr = held[cat == "human journals 2021-22"]
 if len(hr): print(f"held-out human journal passages (2021-22) above it: {int((hr > thr).sum())}/{len(hr)}")
+thr5 = float(np.quantile(hp, 0.95)); med = float(np.median(hp))
 for c in sorted(set(cat[y == 1])):
-    m = cat == c; print(f"  {c}: {int((held[m] > thr).sum())}/{int(m.sum())} caught (held out)")
+    m = cat == c
+    print(f"  {c}: {int((held[m] > thr).sum())}/{int(m.sum())} caught (held out)"
+          f"   [above 5 % human mark: {int((held[m] > thr5).sum())}; above human median: {int((held[m] > med).sum())}]")
 
 if "--no-write" in ARGS: raise SystemExit
-idf, df, clf = fit(np.arange(len(texts)))
+idf, df, clf = fit(np.where(trainable)[0])
 coef = clf.coef_[0]; keep = np.where(np.abs(coef) > 1e-7)[0]; seen = np.where(df > 0)[0]
 out = ROOT / "models" / "uz_ai_v1.npz"; out.parent.mkdir(exist_ok=True)
 np.savez_compressed(out, coef_idx=keep.astype(np.int32), coef_val=coef[keep].astype(np.float32),
