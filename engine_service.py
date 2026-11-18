@@ -154,6 +154,9 @@ def crosslang_loop():
         if crosslang.missing_files():
             CROSSLANG_STATE.update(state="downloading")
             crosslang.download()
+        if crosslang.needs_shrink():
+            CROSSLANG_STATE.update(state="shrinking")
+            crosslang.shrink()
         CROSSLANG_STATE.update(state="loading")
         encoder = crosslang.model()
         CROSSLANG_STATE.update(state="indexing")

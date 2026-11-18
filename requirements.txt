@@ -9,6 +9,7 @@ pytest>=8,<10
 httpx>=0.27,<1
 # Translated-reuse detection on the engine (crosslang.py, off unless CROSSLANG=1): LaBSE through ONNX, no PyTorch
 onnxruntime>=1.29,<2
+onnx>=1.20,<2            # stores the model in 16 bits once (crosslang.shrink)
 tokenizers>=0.22,<1
 safetensors>=0.8,<1
 numpy>=2,<3
