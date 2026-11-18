@@ -408,7 +408,7 @@ def _crosslang(c):
         return None
     state = c.get("state")
     return {"enabled": c.get("enabled") is True, "model": c.get("model") is True,
-            "state": state if state in ("off", "downloading", "loading", "indexing", "ready", "error") else "",
+            "state": state if state in ("off", "downloading", "shrinking", "loading", "indexing", "ready", "error") else "",
             "error": str(c.get("error") or "")[:200],
             **{k: c[k] if type(c.get(k)) is int and 0 <= c[k] <= 10**9 else 0 for k in ("indexed", "total")}}
 

@@ -154,6 +154,9 @@ def crosslang_loop():
         if crosslang.missing_files():
             CROSSLANG_STATE.update(state="downloading")
             crosslang.download()
+        if crosslang.needs_shrink():
+            CROSSLANG_STATE.update(state="shrinking")
+            crosslang.shrink()
         CROSSLANG_STATE.update(state="loading")
         encoder = crosslang.model()
         CROSSLANG_STATE.update(state="indexing")
@@ -166,7 +169,8 @@ def crosslang_loop():
         if lock.acquire(blocking=False):
             try:
                 with closing(connect()) as db:
-                    done = crosslang.index_some(db, encoder, limit=3)
+                    done = crosslang.convert_some(db)      # rows in the earlier float16 format first: frees space
+                    done += crosslang.index_some(db, encoder, limit=3)
                     status = crosslang.index_status(db)
                 CROSSLANG_STATE.update(state="ready" if status["indexed"] >= status["total"] else "indexing", error="")
             except Exception as exc:

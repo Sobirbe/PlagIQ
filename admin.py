@@ -67,7 +67,7 @@ def crosslang_detail(library):
         return "error: " + str(c.get("error", ""))[:200]
     if state in ("indexing", "ready"):
         return f"{state}: {c.get('indexed', 0):,} of {c.get('total', 0):,} library texts indexed"
-    return {"downloading": "downloading the model (1.9 GB, once)", "loading": "loading the model"}.get(state, state or "starting")
+    return {"downloading": "downloading the model (1.9 GB, once)", "shrinking": "storing the model in 16 bits (once; 1.9 GB -> 0.9 GB)", "loading": "loading the model"}.get(state, state or "starting")
 
 
 def checklist(library, probe=""):

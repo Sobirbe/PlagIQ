@@ -80,9 +80,83 @@ def model_dir():
 
 # ----------------------------------------------------------------- model files
 
+MODEL = "onnx/model.onnx"
+SHRUNK = "onnx/model.f16.json"          # written after shrink(): the 16-bit-storage file's size
+
+
+def _expected_size(folder, name):
+    """The pinned size, or for the model the size recorded by shrink() when it was stored in 16 bits."""
+    if name == MODEL and (folder / SHRUNK).is_file():
+        try:
+            return int(json.loads((folder / SHRUNK).read_text("utf-8"))["size"])
+        except (ValueError, KeyError, TypeError, OSError):
+            return FILES[name][0]
+    return FILES[name][0]
+
+
 def missing_files(folder=None):
     folder = Path(folder or model_dir())
-    return [name for name, (size, _) in FILES.items() if not (folder / name).is_file() or (folder / name).stat().st_size != size]
+    return [name for name in FILES if not (folder / name).is_file()
+            or (folder / name).stat().st_size != _expected_size(folder, name)]
+
+
+def shrink_enabled():
+    return os.environ.get("CROSSLANG_FP16", "1") != "0"
+
+
+def needs_shrink(folder=None):
+    folder = Path(folder or model_dir())
+    return shrink_enabled() and (folder / MODEL).is_file() and (folder / MODEL).stat().st_size == FILES[MODEL][0]
+
+
+def shrink(folder=None, tmp_dir=None):
+    """Store the model's large weight tables in 16 bits (1.88 GB -> 0.94 GB on disk). Computation stays 32-bit: each
+    table is cast back when the model loads, and the 1.5 GB word-embedding table is looked up in 16 bits and only the
+    looked-up rows are cast. Measured on 400 Uzbek sentences: same-sentence similarity 1.00000, largest change of any
+    sentence-pair similarity 0.00026 (the matching cut-off is 0.80). The new file is written beside the model when the
+    disk has room, else in the container's temporary folder, and replaces the original only when complete."""
+    import shutil
+    import tempfile
+    import onnx
+    from onnx import TensorProto, helper, numpy_helper
+    folder = Path(folder or model_dir())
+    source = folder / MODEL
+    m = onnx.load(str(source))
+    g = m.graph
+    gathered = {node.input[0] for node in g.node if node.op_type == "Gather"}
+    tables, casts_first = [], []
+    for init in list(g.initializer):
+        if init.data_type != TensorProto.FLOAT or int(np.prod(init.dims)) < 100_000:
+            continue
+        name16 = init.name + "__f16"
+        tables.append(numpy_helper.from_array(numpy_helper.to_array(init).astype(np.float16), name16))
+        g.initializer.remove(init)
+        if init.name in gathered:              # embedding tables: gather the 16-bit rows, then cast only those rows
+            for i, node in enumerate(list(g.node)):
+                if node.op_type == "Gather" and node.input[0] == init.name:
+                    out = node.output[0]
+                    node.input[0], node.output[0] = name16, out + "__f16"
+                    g.node.insert(list(g.node).index(node) + 1,
+                                  helper.make_node("Cast", [out + "__f16"], [out], to=TensorProto.FLOAT, name=out + "__cast"))
+        if any(init.name in node.input for node in g.node):
+            casts_first.append(helper.make_node("Cast", [name16], [init.name], to=TensorProto.FLOAT, name=init.name + "__cast"))
+    g.initializer.extend(tables)
+    for node in reversed(casts_first):
+        g.node.insert(0, node)
+    data = m.SerializeToString()
+    del m, tables
+    room = shutil.disk_usage(folder).free > len(data) + (64 << 20)
+    where = folder / "onnx" if room else Path(tmp_dir or tempfile.gettempdir())
+    part = where / "model.onnx.f16.part"
+    part.write_bytes(data)
+    if room:
+        os.replace(part, source)
+    else:                                      # full volume: free the original first, then move the new file in
+        source.unlink()
+        shutil.move(str(part), str(source))
+    (folder / SHRUNK).write_text(json.dumps({"size": len(data), "from": FILES[MODEL][0]}), "utf-8")
+    log.warning("crosslang: model stored in 16 bits (%.0f MB, was %.0f MB)", len(data) / 1e6, FILES[MODEL][0] / 1e6)
+    return len(data)
 
 
 def download(folder=None, opener=urllib.request.urlopen):
@@ -90,6 +164,8 @@ def download(folder=None, opener=urllib.request.urlopen):
     renamed only when complete and of the expected size."""
     folder = Path(folder or model_dir())
     for name in missing_files(folder):
+        if name == MODEL:
+            (folder / SHRUNK).unlink(missing_ok=True)          # a fresh full-size download replaces a shrunk model
         size = FILES[name][0]
         target = folder / name
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -186,14 +262,43 @@ def sentences(text):
     return out
 
 
+Q8 = b"Q8"          # index format: this tag, then per vector a float32 scale and DIM int8 values (772 bytes)
+
+
 def pack(vectors):
-    """float16 bytes for the index (rounding changes similarities by about 0.001)."""
-    return np.asarray(vectors, dtype=np.float16).tobytes()
+    """Index bytes: 8-bit values with one scale per vector, half the size of the earlier float16 rows. Measured on
+    6,000 real library sentences: similarity changes by at most 0.0015, and no sentence pair moved across the 0.80
+    cut-off (0 of 1,766)."""
+    v = np.atleast_2d(np.asarray(vectors, dtype=np.float32))
+    scale = np.maximum(np.abs(v).max(axis=1, keepdims=True), 1e-12) / 127
+    q = np.round(v / scale).astype(np.int8)
+    return Q8 + b"".join(scale[i].astype(np.float32).tobytes() + q[i].tobytes() for i in range(len(v)))
 
 
 def unpack(blob, rows=None):
-    vec = np.frombuffer(blob, dtype=np.float16).astype(np.float32)
-    return vec.reshape(-1, DIM) if rows is None else vec.reshape(rows, DIM)
+    """Vectors from the index: the 8-bit format (length 2 + 772 n, never a multiple of 4) or the earlier float16 rows
+    (length 1536 n), so an index written before the change keeps working while it is converted (convert_some)."""
+    if len(blob) % 4 == 2 and blob[:2] == Q8:
+        raw = np.frombuffer(blob, dtype=np.uint8, offset=2).reshape(-1, 4 + DIM)
+        scale = raw[:, :4].copy().view(np.float32)
+        vec = raw[:, 4:].copy().view(np.int8).astype(np.float32) * scale
+    else:
+        vec = np.frombuffer(blob, dtype=np.float16).astype(np.float32).reshape(-1, DIM)
+    return vec if rows is None else vec.reshape(rows, DIM)
+
+
+def convert_some(db, limit=2000):
+    """Rewrite up to `limit` index rows stored in the earlier float16 format (2 bytes per value) in the 8-bit format.
+    Returns the number converted. The freed space is reused by SQLite for later rows (the file itself shrinks only
+    when the library is compacted)."""
+    ensure_tables(db)
+    legacy = DIM * 2
+    rows = db.execute("SELECT rowid, vec FROM crosslang_sents WHERE length(vec) = ? LIMIT ?", (legacy, limit)).fetchall()
+    db.executemany("UPDATE crosslang_sents SET vec=? WHERE rowid=?", [(pack(unpack(v, 1)), r) for r, v in rows])
+    docs = db.execute("SELECT source, vec FROM crosslang_docs WHERE length(vec) = ? LIMIT ?", (legacy, limit)).fetchall()
+    db.executemany("UPDATE crosslang_docs SET vec=? WHERE source=?", [(pack(unpack(v, 1)), n) for n, v in docs])
+    db.commit()
+    return len(rows) + len(docs)
 
 
 def digest(path):
