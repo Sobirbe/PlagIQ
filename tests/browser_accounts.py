@@ -83,30 +83,35 @@ try:
             page.on('pageerror', lambda e: errors.append(str(e)))
             page.goto('http://127.0.0.1:8146')
             page.locator('[data-lang=en]').click()
-            page.wait_for_selector('#account summary.signin-open')
-            assert page.locator('#account summary').inner_text() == 'Sign in'
-            assert 'up to 1,000 words can be checked without signing in' in page.locator('#login-note').inner_text()
+            page.wait_for_selector('#account > details > summary.signin-open')
+            assert page.locator('#account > details > summary').inner_text() == 'Sign in'
+            assert 'Sign in to run a check' in page.locator('#login-note').inner_text()      # every check needs an account
             page.locator('#submission').set_input_files({'name': 'essay.txt', 'mimeType': 'text/plain', 'buffer': (EN * 7).encode()})
             page.wait_for_function("() => document.querySelector('#quote').textContent.includes('1,1')")
             page.locator('#consent').check()
             page.locator('button[type=submit]').click()
-            assert 'need sign-in' in page.locator('#status').inner_text(), page.locator('#status').inner_text()
+            assert 'Sign in to run a check' in page.locator('#status').inner_text(), page.locator('#status').inner_text()
             page.context.route('https://oauth.telegram.org/**', telegram_popup)
             with page.expect_popup() as popup:
-                page.locator('#account summary.signin-open').click()
+                if page.locator('#account > details').get_attribute('open') is None:   # opened by "Sign in to run a check"
+                    page.locator('#account > details > summary.signin-open').click()
                 page.locator('#account button.tg').click()
             assert popup.value.url.startswith('https://oauth.telegram.org/auth?bot_id=123456789&origin=http%3A%2F%2F127.0.0.1%3A8146')
-            page.wait_for_function("() => ((document.querySelector('#account summary')||{}).textContent||'').includes('Dilnoza')")  # PlagIQ tab stays open
-            assert 'Dilnoza Karimova' in page.locator('#account summary').inner_text()
+            page.wait_for_function("() => ((document.querySelector('#account > details > summary')||{}).textContent||'').includes('Dilnoza')")  # PlagIQ tab stays open
+            assert 'Dilnoza Karimova' in page.locator('#account > details > summary').inner_text()
             assert page.locator('#status').inner_text() == ''                        # "sign in first" message cleared
-            page.locator('#account summary').click()
+            page.locator('#account > details > summary').click()
             page.locator('#account .menu button', has_text='Sign out').click()
-            page.wait_for_selector('#account summary.signin-open')
+            page.wait_for_selector('#account > details > summary.signin-open')
             page.goto('http://127.0.0.1:8146/login#tgAuthResult=' + tg_result())    # redirect fallback still works
-            page.wait_for_function("() => ((document.querySelector('#account summary')||{}).textContent||'').includes('Dilnoza')")
-            assert 'Dilnoza Karimova' in page.locator('#account summary').inner_text() and page.url.endswith('/')
+            page.wait_for_function("() => ((document.querySelector('#account > details > summary')||{}).textContent||'').includes('Dilnoza')")
+            assert 'Dilnoza Karimova' in page.locator('#account > details > summary').inner_text() and page.url.endswith('/')
             assert page.locator('#login-note').is_hidden()
-            # AI detector mode
+            # AI detector mode: not part of the free check, so the owner grants this tester a pilot allowance
+            os.environ['USERS_DB'] = tmp + '/users.sqlite3'               # the site's accounts database (shared file)
+            sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+            import entitlements
+            entitlements.grant(42, 5, 150000, 30, 'browser test')
             page.locator('input[name=mode][value=ai]').check()
             assert page.locator('#academic-note').is_hidden() and page.locator('#options-set').is_hidden()
             assert 'Pangram (USA)' in page.locator('#ai-explain').inner_text()
@@ -121,8 +126,9 @@ try:
                              'AI-assisted 13%', 'Human 45%', '1 of 1 passages flagged · 1 look “humanized”', 'not proof'):
                 assert expected in box, (expected, box)
             assert page.locator('#score').inner_text() == '55%'
-            page.locator('#ai-box details summary').click()
-            assert 'The rapid growth of remittance inflows' in page.locator('#ai-box details').inner_text()
+            doc = page.locator('#ai-box details', has=page.locator('summary', has_text='Show the document'))
+            doc.locator('summary').click()
+            assert 'The rapid growth of remittance inflows' in doc.inner_text()
             page.locator('[data-lang=uz]').click()
             assert 'AI detektor (Pangram bahosi)' in page.locator('#ai-box').inner_text()
             assert 'Hujjatni AI detektoriga tekshirish' in page.locator('#mode-ai').inner_text()
@@ -130,13 +136,13 @@ try:
             if SHOTS:
                 page.locator('#ai-box').scroll_into_view_if_needed()
                 page.locator('#result').screenshot(path=str(SHOTS / f'ai-result-{width}.png'))
-            page.locator('#account summary').click()
+            page.locator('#account > details > summary').click()
             assert 'My recent checks' in page.locator('#account .menu').inner_text() and 'AI 42' in page.locator('#account .menu').inner_text()
             if SHOTS and width == 1440:
                 page.evaluate('scrollTo(0,0)')
                 page.screenshot(path=str(SHOTS / 'account-menu.png'), clip={'x': 700, 'y': 0, 'width': 740, 'height': 330})
             page.locator('#account .menu button', has_text='Sign out').click()
-            page.wait_for_selector('#account summary.signin-open')
+            page.wait_for_selector('#account > details > summary.signin-open')
             assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), (width, 'overflow')
             assert not errors, errors
             page.context.close()

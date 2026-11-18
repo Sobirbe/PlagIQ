@@ -52,11 +52,17 @@ try:
             page = ctx.new_page()
             page.goto('http://127.0.0.1:8149')
             page.locator('[data-lang=en]').click()
-            page.wait_for_selector('#account summary.signin-open')
-            page.locator('#account summary.signin-open').click()
+            page.wait_for_selector('#account > details > summary.signin-open')
+            if page.locator('#account > details').get_attribute('open') is None:
+                page.locator('#account > details > summary.signin-open').click()
             with page.expect_popup():
                 page.locator('#account button.tg').click()
-            page.wait_for_selector('#account summary:not(.signin-open)')
+            page.wait_for_selector('#account > details > summary:not(.signin-open)')
+            # archiving and corpus checks are not part of the free check: the owner grants a pilot allowance
+            os.environ['USERS_DB'] = tmp + '/users.db'                    # the site's accounts database (shared file)
+            sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+            import entitlements
+            entitlements.grant(user_id, 5, 150000, 30, 'browser test')
             return page
 
         def run(page, name, text, mode='reference'):
@@ -79,10 +85,10 @@ try:
             author.locator('#archive_consent').check()
             author.locator('button[type=submit]').click()
             author.wait_for_function("() => document.body.innerText.includes('Added to the protected archive')")
-            author.locator('#account summary').click()
+            author.locator('#account > details > summary').click()
             menu = author.locator('#account .menu').inner_text()
             assert 'My archived works' in menu and 'Suv resurslarini boshqarish' in menu, menu
-            author.locator('#account summary').click()
+            author.locator('#account > details > summary').click()
 
             student = session(2000 + width, "Aziz", width)
             student.on('pageerror', lambda e: errors.append(str(e)))
@@ -100,7 +106,7 @@ try:
             if SHOTS:
                 student.locator('#result').screenshot(path=str(SHOTS / f'archive-match-{width}.png'))
             # the author removes the work; the copy is no longer found
-            author.locator('#account summary').click()
+            author.locator('#account > details > summary').click()
             author.once('dialog', lambda d: d.accept())
             author.locator('#account .menu button', has_text='Remove').click()
             author.wait_for_function("() => document.querySelector('#account .menu') && document.querySelector('#account .menu').textContent.includes('No archived works')")

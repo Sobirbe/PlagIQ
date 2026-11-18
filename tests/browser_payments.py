@@ -63,12 +63,12 @@ try:
             page.on('pageerror', lambda e: errors.append(str(e)))
             page.goto(BASE + '/login#tgAuthResult=' + tg_result(42 + width))
             page.locator('[data-lang=en]').click()
-            page.wait_for_selector('#account summary:not(.signin-open)')
-            page.wait_for_function('() => ((document.querySelector("#account summary") || {}).textContent || "").includes("UZS")')
-            assert '0 UZS' in page.locator('#account summary').inner_text()
+            page.wait_for_selector('#account > details > summary:not(.signin-open)')
+            page.wait_for_function('() => ((document.querySelector("#account > details > summary") || {}).textContent || "").includes("UZS")')
+            assert '0 UZS' in page.locator('#account > details > summary').inner_text()
             assert 'TEST MODE' in page.locator('#pilot-bar').inner_text()
             page.locator('#calc-words').fill('3000')
-            assert '15,000' in page.locator('#calc-out').inner_text() and 'taken from your balance' in page.locator('#calc-out').inner_text()
+            assert 'Student · 15,000 UZS' in page.locator('#calc-out').inner_text(), page.locator('#calc-out').inner_text()
             # A paid check with an empty balance is refused.
             page.locator('input[name=mode][value=reference]').check()
             page.locator('#submission').set_input_files({'name': 'essay.txt', 'mimeType': 'text/plain', 'buffer': LONG.encode()})
@@ -76,7 +76,7 @@ try:
             page.locator('button[type=submit]').click()
             page.wait_for_function('() => document.querySelector("#status").textContent.includes("balance is too low")')
             # Top up 20,000 so'm with Payme: the browser goes to the sandbox checkout.
-            page.locator('#account summary').click()
+            page.locator('#account > details > summary').click()
             menu = page.locator('#account .menu')
             assert 'sandbox payments only' in menu.inner_text() and 'Balance: 0' in menu.inner_text()
             if SHOTS:
@@ -108,7 +108,7 @@ try:
             page.wait_for_function('() => document.querySelector("#login-note").textContent.includes("Payment received")')
             assert '20,000' in page.locator('#login-note').inner_text()
             assert '?paid=' not in page.url
-            page.wait_for_function('() => document.querySelector("#account summary").textContent.includes("20,000")')
+            page.wait_for_function('() => document.querySelector("#account > details > summary").textContent.includes("20,000")')
             page.locator('input[name=mode][value=reference]').check()
             page.locator('#submission').set_input_files({'name': 'essay.txt', 'mimeType': 'text/plain', 'buffer': LONG.encode()})
             page.locator('#reference_text').fill(EN)
@@ -116,8 +116,8 @@ try:
             page.wait_for_selector('#result', state='visible')
             page.wait_for_function('() => document.querySelector("#plan-note").textContent.includes("Charged")')
             assert 'Charged 15,000' in page.locator('#plan-note').inner_text()
-            page.wait_for_function('() => document.querySelector("#account summary").textContent.includes("5,000")')
-            page.locator('#account summary').click()
+            page.wait_for_function('() => document.querySelector("#account > details > summary").textContent.includes("5,000")')
+            page.locator('#account > details > summary').click()
             with page.expect_popup() as popup:
                 page.locator('#account .menu a', has_text='receipt').click()
             receipt = popup.value
@@ -131,15 +131,15 @@ try:
             assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), (width, 'overflow')
             # Deleting the account warns about the balance, then erases it with the payment records.
             page.locator('[data-lang=en]').click()
-            page.locator('#account summary').click()
+            page.locator('#account > details > summary').click()
             messages = []
             page.once('dialog', lambda d: (messages.append(d.message), d.accept()))
             page.locator('#account .menu button', has_text='Delete my account').click()
-            page.wait_for_selector('#account summary.signin-open')
+            page.wait_for_selector('#account > details > summary.signin-open')
             assert 'unspent balance of 5,000 UZS is lost' in messages[0], messages
             page.goto(BASE + '/login#tgAuthResult=' + tg_result(42 + width))
-            page.wait_for_function('() => ((document.querySelector("#account summary") || {}).textContent || "").includes("UZS")')
-            assert '· 0 UZS' in page.locator('#account summary').inner_text()
+            page.wait_for_function('() => ((document.querySelector("#account > details > summary") || {}).textContent || "").includes("UZS")')
+            assert '· 0 UZS' in page.locator('#account > details > summary').inner_text()
             assert not errors, errors
             context.close()
         browser.close()
