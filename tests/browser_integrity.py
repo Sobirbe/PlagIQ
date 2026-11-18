@@ -25,6 +25,7 @@ try:
                                        device_scale_factor=2 if SHOTS else 1).new_page()
             errors = []
             page.on('pageerror', lambda e: errors.append(str(e)))
+            page.add_init_script("try{localStorage.getItem('plagiq-ui-lang')||localStorage.setItem('plagiq-ui-lang','en')}catch(e){}")  # an English-speaking visitor
             page.goto('http://127.0.0.1:8145')
             page.locator('input[name=mode][value=reference]').check()
             page.locator('#submission').set_input_files({'name': 'essay.txt', 'mimeType': 'text/plain', 'buffer': TEXT.encode()})

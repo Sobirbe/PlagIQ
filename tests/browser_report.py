@@ -48,7 +48,10 @@ try:
             page.locator('#consent').check()
             page.locator('button[type=submit]').click()
             page.wait_for_selector('#source-list .source-item')
-            assert page.locator('#originality').inner_text().startswith('Originality: 41.7%')   # 100 % minus every match
+            kpis = page.locator('#kpis').inner_text()                        # similarity, unmatched text, sources with matches
+            assert '58.3%' in kpis and '41.7%' in kpis and 'Text with no match found' in kpis and 'Sources with matches' in kpis
+            assert kpis.split('Text with no match found')[1].strip().startswith('2'), kpis
+            assert 'does not guarantee originality' in page.locator('#kpi-note').inner_text()
             first = page.locator('#source-list .source-item').first
             assert first.locator('.swatch.s0').count() == 1 and page.locator('#source-list .swatch.s1').count() == 1
             pair = first.locator('.pair').inner_text()
@@ -67,7 +70,7 @@ try:
             page.locator('.hl-tools button', has_text='Colour by source').click()
             page.locator('[data-lang=uz]').click()
             assert 'Sizning matningiz' in page.locator('#source-list').inner_text()
-            assert page.locator('#originality').inner_text().startswith('Originallik: 41.7%')
+            assert 'Moslik topilmagan matn' in page.locator('#kpis').inner_text() and '41.7%' in page.locator('#kpis').inner_text()
             page.locator('[data-lang=ru]').click()
             assert 'Ваш текст' in page.locator('#source-list').inner_text()
             page.locator('[data-lang=en]').click()

@@ -40,7 +40,7 @@ from discovery import discover
 import html
 from engine_client import EngineError, configured as corpus_configured, library as engine_library, run_check, summarize
 import engine_client
-from report_pdf import build_pdf, build_short_pdf
+from report_pdf import build_certificate_pdf, build_pdf, build_short_pdf
 from security import SecurityMiddleware, MAX_REQUEST
 import checkstatus
 import io
@@ -1222,6 +1222,16 @@ def validate_check(user, language, mode, consent, exclude_quotes, exclude_biblio
     return options, ai_check, deposit
 
 
+DOC_TYPES = ("article", "dissertation", "master", "bachelor", "course", "conference", "monograph", "other")
+
+
+def document_meta(author, title, kind):
+    """Optional author, title and type the user typed for the certificate: plain text, no control characters."""
+    clean = lambda v, n: " ".join("".join(ch for ch in str(v or "") if ch.isprintable()).split())[:n]
+    meta = {"author": clean(author, 200), "title": clean(title, 400), "type": kind if kind in DOC_TYPES else ""}
+    return {k: v for k, v in meta.items() if v}
+
+
 @app.post("/api/check")
 async def check(request:Request, submission:UploadFile=File(...),
                 reference:UploadFile|None=File(None),reference_text:str=Form(""),
@@ -1231,7 +1241,9 @@ async def check(request:Request, submission:UploadFile=File(...),
                 archive:bool=Form(False),archive_consent:bool=Form(False),archive_title:str=Form("",max_length=300),
                 archive_author:str=Form("",max_length=300),institution:str=Form("",max_length=80),
                 progress_token:str=Form("",alias="progress",max_length=40),
-                expected_price:int|None=Form(None,ge=0,le=10_000_000)):
+                expected_price:int|None=Form(None,ge=0,le=10_000_000),
+                doc_author:str=Form("",max_length=200),doc_title:str=Form("",max_length=400),
+                doc_type:str=Form("",max_length=20)):
     global active_scans
     purge_reports()
     user = auth.read(request.cookies.get(auth.COOKIE))
@@ -1244,6 +1256,7 @@ async def check(request:Request, submission:UploadFile=File(...),
     if active_scans >= scan_capacity():
         raise ApiError(503, "server_busy", "PlagIQ is processing other documents. Try again in a minute.")
     rate_limit(request, user)
+    submission.document_meta = document_meta(doc_author, doc_title, doc_type)
     active_scans += 1                          # reserve the slot before any await, so overlapping requests cannot all pass
     # The check is recorded before it runs: if the browser is closed, it still finishes and appears in "My checks".
     job = uuid.uuid4().hex
@@ -1902,6 +1915,8 @@ async def analyse(submission, reference, reference_text, language, mode, options
     ocr = getattr(submission, "ocr_info", None) or {}
     if ocr.get("ocr_pages"):
         result["ocr"] = {"pages": ocr["ocr_pages"], "models": ocr.get("ocr_models", ""), "seconds": ocr.get("ocr_seconds")}
+    if getattr(submission, "document_meta", None):
+        result["document_meta"] = submission.document_meta
     result.update({"document":clean_filename(submission.filename, "Document"),
                    "date":datetime.now(timezone.utc).isoformat(timespec="seconds"),
                    "quotations_excluded":False, "bibliography_excluded":False,
@@ -2020,6 +2035,40 @@ def _stored_seconds_left(identifier, fallback):
     except sqlite3.Error:
         stored = None
     return max(0, stored["expires"] - time.time()) if stored else fallback
+
+
+@app.get("/api/report/{identifier}/certificate.pdf")
+def report_certificate(identifier: str, request: Request, lang: str = "en"):
+    """The one-page certificate as its own PDF (same figures and QR code as page 1 of the report)."""
+    entry = owned(identifier, request)
+    no_exports(entry["result"])
+    base = os.getenv("PUBLIC_ORIGIN", "").strip() or str(request.base_url)
+    lang = lang if lang in ("uz", "uzc", "ru", "en") else "en"
+    content = build_certificate_pdf(entry["result"], identifier, lang, verify.link(entry["result"], identifier, base))
+    return Response(content, media_type="application/pdf",
+                    headers={"Content-Disposition": 'attachment; filename="PlagIQ-certificate.pdf"'})
+
+
+SAMPLE_ID = "5a4d91e0c0de"                  # shown on the sample only; never a real report number
+
+
+@app.get("/api/sample-report.pdf")
+def sample_report_pdf(lang: str = "uz", full: int = 0):
+    """The sample's report as a PDF: fictional document and sources, marked SAMPLE, with no verification link."""
+    lang = lang if lang in ("uz", "uzc", "ru", "en") else "uz"
+    data = {**sample_report.build(), "sample": True}
+    content = (build_pdf(data, SAMPLE_ID, lang, 15, None) if full else build_short_pdf(data, SAMPLE_ID, lang, None))
+    return Response(content, media_type="application/pdf", headers={
+        "Content-Disposition": f'attachment; filename="PlagIQ-sample-{"full-" if full else ""}report.pdf"',
+        "Cache-Control": "no-store"})
+
+
+@app.get("/api/sample-certificate.pdf")
+def sample_certificate_pdf(lang: str = "uz"):
+    lang = lang if lang in ("uz", "uzc", "ru", "en") else "uz"
+    content = build_certificate_pdf({**sample_report.build(), "sample": True}, SAMPLE_ID, lang, None)
+    return Response(content, media_type="application/pdf", headers={
+        "Content-Disposition": 'attachment; filename="PlagIQ-sample-certificate.pdf"', "Cache-Control": "no-store"})
 
 
 @app.get("/api/report/{identifier}.pdf")

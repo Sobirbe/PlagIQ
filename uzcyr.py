@@ -2,7 +2,7 @@
 
 The Cyrillic interface is generated from the Uzbek Latin texts, so the two never drift apart. Rules (the 1995
 alphabet, read in reverse): oʻ -> ў, gʻ -> ғ, sh -> ш, ch -> ч, yo/yu/ya/ye -> ё/ю/я/е, e at the start of a word or
-after a vowel -> э, ts -> ц, the tutuq belgisi (ʼ) -> ъ, q -> қ, h -> ҳ, x -> х, j -> ж, y -> й. Russian loanwords that
+after a vowel -> э, ts -> ц at the start of a word and before iya/io/ia (тс otherwise: muvaffaqiyatsiz, o‘tsa), the tutuq belgisi (ʼ) -> ъ, q -> қ, h -> ҳ, x -> х, j -> ж, y -> й. Russian loanwords that
 Uzbek Cyrillic writes with ь or я (сентябрь, файл ...) come from EXCEPTIONS. Left as they are: brand and service names,
 abbreviations in capitals (PDF, DOCX, QR, SHA-256), links, e-mail addresses, {placeholders} and HTML tags.
 
@@ -22,7 +22,8 @@ EXCEPTIONS = {"sentabr": "сентябрь", "oktabr": "октябрь", "noyabr
               "fevral": "февраль", "aprel": "апрель", "iyun": "июнь", "iyul": "июль", "parol": "пароль", "film": "фильм",
               "model": "модель", "kontrol": "контроль", "rol": "роль", "stil": "стиль", "kompyuter": "компьютер",
               "obyekt": "объект", "subyekt": "субъект", "konferensiya": "конференция", "funksiya": "функция",
-              "aksiya": "акция", "provinsiya": "провинция", "sotsial": "социал", "kvitansiya": "квитанция"}
+              "aksiya": "акция", "provinsiya": "провинция", "sotsial": "социал", "kvitansiya": "квитанция", "dotsent": "доцент",
+              "kontsert": "концерт", "kontsern": "концерн"}
 MONTHS = {"sentabr", "oktabr", "noyabr", "dekabr", "yanvar", "fevral", "aprel", "iyun", "iyul"}
 # Common endings after a listed loanword (stem + ending keeps the loanword's spelling).
 ENDINGS = ("", "lar", "ni", "ning", "ga", "da", "dan", "dagi", "i", "si", "lari", "larni", "larning", "larga", "larda",
@@ -33,9 +34,9 @@ ENDINGS = ("", "lar", "ni", "ning", "ga", "da", "dan", "dagi", "i", "si", "lari"
 FOREIGN = ("PDF|DOCX|DOC|TXT|CSV|OCR|QR|DOI|URL|API|HTML|JSON|UZS|USD|AI|ID|IP|PhD|DSc|ORCID|ISSN|ISBN|SHA-256|UTF-8|"
            "UTF-16|CC BY|BOM|SMS")
 KEEP = re.compile(r"(\{[^}]*\}|<[^>]+>|&[a-z#0-9]+;|https?://\S+|www\.\S+|[\w.+-]+@[\w-]+\.[\w.]+|robots\.txt|"
-                  r"(?<![A-Za-z])(?:PlagIQ|OpenAlex|Telegram|Pangram|Payme|Click|Uzum|CyberLeninka|Zenodo|Wikipedia|Yandex|"
+                  r"(?<![A-Za-z])(?:PlagIQ|PLAGIQ|OpenAlex|Telegram|Pangram|Payme|Click|Uzum|CyberLeninka|Zenodo|Wikipedia|Yandex|"
                   r"Brave|Railway|Google|Excel|Word|Turnitin|Antiplagiat|Scopus|Unpaywall|CORE|humanizer)(?![A-Za-z])|"
-                  r"(?<![A-Za-z])(?:PlagIQ|OpenAlex|Telegram|Pangram|Payme|Click|Uzum|CyberLeninka|Zenodo|Wikipedia|Yandex|"
+                  r"(?<![A-Za-z])(?:PlagIQ|PLAGIQ|OpenAlex|Telegram|Pangram|Payme|Click|Uzum|CyberLeninka|Zenodo|Wikipedia|Yandex|"
                   r"Brave|Railway|Google|Excel|Word|Turnitin|Antiplagiat|Scopus|Unpaywall)"
                   r"(?=['‘ʼ’]?(?:dagi|dan|da|ga|ka|ning|ni|lar)(?![A-Za-z]))|"
                   r"(?<![A-Za-z])[Ee]-?mail|\b[A-Z][A-Z0-9]*_[A-Z0-9_]+\b|"
@@ -86,8 +87,8 @@ def _letters(word, prev=""):
             out.append("ш"); i += 2; continue
         if c == "c" and nxt == "h":
             out.append("ч"); i += 2; continue
-        if c == "t" and nxt == "s":
-            out.append("ц"); i += 2; continue
+        if c == "t" and nxt == "s" and (i == 0 or (low[i + 2:i + 3] == "i" and low[i + 3:i + 4] in ("y", "o", "a"))):
+            out.append("ц"); i += 2; continue        # tsement, natsional, -tsiya; not muvaffaqiyat+siz, o‘t+sa (тс)
         if c == "y" and nxt and nxt in "ouae" and not (nxt == "o" and i + 2 < len(low) and low[i + 2] in APOS):
             out.append({"o": "ё", "u": "ю", "a": "я", "e": "е"}[nxt]); i += 2; continue
         if c == "e":

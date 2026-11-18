@@ -61,9 +61,11 @@ with tempfile.TemporaryDirectory() as tmp:
                 errors = []
                 page.on('pageerror', lambda e: errors.append(str(e)))
                 page.goto('http://127.0.0.1:8133')
-                # Browser locale picks Russian on first visit.
-                assert page.locator('html').get_attribute('lang') == 'ru', 'locale default'
-                assert page.locator('[data-lang=ru]').get_attribute('aria-pressed') == 'true'
+                # First visit opens in Uzbek Latin whatever the browser locale (owner's choice); Russian is one click away.
+                assert page.locator('html').get_attribute('lang') == 'uz', 'Uzbek by default'
+                assert page.locator('[data-lang=uz]').get_attribute('aria-pressed') == 'true'
+                page.locator('[data-lang=ru]').click()
+                assert page.locator('html').get_attribute('lang') == 'ru'
 
                 # Client-side validation is translated and needs no upload.
                 page.locator('#submit').click()
@@ -99,7 +101,7 @@ with tempfile.TemporaryDirectory() as tmp:
                 assert 'UZ 1' in page.locator('#coverage').inner_text()
                 assert 'Iqtiboslar' in page.locator('#notice').inner_text()
                 assert 'so‘zdan' in page.locator('#details').inner_text(), 'word measure shown'
-                assert 'korpus versiyasi' in page.locator('#coverage').inner_text()
+                assert 'baza versiyasi' in page.locator('#coverage').inner_text()
                 assert page.locator('#highlight-box summary').count() == 1
                 page.locator('#highlight-box summary').click()
                 assert page.locator('#highlight-box mark').count() >= 1
@@ -148,6 +150,9 @@ with tempfile.TemporaryDirectory() as tmp:
                 assert page.locator('#highlight-box summary').count() == 1
                 assert page.locator('#source-list').inner_text().count('Ваш источник') == 1
                 # Citation options: a quoted, referenced passage excluded on request, disclosed before/after.
+                assert not page.locator('#exclude_quotes').is_visible()          # under "Дополнительные настройки"
+                page.locator('#advanced-label').click()
+                assert page.locator('#advanced-label').inner_text() == 'Дополнительные настройки'
                 assert 'ПАРАМЕТРЫ РАСЧЁТА' in page.locator('#options-label').inner_text()
                 page.locator('#submission').set_input_files({'name': 'q.txt', 'mimeType': 'text/plain',
                                                              'buffer': ('Введение. «' + RU + '» [1]. Заключение.').encode()})

@@ -43,6 +43,7 @@ try:
                 posted.append(route.request.post_data or '')
                 route.fulfill(status=200, content_type='application/json', body=json.dumps(RESULT))
             page.route('**/api/check', fake)
+            page.add_init_script("try{localStorage.getItem('plagiq-ui-lang')||localStorage.setItem('plagiq-ui-lang','en')}catch(e){}")  # an English-speaking visitor
             page.goto('http://127.0.0.1:8144')
             page.wait_for_function("() => !document.getElementById('web-opt').hidden")
             assert 'with Yandex and Brave: up to 20 short excerpts' in page.locator('#web-label').inner_text()

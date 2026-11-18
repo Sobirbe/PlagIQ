@@ -32,7 +32,7 @@ def test_certificate_facts_match_signed_verification(monkeypatch):
     monkeypatch.setenv("VERIFY_SECRET", "s" * 40)
     url = verify.link(RESULT, ID, "https://plagiq.example")
     text, doc = first_page(RESULT, url=url)
-    for expected in ("CERTIFICATE OF CHECK", "0149-96EE-A688", "thesis.docx", "2026-11-11 12:15 (Tashkent time, UTC+5)", "3 894", "12.5%",
+    for expected in ("PLAGIQ — SIMILARITY CHECK STATEMENT", "0149-96EE-A688", "thesis.docx", "2026-11-11 12:15 (Tashkent time, UTC+5)", "3 894", "12.5%",
                      "before exclusions: 14.0%", "Full texts: 2 · abstracts: 2 · web pages: 1", "quotations",
                      "Review suggested (1)", "OpenAlex and the web (Brave)", "Verify this certificate",
                      "not a certificate of originality"):
@@ -40,12 +40,12 @@ def test_certificate_facts_match_signed_verification(monkeypatch):
     signed = verify.facts(RESULT, ID)
     assert signed["n"] == "5" and signed["p"] == "12.5" and signed["w"] == "3894"     # 2 + 2 + 1 sources, as printed
     assert len(doc[0].get_drawings()) > 100 and url[:40] in text.replace(" ", "")      # QR drawn, link printed
-    assert "CERTIFICATE OF CHECK" not in " ".join(doc[1].get_text().split())          # evidence starts on page 2
+    assert "SIMILARITY CHECK STATEMENT" not in " ".join(doc[1].get_text().split())          # evidence starts on page 2
 
 
 def test_without_secret_says_verification_is_off():
     text, _ = first_page(dict(RESULT, percent=None, not_evaluated_reason="no_abstracts"), "ru")
-    assert "СЕРТИФИКАТ ПРОВЕРКИ" in text and "Онлайн-проверка на этом сервере не настроена" in text and "Не оценено" in text
+    assert "ЗАКЛЮЧЕНИЕ О ПРОВЕРКЕ НА ЗАИМСТВОВАНИЯ" in text and "Онлайн-проверка на этом сервере не настроена" in text and "Не оценено" in text
 
 
 @pytest.mark.parametrize("mode, expected", [("reference", "1 reference document"), ("corpus", "5 indexed sources")])
@@ -55,10 +55,32 @@ def test_sources_line_per_mode(mode, expected):
 
 def test_long_file_name_and_uzbek_fit_on_one_page():
     text, doc = first_page(dict(RESULT, document="Magistrlik_dissertatsiyasi_" * 8 + ".docx"), "uz")
-    assert "TEKSHIRUV SERTIFIKATI" in text and "Sertifikatni tekshirish" in text
+    assert "PLAGIAT TEKSHIRUVI XULOSASI" in text and "Sertifikatni tekshirish" in text
     assert "Faqat tekshiruv fakti tasdiqlanadi" in text                               # bottom notice still on page 1
     assert "dissertats…di" in text and "_.docx" in text                               # shortened, extension kept
     blocks = doc[0].get_text("blocks")
     heading = next(b for b in blocks if "Sertifikatni tekshirish" in b[4])
     above = [b for b in blocks if b[1] < heading[1] and b is not heading]
     assert all(b[3] <= heading[1] for b in above), [b[4][:30] for b in above if b[3] > heading[1]]    # nothing overlaps
+
+
+def test_one_page_certificate_with_author_title_type_and_matching_sources(monkeypatch):
+    monkeypatch.setenv("VERIFY_SECRET", "s" * 40)
+    meta = {**RESULT, "document_meta": {"author": "Shukurov S.", "title": "Kalitlar noto‘g‘ri qo‘llarda", "type": "article"}}
+    url = verify.link(meta, ID, "https://plagiq.example")
+    doc = pymupdf.open(stream=report_pdf.build_certificate_pdf(meta, ID, "uz", url))
+    assert doc.page_count == 1
+    text = " ".join(doc[0].get_text().split())
+    for expected in ("PLAGIQ — PLAGIAT TEKSHIRUVI XULOSASI", "Kalitlar noto‘g‘ri qo‘llarda", "Muallif: Shukurov S.",
+                     "Hujjat turi: Jurnal maqolasi", "Fayl: thesis.docx", "Moslik aniqlangan manbalar 2", "Originallik: 86%",
+                     "12.5%", "Sertifikatni tekshirish"):
+        assert expected in text, expected
+    assert any("/verify?" in (link.get("uri") or "") for link in doc[0].get_links())
+    assert "Shukurov" not in url and "Kalitlar" not in url                     # verification needs no personal data
+
+
+def test_titles_fit_in_every_language():
+    for lang in ("en", "ru", "uz", "uzc"):
+        doc = pymupdf.open(stream=report_pdf.build_certificate_pdf(RESULT, ID, lang, None))
+        assert doc.page_count == 1, lang
+        assert certificate.C[lang]["title"].split()[0] in doc[0].get_text(), lang

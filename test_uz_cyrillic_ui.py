@@ -14,6 +14,9 @@ import report_pdf
 import uzcyr
 
 CASES = {
+    "muvaffaqiyatsiz": "муваффақиятсиз", "Agar o‘tsa": "Агар ўтса", "ketsangiz": "кетсангиз",
+    "tsement": "цемент", "natsional": "национал", "kvalifikatsiya": "квалификация", "dotsentlar": "доцентлар",
+    "PLAGIQ — PLAGIAT TEKSHIRUVI XULOSASI": "PLAGIQ — ПЛАГИАТ ТЕКШИРУВИ ХУЛОСАСИ",
     "Oʻzbekiston": "Ўзбекистон", "taʼlim": "таълим", "yoʻl": "йўл", "gʻoya": "ғоя", "Mening tekshiruvlarim": "Менинг текширувларим",
     "esa": "эса", "Elektron pochta": "Электрон почта", "shu yerda": "шу ерда", "qayerda": "қаерда", "ilmiy": "илмий",
     "Yangi": "Янги", "poeziya": "поэзия", "15-sentabrda": "15-сентябрда", "kvitansiyalar": "квитанциялар",
@@ -90,7 +93,7 @@ def test_server_texts_and_reports_in_cyrillic():
                        files={"submission": ("ish.txt", io.BytesIO(text.encode()))}).json()
     pdf = client.get(f"/api/report/{data['report_id']}.pdf?lang=uzc")
     body = " ".join(p.get_text() for p in pymupdf.open(stream=pdf.content, filetype="pdf"))
-    assert "ТЕКШИРУВ СЕРТИФИКАТИ" in body and "Тошкент вақти" in body
+    assert "PLAGIQ — ПЛАГИАТ ТЕКШИРУВИ ХУЛОСАСИ" in body and "Тошкент вақти" in body
     assert "TEKSHIRUV" not in body.upper().replace("ТЕКШИРУВ", "")
     verify_page = client.get("/verify?r=abc&ui=uzc").text
     assert '<html lang="uz-Cyrl">' in verify_page and "ЎЗ</a>" in verify_page
