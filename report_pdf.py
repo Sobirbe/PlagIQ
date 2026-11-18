@@ -84,7 +84,7 @@ T = {
     passages_more="{n} further passage(s) for this source are not listed.",
     loc="Your text: characters {qs}–{qe} · Source: characters {ss}–{se}",
     loc_note="Character positions are zero-based, end-exclusive, counted in the extracted text.",
-    limit_web="Only the scope named above was searched; the web search covered only the top pages found for 3 short excerpts. No translation or paraphrase screening was performed.",
+    limit_web="Only the scope named above was searched; the web search covered only the top pages found for {n} short excerpts.", limit_noweb="Only the scope named above was searched. No web-wide search was performed.", scr_none=" No translation or paraphrase screening was performed.", scr_trans=" Translation screening compared the document with the PlagIQ library only; no paraphrase screening was performed.", scr_both=" Translation and paraphrase screening compared the document with the PlagIQ library only.",
     limits=["Only the scope named above was searched. No web-wide, translation or paraphrase screening was performed.",
             "Records with metadata only (no abstract and no full text) were listed but not text-compared.",
             "A low or zero result does not show that a document is original.",
@@ -142,7 +142,7 @@ T = {
     passages_more="Ещё {n} фрагмент(ов) этого источника не показаны.",
     loc="Ваш текст: символы {qs}–{qe} · Источник: символы {ss}–{se}",
     loc_note="Позиции символов считаются с нуля, конец не включается, по извлечённому тексту.",
-    limit_web="Проверен только указанный охват; поиск в интернете охватил только первые страницы, найденные по 3 коротким отрывкам. Проверка перевода и перефразирования не проводилась.",
+    limit_web="Проверен только указанный охват; поиск в интернете охватил только первые страницы, найденные по коротким отрывкам (отрывков: {n}).", limit_noweb="Проверен только указанный охват. Поиск по всему интернету не проводился.", scr_none=" Проверка перевода и перефразирования не проводилась.", scr_trans=" Проверка перевода сравнивала документ только с библиотекой PlagIQ; проверка перефразирования не проводилась.", scr_both=" Проверка перевода и перефразирования сравнивала документ только с библиотекой PlagIQ.",
     limits=["Проверен только указанный охват. Поиск по интернету, переводу и перефразированию не проводился.",
             "Записи только с метаданными (без аннотации и полного текста) указаны, но текст не сравнивался.",
             "Низкий или нулевой результат не доказывает оригинальность.",
@@ -200,7 +200,7 @@ T = {
     passages_more="Bu manba bo‘yicha yana {n} ta parcha ko‘rsatilmagan.",
     loc="Sizning matn: {qs}–{qe} belgilar · Manba: {ss}–{se} belgilar",
     loc_note="Belgi o‘rinlari noldan sanaladi, oxirgisi kirmaydi, ajratilgan matn bo‘yicha.",
-    limit_web="Faqat yuqorida ko‘rsatilgan doira tekshirildi; internet qidiruvi faqat 3 ta qisqa parcha bo‘yicha topilgan birinchi sahifalarni qamradi. Tarjima yoki parafraz tekshiruvi bajarilmadi.",
+    limit_web="Faqat yuqorida ko‘rsatilgan doira tekshirildi; internet qidiruvi faqat {n} ta qisqa parcha bo‘yicha topilgan birinchi sahifalarni qamradi.", limit_noweb="Faqat yuqorida ko‘rsatilgan doira tekshirildi. Butun internet bo‘yicha qidiruv bajarilmadi.", scr_none=" Tarjima yoki parafraz tekshiruvi bajarilmadi.", scr_trans=" Tarjima tekshiruvi hujjatni faqat PlagIQ kutubxonasi bilan solishtirdi; parafraz tekshiruvi bajarilmadi.", scr_both=" Tarjima va parafraz tekshiruvi hujjatni faqat PlagIQ kutubxonasi bilan solishtirdi.",
     limits=["Faqat yuqorida ko‘rsatilgan doira tekshirildi. Internet, tarjima yoki parafraz tekshiruvi bajarilmadi.",
             "Faqat metama’lumoti bor (annotatsiyasi ham, to‘liq matni ham yo‘q) yozuvlar matn bo‘yicha solishtirilmadi.",
             "Past yoki nol natija hujjat original ekanini isbotlamaydi.",
@@ -916,8 +916,12 @@ def build_pdf(result, identifier, lang="en", minutes_left=15, verify_url=None):
 
     story += [Paragraph(t["s_limits"], st["h"])]
     limits = list(t["limits"]) if mode != "ai" else [AI_T.get(lang, AI_T["en"])["limit"]] + list(t["limits"])[2:]
-    if mode == "academic" and (result.get("web") or {}).get("enabled"):
-        limits[0] = t["limit_web"]
+    if mode != "ai":
+        web = result.get("web") or {}
+        screening = (t["scr_both"] if "paraphrased" in result else t["scr_trans"] if "translated" in result
+                     else t["scr_none"])                   # what the engine actually ran for this check
+        limits[0] = (t["limit_web"].format(n=web.get("excerpts", 0)) if mode == "academic" and web.get("enabled")
+                     else t["limit_noweb"]) + screening
     metadata_only = (result.get("source_count") or 0) - (result.get("evaluated_sources") or 0)
     if mode != "academic" or metadata_only <= 0:
         limits.pop(1)                                       # no metadata-only records in this report

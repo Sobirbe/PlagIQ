@@ -91,3 +91,20 @@ def test_engine_and_website_show_it_separately_only_when_switched_on(engine, mon
     with corpus.connect() as db:
         monkeypatch.setenv("CROSSLANG", "0")
         assert not engine_service.paraphrase_enabled()
+
+
+def test_pdf_limitations_say_what_screening_ran():
+    """The limitations line said "No translation or paraphrase screening was performed" and "3 short excerpts" in
+    every report; it now follows the check: the web excerpts actually searched and the screening the engine ran."""
+    import report_pdf
+    base = {"mode": "academic", "language": "uz", "percent": 0.0, "total_tokens": 900, "status": "completed_no_matches",
+            "sources": [], "checked_at": "2026-11-18T06:00:00Z", "web": {"enabled": True, "excerpts": 5, "providers": ["Brave"]}}
+    def limits(result):
+        pdf = report_pdf.build_pdf(result, "a" * 12, "en")
+        return " ".join("".join(p.get_text() for p in pymupdf.open(stream=pdf)).split())
+    assert "top pages found for 5 short excerpts. No translation or paraphrase screening" in limits(base)
+    assert "Translation screening compared the document with the PlagIQ library only; no paraphrase" in \
+        limits({**base, "translated": []})
+    assert "Translation and paraphrase screening compared the document with the PlagIQ library only." in \
+        limits({**base, "translated": [], "paraphrased": []})
+    assert "No web-wide search was performed. No translation" in limits({**base, "web": {"enabled": False}})
