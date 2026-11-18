@@ -12,7 +12,8 @@ from reportlab.lib.styles import ParagraphStyle
 
 C = {
     "en": dict(
-        title="CERTIFICATE OF CHECK", number="Certificate No.",
+        title="PLAGIQ — SIMILARITY CHECK STATEMENT", number="Certificate No.",
+        author="Author", doc_type="Document type", file="File", matched_sources="Sources with matches", sample="SAMPLE", sample_note="Sample with a fictional document and sources: not a real check and not verifiable.", types=dict(article="Journal article", dissertation="Doctoral dissertation", master="Master’s thesis", bachelor="Bachelor’s thesis", course="Course paper", conference="Conference paper or abstract", monograph="Monograph or textbook", other="Other"),
         intro="This certifies that the document below was checked by PlagIQ on the date shown, "
               "with the scope and result stated on this page.",
         document="Document", date="Checked on", words="Words", language="Language", fingerprint="Document fingerprint (SHA-256)",
@@ -35,7 +36,8 @@ C = {
         notice="This certifies the check only. It is not a certificate of originality or of the absence of plagiarism, "
                "and any AI figure is the named provider's estimate, not proof. A low result does not prove originality; matches need human review."),
     "ru": dict(
-        title="СЕРТИФИКАТ ПРОВЕРКИ", number="Сертификат №",
+        title="PLAGIQ — ЗАКЛЮЧЕНИЕ О ПРОВЕРКЕ НА ЗАИМСТВОВАНИЯ", number="Сертификат №",
+        author="Автор", doc_type="Тип документа", file="Файл", matched_sources="Источников с совпадениями", sample="ОБРАЗЕЦ", sample_note="Образец с вымышленным документом и источниками: не настоящая проверка, проверить его нельзя.", types=dict(article="Журнальная статья", dissertation="Диссертация", master="Магистерская диссертация", bachelor="Выпускная квалификационная работа", course="Курсовая работа", conference="Доклад или тезисы конференции", monograph="Монография или учебник", other="Другое"),
         intro="Настоящим подтверждается, что указанный ниже документ проверен PlagIQ в указанную дату "
               "в охвате и с результатом, приведёнными на этой странице.",
         document="Документ", date="Дата проверки", words="Слов", language="Язык", fingerprint="Отпечаток документа (SHA-256)",
@@ -59,7 +61,8 @@ C = {
         notice="Подтверждается только факт проверки. Это не сертификат оригинальности или отсутствия плагиата, "
                "а любая оценка ИИ — оценка указанного провайдера, а не доказательство. Низкий результат не доказывает оригинальность; совпадения требуют проверки человеком."),
     "uz": dict(
-        title="TEKSHIRUV SERTIFIKATI", number="Sertifikat №",
+        title="PLAGIQ — PLAGIAT TEKSHIRUVI XULOSASI", number="Sertifikat №",
+        author="Muallif", doc_type="Hujjat turi", file="Fayl", matched_sources="Moslik aniqlangan manbalar", sample="NAMUNA", sample_note="Namuna: hujjat va manbalar to‘qima, bu haqiqiy tekshiruv emas va uni tasdiqlab bo‘lmaydi.", types=dict(article="Jurnal maqolasi", dissertation="Dissertatsiya", master="Magistrlik dissertatsiyasi", bachelor="Bitiruv malakaviy ishi", course="Kurs ishi", conference="Konferensiya materiali yoki tezis", monograph="Monografiya yoki darslik", other="Boshqa"),
         intro="Ushbu sertifikat quyidagi hujjat ko‘rsatilgan sanada PlagIQ tomonidan shu sahifada "
               "keltirilgan doira va natija bilan tekshirilganini tasdiqlaydi.",
         document="Hujjat", date="Tekshirilgan sana", words="So‘zlar", language="Til", fingerprint="Hujjat izi (SHA-256)",
@@ -156,7 +159,9 @@ def facts(result, lang):
     scope = t["scope_ai"] if mode == "ai" else t["scopes"].get(mode, "").format(w=t["scope_web"].format(p=providers) if web.get("enabled") else "")
     if mode == "academic" and (result.get("library") or {}).get("searched"):
         scope += t["scope_library"]
+    matched = sum(1 for src in result.get("sources") or [] if (src.get("matched_tokens") or 0) > 0)
     rows = ([] if mode == "ai" else checkstatus.rows(result, lang)) + [(t["sources"], sources)] + \
+        ([] if mode == "ai" or result.get("percent") is None else [(t["matched_sources"], str(matched))]) + \
         ([] if mode == "ai" else [(t["exclusions"], ", ".join(chosen) or t["ex_none"])])
     ai = result.get("ai") or {}
     if ai.get("status") == "done":
@@ -226,7 +231,11 @@ class CertificatePage(Flowable):
         c.setLineWidth(0.8)
         c.line(pad, y, w - pad, y)
         y -= 26
-        c.setFont(self.bold, 21)
+        from reportlab.pdfbase.pdfmetrics import stringWidth
+        size = 21
+        while size > 13 and stringWidth(t["title"], self.bold, size) > inner:
+            size -= 0.5
+        c.setFont(self.bold, size)
         c.setFillColor(INK)
         c.drawCentredString(w / 2, y - 6, t["title"])
         y = self._para(esc(t["intro"]), pad + 10 * mm, y - 18, inner - 20 * mm, 9.5, color=MUTED, align=1) - 14
@@ -237,10 +246,18 @@ class CertificatePage(Flowable):
         cols = [(t["date"], date), (t["words"], f"{int(r.get('total_tokens') or 0):,}".replace(",", " ")),
                 (t["language"], str(r.get("language", "")).upper()),
                 (t["fingerprint"], " ".join(str(r.get("sha256", ""))[i:i + 4] for i in range(0, 16, 4)) + " …")]
-        widths = [(inner - 12 * mm) * f for f in (0.25, 0.15, 0.15, 0.45)]
+        widths = [(inner - 12 * mm) * f for f in (0.33, 0.13, 0.12, 0.42)]
         lefts = [pad + 6 * mm + sum(widths[:i]) for i in range(4)]
+        meta = r.get("document_meta") or {}
+        heading = _short(meta.get("title") or r.get("document", ""), 100 if meta.get("title") else 70)
+        details = " · ".join(x for x in (
+            f'{t["author"]}: {meta["author"]}' if meta.get("author") else "",
+            f'{t["doc_type"]}: {t["types"].get(meta["type"], "")}' if meta.get("type") in t["types"] else "",
+            f'{t["file"]}: {_short(r.get("document", ""))}' if meta.get("title") else "") if x)
         name = self._style(13, self.bold)
-        name_h = Paragraph(esc(_short(r.get("document", ""))), name).wrap(inner - 12 * mm, 1000)[1]
+        name_h = Paragraph(esc(heading), name).wrap(inner - 12 * mm, 1000)[1]
+        if details:
+            name_h += 4 + Paragraph(esc(details), self._style(9)).wrap(inner - 12 * mm, 1000)[1]
         col_h = max(Paragraph(esc(k), self._style(7.5)).wrap(cw - 4, 1000)[1] + 2
                     + Paragraph(esc(v), self._style(9.5, self.bold)).wrap(cw - 4, 1000)[1] for (k, v), cw in zip(cols, widths))
         block_h = 8 * mm + name_h + 8 + col_h + 6 * mm
@@ -248,15 +265,22 @@ class CertificatePage(Flowable):
         c.setStrokeColor(LINE)
         c.setLineWidth(0.6)
         c.roundRect(pad, y - block_h, inner, block_h, 3 * mm, stroke=1, fill=1)
-        rows_top = self._para(esc(_short(r.get("document", ""))), pad + 6 * mm, y - 8 * mm, inner - 12 * mm, 13, self.bold) - 8
+        rows_top = self._para(esc(heading), pad + 6 * mm, y - 8 * mm, inner - 12 * mm, 13, self.bold) - 4
+        if details:
+            rows_top = self._para(esc(details), pad + 6 * mm, rows_top, inner - 12 * mm, 9, color=MUTED) - 4
+        rows_top -= 4
         for (k, v), x, cw in zip(cols, lefts, widths):
             yy = self._para(esc(k), x, rows_top, cw - 4, 7.5, color=MUTED)
             self._para(esc(v), x, yy - 2, cw - 4, 9.5, self.bold)
         y -= block_h + 12 * mm
 
         # result ring + facts
-        ring = 21 * mm
-        cx, cy = pad + ring + 4 * mm, y - ring
+        # The result ring and its labels must end above the verification block (drawn from the page bottom up);
+        # a two-line title or an author line pushes it down, so the ring shrinks when space is short.
+        notice_top = Paragraph(esc(t["notice"]), self._style(7.5)).wrap(inner, 1000)[1]
+        verify_top = pad + notice_top + 22 * mm + 34 * mm + 11 * mm
+        ring = max(13 * mm, min(21 * mm, (y - verify_top - 27 * mm) / 2))
+        cx, cy = pad + 25 * mm, y - ring
         ai_mode = r.get("mode") == "ai"
         ai = r.get("ai") or {}
         percent = r.get("percent") if not ai_mode else (
@@ -271,21 +295,22 @@ class CertificatePage(Flowable):
             c.drawPath(path, stroke=1, fill=0)
         c.setFillColor(TEAL)
         label = t["not_evaluated"] if percent is None else (f"{percent}%" if ai_mode else checkstatus.headline(r, self.lang))
-        c.setFont(self.bold, 12 if percent is None else 22 if label.endswith("%") and label[0].isdigit() else 13)
+        c.setFont(self.bold, (12 if percent is None else 22 if label.endswith("%") and label[0].isdigit() else 13) * min(1.0, ring / (21 * mm)))
         c.drawCentredString(cx, cy - 7, label)
-        label_end = self._para(esc(t["ai_ring"] if ai_mode else t["result"]), cx - ring - 4 * mm, cy - ring - 6 * mm,
-                               2 * ring + 8 * mm, 8.5, self.bold, align=1)
+        lw = max(2 * ring + 8 * mm, 50 * mm)            # labels keep their width when the ring is smaller
+        label_end = self._para(esc(t["ai_ring"] if ai_mode else t["result"]), cx - lw / 2, cy - ring - 6 * mm,
+                               lw, 8.5, self.bold, align=1)
         citation = r.get("citation") or {}
         below = min(cy - ring - 13 * mm, label_end - 2 * mm)
         if percent is not None and citation.get("percent_all") not in (None, percent):
-            self._para(esc(t["before"].format(p=citation["percent_all"])), cx - ring - 4 * mm, below,
-                       2 * ring + 8 * mm, 7.5, color=MUTED, align=1)
+            self._para(esc(t["before"].format(p=citation["percent_all"])), cx - lw / 2, below,
+                       lw, 7.5, color=MUTED, align=1)
             below -= 5 * mm
         original = None if ai_mode else checkstatus.originality(r, self.lang)
         if original:                                # as Uzbek checkers report it, next to the match figure
-            self._para(esc(original), cx - ring - 6 * mm, below, 2 * ring + 12 * mm, 9.5, self.bold, color=TEAL, align=1)
+            self._para(esc(original), cx - lw / 2, below, lw, 9.5, self.bold, color=TEAL, align=1)
             below -= 5 * mm
-        fx = cx + ring + 12 * mm
+        fx = pad + 56 * mm
         fy = y + 2
         rows_ = facts(r, self.lang)
         # The facts must end above the verification block (drawn below from the page bottom up). A long status note
@@ -329,7 +354,15 @@ class CertificatePage(Flowable):
             c.roundRect(w - pad - size, top - size, size, size, 2 * mm, stroke=1, fill=0)
             c.setDash()
             ty = self._para(esc(t["verify"]), pad, top, text_w, 11, self.bold)
-            self._para(esc(t["verify_off"]), pad, ty - 3, text_w, 8.5, color=MUTED)
+            self._para(esc(t["sample_note"] if r.get("sample") else t["verify_off"]), pad, ty - 3, text_w, 8.5, color=MUTED)
+        if r.get("sample"):                          # a sample must never pass for a real certificate
+            c.saveState()
+            c.setFillColor(colors.Color(0.71, 0.27, 0.17, alpha=0.16))
+            c.setFont(self.bold, 96)
+            c.translate(w / 2, h / 2)
+            c.rotate(35)
+            c.drawCentredString(0, -30, t["sample"])
+            c.restoreState()
 
 
 import uzcyr  # noqa: E402  (Uzbek Cyrillic texts, generated from the Uzbek Latin ones)

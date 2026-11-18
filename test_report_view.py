@@ -104,7 +104,7 @@ def test_short_report_is_three_pages_at_most_even_for_a_thesis():
         pages = doc.page_count
         text = " ".join(" ".join(page.get_text() for page in doc).split())
     assert pages <= 3, pages
-    assert "TEKSHIRUV SERTIFIKATI" in text and f"{data['percent']:.1f}%" in text          # certificate with the result
+    assert "PLAGIAT TEKSHIRUVI XULOSASI" in text and f"{data['percent']:.1f}%" in text          # certificate with the result
     assert "Mosliklar qayerda" in text and "45 ta mos parchadan eng uzun 10 tasi" in text
     assert "Ilova: mosliklar belgilangan hujjatingiz" not in text                           # no full document
     full = client.get(f"/api/report/{data['report_id']}.pdf?full=1&lang=uz")

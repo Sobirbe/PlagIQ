@@ -828,6 +828,17 @@ def build_short_pdf(result, identifier, lang="en", verify_url=None):
     return out.getvalue()
 
 
+def build_certificate_pdf(result, identifier, lang="en", verify_url=None):
+    """The one-page certificate alone (the detailed report is build_pdf / build_short_pdf)."""
+    out = io.BytesIO()
+    doc = SimpleDocTemplate(out, pagesize=A4, leftMargin=18 * mm, rightMargin=18 * mm, topMargin=16 * mm,
+                            bottomMargin=20 * mm, title="PlagIQ certificate", author="PlagIQ",
+                            subject=T.get(lang, T["en"])["subtitle"])
+    doc.build([CertificatePage(result, identifier, lang, verify_url, _qr, (REGULAR, BOLD))],
+              canvasmaker=_numbered_canvas(T.get(lang, T["en"]), identifier))
+    return out.getvalue()
+
+
 def build_pdf(result, identifier, lang="en", minutes_left=15, verify_url=None):
     t = T.get(lang, T["en"])
     st = _styles()
