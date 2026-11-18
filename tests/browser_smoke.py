@@ -61,6 +61,8 @@ with tempfile.TemporaryDirectory() as tmp:
                         import pymupdf as fitz
                         with fitz.open(tmp+'/report.pdf') as pdf:
                             assert 'PlagIQ' in ''.join(pg.get_text() for pg in pdf)
+                        if page.locator('#advanced').get_attribute('open') is None:   # under "Qo‘shimcha sozlamalar"
+                            page.locator('#advanced-label').click()
                         page.locator('[name=mode][value=corpus]').check()
                         assert not page.locator('#consent').is_checked()
                         assert 'OpenAlex' not in page.locator('#consent-label').inner_text()

@@ -107,11 +107,18 @@ try:
             page.wait_for_function("() => ((document.querySelector('#account > details > summary')||{}).textContent||'').includes('Dilnoza')")
             assert 'Dilnoza Karimova' in page.locator('#account > details > summary').inner_text() and page.url.endswith('/')
             assert page.locator('#login-note').is_hidden()
+            # Step 2 shows three choices: plagiarism, plagiarism + AI (the checkbox under it), two documents
+            shown = page.evaluate("() => [...document.querySelectorAll('#checker fieldset.scopeset:not(.options) > .mode-list > label')]"
+                                  ".filter(l => l.offsetParent).map(l => l.innerText.split('\\n')[0])")
+            assert shown == ['Plagiarism check (recommended)', '+ AI-writing check as well (Pangram; Russian and English texts)',
+                             'Compare two documents'], shown
             # AI detector mode: not part of the free check, so the owner grants this tester a pilot allowance
             os.environ['USERS_DB'] = tmp + '/users.sqlite3'               # the site's accounts database (shared file)
             sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
             import entitlements
             entitlements.grant(42, 5, 150000, 30, 'browser test')
+            if page.locator('#advanced').get_attribute('open') is None:   # under "Qo‘shimcha sozlamalar"
+                page.locator('#advanced-label').click()
             page.locator('input[name=mode][value=ai]').check()
             assert page.locator('#academic-note').is_hidden() and page.locator('#options-set').is_hidden()
             assert 'Pangram (USA)' in page.locator('#ai-explain').inner_text()

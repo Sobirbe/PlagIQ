@@ -94,6 +94,8 @@ with tempfile.TemporaryDirectory() as tmp:
                 # DOCX with a long Cyrillic filename vs. Uzbek Cyrillic corpus source (cross-script).
                 page.locator('#submission').set_input_files({'name': LONG_NAME, 'mimeType':
                     'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'buffer': docx_bytes(UZ)})
+                if page.locator('#advanced').get_attribute('open') is None:   # under "Qo‘shimcha sozlamalar"
+                    page.locator('#advanced-label').click()
                 page.locator('[name=mode][value=corpus]').check()
                 page.locator('#consent').check()
                 page.locator('#submit').click()
@@ -150,8 +152,9 @@ with tempfile.TemporaryDirectory() as tmp:
                 assert page.locator('#highlight-box summary').count() == 1
                 assert page.locator('#source-list').inner_text().count('Ваш источник') == 1
                 # Citation options: a quoted, referenced passage excluded on request, disclosed before/after.
-                assert not page.locator('#exclude_quotes').is_visible()          # under "Дополнительные настройки"
-                page.locator('#advanced-label').click()
+                if page.locator('#advanced').get_attribute('open') is None:      # under "Дополнительные настройки"
+                    assert not page.locator('#exclude_quotes').is_visible()
+                    page.locator('#advanced-label').click()
                 assert page.locator('#advanced-label').inner_text() == 'Дополнительные настройки'
                 assert 'ПАРАМЕТРЫ РАСЧЁТА' in page.locator('#options-label').inner_text()
                 page.locator('#submission').set_input_files({'name': 'q.txt', 'mimeType': 'text/plain',
