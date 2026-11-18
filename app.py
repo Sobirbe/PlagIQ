@@ -1632,8 +1632,9 @@ async def search_library(result, original, language, owner):
         return {"searched": False, "error": exc.code}
     for source in summary["sources"]:
         mark_own(source, owner)
-    if "translated" in summary:
-        result["translated"] = own_translated(summary["translated"], owner, original)
+    for key in ("translated", "paraphrased"):
+        if key in summary:
+            result[key] = own_translated(summary[key], owner, original)
     result["sources"] = summary["sources"] + result["sources"]
     intervals = corpus.merge([list(i) for i in result.get("intervals", [])] + [list(i) for i in summary["intervals"]])
     result["exact_intervals"] = corpus.merge([list(i) for i in result.get("exact_intervals", [])]
@@ -1836,8 +1837,9 @@ async def analyse(submission, reference, reference_text, language, mode, options
             "intervals":summary["intervals"] if evaluated else [],
             "exact_intervals":summary.get("exact_intervals", summary["intervals"]) if evaluated else [],
         }
-        if "translated" in summary:
-            result["translated"] = own_translated(summary["translated"], owner, original)
+        for key in ("translated", "paraphrased"):
+            if key in summary:
+                result[key] = own_translated(summary[key], owner, original)
     if detected and detected != chosen:
         result["language_note"] = {"selected": chosen, "detected": detected}
     intervals = result.pop("intervals", [])
@@ -1854,7 +1856,7 @@ async def analyse(submission, reference, reference_text, language, mode, options
         # Matched words found only as edited copying (words replaced, inserted or deleted), reported separately.
         lex = corpus.lexical(original, language)
         result["edited_tokens"] = max(0, corpus.words_in_intervals(lex, intervals) - corpus.words_in_intervals(lex, exact_intervals))
-    if result.get("translated"):        # the sentence pairs are rebuilt from the stored text when reopened, and in the PDF
+    if result.get("translated") or result.get("paraphrased"):   # sentence pairs are rebuilt from the stored text (reopen, PDF)
         result["_text"] = original
     result["highlight_html"] = ""
     if result.get("percent") is not None:
@@ -1969,9 +1971,10 @@ def finish(request, result, identifier=None, session=None):
     response = JSONResponse({"report_id": identifier, **{k: v for k, v in result.items() if not k.startswith("_")}},
                             headers={"x-report-id": identifier})
     cached = {k:v for k,v in result.items() if k not in PRIVATE_FIELDS}
-    if cached.get("translated"):        # likewise the manuscript side of translated-sentence pairs
-        cached["translated"] = [{**t, "pairs": [{k: v for k, v in p.items() if k != "query_excerpt"} for p in t["pairs"]]}
-                                for t in cached["translated"]]
+    for key in ("translated", "paraphrased"):   # likewise the manuscript side of translated / paraphrased sentence pairs
+        if cached.get(key):
+            cached[key] = [{**t, "pairs": [{k: v for k, v in p.items() if k != "query_excerpt"} for p in t["pairs"]]}
+                           for t in cached[key]]
     if cached.get("sources"):           # manuscript excerpts of the side-by-side view are never cached
         cached["sources"] = [{**s, "passages": [{k: v for k, v in p.items() if k != "query_excerpt"}
                                                 for p in s.get("passages") or []]} for s in cached["sources"]]
@@ -2229,9 +2232,10 @@ def report_json(identifier: str, request: Request):
             {**p, "query_excerpt": text[p["query_start"]:p["query_end"]][:600] + ("…" if p["query_end"] - p["query_start"] > 600 else "")}
             if type(p.get("query_start")) is int and type(p.get("query_end")) is int and 0 <= p["query_start"] < p["query_end"] <= len(text)
             else p for p in src.get("passages") or []]} for src in result.get("sources") or []]
-    if text is not None and result.get("translated"):
-        result["translated"] = [{**t, "pairs": [
-            {**p, "query_excerpt": text[p["query_start"]:p["query_end"]][:500]}
-            if type(p.get("query_start")) is int and type(p.get("query_end")) is int and 0 <= p["query_start"] < p["query_end"] <= len(text)
-            else p for p in t["pairs"]]} for t in result["translated"]]
+    for key in ("translated", "paraphrased"):
+        if text is not None and result.get(key):
+            result[key] = [{**t, "pairs": [
+                {**p, "query_excerpt": text[p["query_start"]:p["query_end"]][:500]}
+                if type(p.get("query_start")) is int and type(p.get("query_end")) is int and 0 <= p["query_start"] < p["query_end"] <= len(text)
+                else p for p in t["pairs"]]} for t in result[key]]
     return {"report_id": identifier, "reopened": True, **{k: v for k, v in result.items() if not k.startswith("_")}}

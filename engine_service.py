@@ -177,14 +177,21 @@ def crosslang_loop():
         import_stop.wait(0.2 if done else 30)
 
 
-def translated(db, text, language, exclude_ids=()):
-    """Possible translated reuse for /v1/checks, when the model is loaded (never waits for it)."""
+def paraphrase_enabled():
+    """PARAPHRASE=1 (needs CROSSLANG=1 and its model): same-language meaning matching (evaluation/PARAPHRASE.md)."""
+    return os.environ.get("PARAPHRASE", "0") == "1" and crosslang.enabled()
+
+
+def translated(db, text, language, exclude_ids=(), same_language=False, skip=()):
+    """Possible translated reuse for /v1/checks, when the model is loaded (never waits for it). same_language=True:
+    possible paraphrased reuse instead, leaving out manuscript spans in `skip` (already found by word matching)."""
     if not crosslang.enabled() or crosslang._model is None:
         return None
     exclude = {row[0] for row in db.execute(
         f"SELECT num FROM sources WHERE id IN ({','.join('?' * len(exclude_ids))})", list(exclude_ids))} if exclude_ids else set()
     out = []
-    for item in crosslang.search(db, text, language, crosslang._model, exclude=exclude)[:10]:
+    for item in crosslang.search(db, text, language, crosslang._model, exclude=exclude,
+                                 same_language=same_language, skip=skip)[:10]:
         identifier, raw, source_text = db.execute("SELECT id, metadata, text FROM sources WHERE num=?", (item["num"],)).fetchone()
         m = json.loads(raw)
         deposit = m.get("rights_basis") in DEPOSITS
@@ -313,6 +320,15 @@ def check(query: Query):
                 found = None
             if found is not None:
                 report['translated'] = found
+            if paraphrase_enabled():
+                try:
+                    found = translated(db, query.query_text, query.language, exclude, same_language=True,
+                                       skip=report.get('unique_passages') or ())
+                except Exception as exc:             # never fail a check because of this
+                    log.warning("paraphrase search failed: %s: %s", type(exc).__name__, str(exc)[:200])
+                    found = None
+                if found is not None:
+                    report['paraphrased'] = found
         identifier = uuid.uuid4().hex
         reports[identifier] = (time.monotonic() + 180, report)
         return {'status_url': f'/v1/checks/{identifier}', 'report_url': f'/v1/checks/{identifier}/report'}

@@ -253,15 +253,34 @@ def index_some(db, encoder, limit=5, max_per_text=5000):
 PART = 40                      # manuscript sentences per part for the shortlist (a few paragraphs)
 
 
-def search(db, text, language, encoder, exclude=(), max_pairs=8):
+TEMPLATE = re.compile(r"(?i)адабиётлар|adabiyotlar|список литературы|references|bibliograph|калит сўзлар|kalit so|"
+                      r"таянч сўз|tayanch so|ключевые слова|keywords|аннотация|annotatsiya|abstract|удк|udc|issn|doi")
+
+
+def template_like(sentence):
+    """Reference entries, keyword and annotation lines, journal headers and footers: text every paper shares in some
+    form. Measured in evaluation/PARAPHRASE.md as the only source of false paraphrase matches."""
+    if TEMPLATE.search(sentence):
+        return True
+    cites = len(re.findall(r"(?:^|\s)\d{1,3}\.\s*[A-ZА-ЯЁЎҚҒҲ][a-zа-яёўқғҳʼ’']+\s+[A-ZА-ЯЁЎҚҒҲ]\.", sentence))
+    marks = len(re.findall(r"(?:\b[ТT]\.\s?:|\bС\.\s?\d|\b[бБ]\.\s?\d|\bpp?\.\s?\d|//|№\s?\d|\b(?:19|20)\d\d\b)", sentence))
+    return cites >= 1 or marks >= 2
+
+
+def search(db, text, language, encoder, exclude=(), max_pairs=8, same_language=False, skip=()):
     """Library texts in OTHER languages that at least MIN_SENTENCES manuscript sentences appear to be translated
-    from: [{"num", "pairs": [(q_start, q_end, s_start, s_end, similarity)], "sentences": n}], strongest first."""
+    from: [{"num", "pairs": [(q_start, q_end, s_start, s_end, similarity)], "sentences": n}], strongest first.
+    same_language=True looks for paraphrase instead: library texts in the SAME language, leaving out manuscript
+    sentences that overlap a span in `skip` (already found by word matching) and template lines (template_like)."""
     ensure_tables(db)
     spans = sentences(text)[:max_sentences()]
+    if same_language:
+        spans = [(s, e) for s, e in spans if not template_like(text[s:e])
+                 and sum(max(0, min(e, b) - max(s, a)) for a, b in skip) < 0.5 * (e - s)]
     if len(spans) < MIN_SENTENCES:
         return []
     docs = db.execute("SELECT d.source, d.vec FROM crosslang_docs d JOIN sources s ON s.num = d.source "
-                      "WHERE d.language != ? AND d.vec IS NOT NULL", (language,)).fetchall()
+                      f"WHERE d.language {'=' if same_language else '!='} ? AND d.vec IS NOT NULL", (language,)).fetchall()
     docs = [(num, vec) for num, vec in docs if num not in exclude]
     if not docs:
         return []
