@@ -68,6 +68,7 @@ with tempfile.TemporaryDirectory() as tmp:
             page.route("https://test.paycom.uz/**", lambda route: (sandbox.append(route.request.url),
                                                                   route.fulfill(body="<p>Payme sandbox (stub)</p>",
                                                                                 content_type="text/html")))
+            page.add_init_script("try{localStorage.getItem('plagiq-ui-lang')||localStorage.setItem('plagiq-ui-lang','en')}catch(e){}")  # an English-speaking visitor
             page.goto(BASE)
             page.wait_for_function("() => document.querySelectorAll('#price-cards .price').length === 6")
             page.locator("#account summary").click()

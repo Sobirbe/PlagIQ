@@ -52,7 +52,7 @@ T = {
                     no_comparable_sources="не найдено источников с текстом для сравнения", no_sources_in_language="в библиотеке нет текстов на этом языке")),
     "uz": dict(
         label="Tekshiruv holati",
-        eyebrow_done="TEKSHIRUV TUGADI", eyebrow_incomplete="TEKSHIRUV TO‘LIQ EMAS", eyebrow_failed="QIDIRUV BAJARILMADI",
+        eyebrow_done="TEKSHIRUV YAKUNLANDI", eyebrow_incomplete="TEKSHIRUV TO‘LIQ EMAS", eyebrow_failed="QIDIRUV BAJARILMADI",
         completed_matches="Yakunlandi: mosliklar topildi", completed_no_matches="Yakunlandi: moslik topilmadi",
         incomplete_coverage="To‘liq emas: manbalarning bir qismi tekshirilmadi", failed_search="Xato: manbalarni qidirish",
         ai_only="AI detektor tekshiruvi", at_least="kamida {p}%",
