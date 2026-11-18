@@ -169,7 +169,8 @@ def crosslang_loop():
         if lock.acquire(blocking=False):
             try:
                 with closing(connect()) as db:
-                    done = crosslang.index_some(db, encoder, limit=3)
+                    done = crosslang.convert_some(db)      # rows in the earlier float16 format first: frees space
+                    done += crosslang.index_some(db, encoder, limit=3)
                     status = crosslang.index_status(db)
                 CROSSLANG_STATE.update(state="ready" if status["indexed"] >= status["total"] else "indexing", error="")
             except Exception as exc:
