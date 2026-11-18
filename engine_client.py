@@ -396,9 +396,21 @@ async def library():
                               if k in ("wikipedia", "cyberleninka", "zenodo", "journals", "archive", "university", "other")},
                 "collection_counts": _collections(data.get("collection_counts")),
                 "last_import": max(finished) if finished else None,
-                "auto_import": [l for l in data.get("auto_import") or [] if l in LANGUAGES]}
+                "auto_import": [l for l in data.get("auto_import") or [] if l in LANGUAGES],
+                "crosslang": _crosslang(data.get("crosslang"))}
     except (httpx.HTTPError, EngineError, ValueError, TypeError, AttributeError, KeyError):
         return None
+
+
+def _crosslang(c):
+    """The engine's translated/paraphrased-reuse status for /admin (crosslang.py), rebuilt from an allowlist."""
+    if not isinstance(c, dict):
+        return None
+    state = c.get("state")
+    return {"enabled": c.get("enabled") is True, "model": c.get("model") is True,
+            "state": state if state in ("off", "downloading", "loading", "indexing", "ready", "error") else "",
+            "error": str(c.get("error") or "")[:200],
+            **{k: c[k] if type(c.get(k)) is int and 0 <= c[k] <= 10**9 else 0 for k in ("indexed", "total")}}
 
 
 # ------------------------------------------------------------- owner diagnostics

@@ -91,3 +91,24 @@ def test_engine_and_website_show_it_separately_only_when_switched_on(engine, mon
     with corpus.connect() as db:
         monkeypatch.setenv("CROSSLANG", "0")
         assert not engine_service.paraphrase_enabled()
+
+
+def test_admin_shows_the_engines_translated_reuse_status(engine, monkeypatch, tmp_path):  # noqa: F811
+    """The website rebuilt the engine's /v1/library answer from an allowlist that left `crosslang` out, so /admin
+    said "off (optional)" even when the engine had CROSSLANG=1."""
+    from test_auth_ai import TOKEN, sign_in
+    monkeypatch.setenv("USERS_DB", str(tmp_path / "u.sqlite3"))
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", TOKEN)
+    monkeypatch.setenv("OWNER_TELEGRAM_IDS", "42")
+    monkeypatch.setenv("CROSSLANG", "1")
+    monkeypatch.setitem(engine_service.CROSSLANG_STATE, "state", "indexing")
+    with corpus.connect() as db:
+        corpus.ingest(db, meta(1, "uz", title="Uzbek original"), body("uz", (0, 1, 2)))
+    client = TestClient(web.app)
+    sign_in(client, user_id=42)
+    page = client.get("/admin").text
+    row = page[page.index("Translated reuse"):].split("</tr>")[0]
+    assert "off (optional)" not in row and "indexing: 0 of 1 library texts indexed" in row, row
+    monkeypatch.setitem(engine_service.CROSSLANG_STATE, "state", "error")
+    monkeypatch.setitem(engine_service.CROSSLANG_STATE, "error", "MemoryError: model too large")
+    assert "error: MemoryError: model too large" in client.get("/admin").text
