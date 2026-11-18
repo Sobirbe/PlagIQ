@@ -66,6 +66,8 @@ try:
             return page
 
         def run(page, name, text, mode='reference'):
+            if mode in ('ai', 'corpus') and page.locator('#advanced').get_attribute('open') is None:
+                page.locator('#advanced-label').click()                    # other check types are under "Qo‘shimcha sozlamalar"
             page.locator(f'input[name=mode][value={mode}]').check()
             page.locator('#submission').set_input_files({'name': name, 'mimeType': 'text/plain', 'buffer': text.encode()})
             if mode == 'reference':
