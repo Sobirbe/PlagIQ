@@ -14,6 +14,7 @@ import report_pdf
 import uzcyr
 
 CASES = {
+    "V0.5 · ILMIY SINOV": "V0.5 · ИЛМИЙ СИНОВ",
     "muvaffaqiyatsiz": "муваффақиятсиз", "Agar o‘tsa": "Агар ўтса", "ketsangiz": "кетсангиз",
     "tsement": "цемент", "natsional": "национал", "kvalifikatsiya": "квалификация", "dotsentlar": "доцентлар",
     "PLAGIQ — PLAGIAT TEKSHIRUVI XULOSASI": "PLAGIQ — ПЛАГИАТ ТЕКШИРУВИ ХУЛОСАСИ",
