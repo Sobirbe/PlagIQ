@@ -221,7 +221,8 @@ def summarize(report: dict, max_sources=25) -> dict:
                 "collection_counts": _collections(report.get("collection_counts")),
                 "matched_source_count": len(raw_sources),
                 "sources_truncated": len(raw_sources) > max_sources,
-                **({"translated": _translated(report["translated"], document_length)} if "translated" in report else {})}
+                **({"translated": _translated(report["translated"], document_length)} if "translated" in report else {}),
+                **({"paraphrased": _translated(report["paraphrased"], document_length)} if "paraphrased" in report else {})}
     except (ValueError, TypeError, KeyError, AttributeError) as exc:
         raise EngineError("Invalid corpus evidence response.") from exc
 

@@ -415,11 +415,35 @@ TRANSLATED_T = {
 }
 
 
-def translated_section(result, lang, st, table, pairs=3):
-    items = result.get("translated") or []
+PARAPHRASED_T = {
+    "en": dict(TRANSLATED_T["en"], title="Possible paraphrased reuse (review)", note="Sentences of the document that closely "
+               "match, in meaning, sentences of a text in the same language in the PlagIQ library, although few or no words are "
+               "the same (a paraphrase, for example rewritten by a person or a chatbot). Found by sentence similarity (LaBSE, at "
+               "least 2 sentences of one text at similarity 0.80 or more); sentences already found by word matching, reference "
+               "entries and keyword or annotation lines are left out. This is a separate signal for review and is NOT included "
+               "in the percentage; texts on the same narrow subject can also say similar things. Compare the sentences before "
+               "drawing conclusions."),
+    "ru": dict(TRANSLATED_T["ru"], title="Возможное заимствование через перефразирование (проверьте)", note="Предложения "
+               "документа, близкие по смыслу к предложениям текста на том же языке из библиотеки PlagIQ, хотя совпадающих слов "
+               "мало или нет (пересказ, например человеком или чат-ботом). Найдены по сходству предложений (LaBSE, не менее 2 "
+               "предложений одного текста со сходством от 0,80); предложения, уже найденные по совпадению слов, записи списка "
+               "литературы и строки ключевых слов и аннотаций не учитываются. Это отдельный сигнал для проверки, он НЕ входит в "
+               "процент; тексты на одну узкую тему тоже могут говорить похожее. Сравните предложения, прежде чем делать выводы."),
+    "uz": dict(TRANSLATED_T["uz"], title="Ehtimoliy qayta ifodalash orqali o‘zlashtirish (tekshiring)", note="Hujjatdagi "
+               "gaplar ma’no jihatidan PlagIQ kutubxonasidagi shu tildagi matn gaplariga juda yaqin, garchi bir xil so‘zlar kam "
+               "yoki umuman yo‘q bo‘lsa ham (qayta ifodalash, masalan inson yoki chatbot tomonidan). Gaplar o‘xshashligi "
+               "bo‘yicha topildi (LaBSE, bitta matnning kamida 2 ta gapi, o‘xshashlik 0,80 va undan yuqori); so‘zlar mosligi "
+               "bilan topilgan gaplar, adabiyotlar yozuvlari, kalit so‘zlar va annotatsiya qatorlari hisobga olinmaydi. Bu "
+               "tekshirish uchun alohida belgi, foizga KIRMAYDI; bir tor mavzudagi matnlar ham o‘xshash fikr aytishi mumkin. "
+               "Xulosa qilishdan oldin gaplarni solishtiring."),
+}
+
+
+def translated_section(result, lang, st, table, pairs=3, key="translated"):
+    items = result.get(key) or []
     if not items:
         return []
-    t = TRANSLATED_T.get(lang, TRANSLATED_T["en"])
+    t = (PARAPHRASED_T if key == "paraphrased" else TRANSLATED_T).get(lang, TRANSLATED_T["en"])
     text = result.get("_text") or ""
     rows = []
     for item in items:
@@ -518,6 +542,7 @@ def _plagiarism_sections(result, mode, t, st, table, esc, headline, basis, lang)
     story += ai_section(result.get("ai"), lang, st, table)
     story += uz_section(result.get("ai_uz"), lang, st, table)
     story += translated_section(result, lang, st, table)
+    story += translated_section(result, lang, st, table, key="paraphrased")
 
     story.append(Paragraph(t["s_sources"], st["h"]))
     sources = result.get("sources") or []
@@ -908,5 +933,5 @@ def build_pdf(result, identifier, lang="en", minutes_left=15, verify_url=None):
 
 
 import uzcyr  # noqa: E402  (Uzbek Cyrillic texts, generated from the Uzbek Latin ones)
-for _table in (T, VIEW_T, INTEGRITY_T, AI_T, EDITED_T, EXCLUDED_T, TRANSLATED_T, UZAI_T):
+for _table in (T, VIEW_T, INTEGRITY_T, AI_T, EDITED_T, EXCLUDED_T, TRANSLATED_T, PARAPHRASED_T, UZAI_T):
     uzcyr.add_to(_table)
