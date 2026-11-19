@@ -14,6 +14,7 @@ import report_pdf
 import uzcyr
 
 CASES = {
+    "V0.5 · ILMIY SINOV": "V0.5 · ИЛМИЙ СИНОВ",
     "muvaffaqiyatsiz": "муваффақиятсиз", "Agar o‘tsa": "Агар ўтса", "ketsangiz": "кетсангиз",
     "tsement": "цемент", "natsional": "национал", "kvalifikatsiya": "квалификация", "dotsentlar": "доцентлар",
     "PLAGIQ — PLAGIAT TEKSHIRUVI XULOSASI": "PLAGIQ — ПЛАГИАТ ТЕКШИРУВИ ХУЛОСАСИ",
@@ -98,3 +99,12 @@ def test_server_texts_and_reports_in_cyrillic():
     verify_page = client.get("/verify?r=abc&ui=uzc").text
     assert '<html lang="uz-Cyrl">' in verify_page and "ЎЗ</a>" in verify_page
     assert '<html lang="uz-Cyrl">' in client.get("/verify?r=abc", headers={"accept-language": "uz-Cyrl-UZ"}).text
+
+
+def test_inline_label_lookups_pick_the_language():
+    """`(o=>o||...)({en:..,uz:..})` (the key lookup left out) put "[object Object]" in the Privacy link and between
+    web-search provider names; every inline lookup must index the object by the language."""
+    import re
+    page = open("index.html", encoding="utf-8").read()
+    lookups = re.findall(r"\(o=>o(\[\w+\])?\|\|", page)
+    assert lookups and all(lookups), "an inline label lookup without [code]/[current]"

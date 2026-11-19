@@ -39,7 +39,7 @@ KEEP = re.compile(r"(\{[^}]*\}|<[^>]+>|&[a-z#0-9]+;|https?://\S+|www\.\S+|[\w.+-
                   r"(?<![A-Za-z])(?:PlagIQ|PLAGIQ|OpenAlex|Telegram|Pangram|Payme|Click|Uzum|CyberLeninka|Zenodo|Wikipedia|Yandex|"
                   r"Brave|Railway|Google|Excel|Word|Turnitin|Antiplagiat|Scopus|Unpaywall)"
                   r"(?=['‘ʼ’]?(?:dagi|dan|da|ga|ka|ning|ni|lar)(?![A-Za-z]))|"
-                  r"(?<![A-Za-z])[Ee]-?mail|\b[A-Z][A-Z0-9]*_[A-Z0-9_]+\b|"
+                  r"(?<![A-Za-z])[Ee]-?mail|(?<![A-Za-z])[Vv]\d+(?:\.\d+)+|\b[A-Z][A-Z0-9]*_[A-Z0-9_]+\b|"
                   rf"(?<![A-Za-z])(?:{FOREIGN})(?![A-Za-z0-9])|(?<![A-Za-z])(?:{FOREIGN})(?=[a-z‘ʼ'’]))")
 WORD = re.compile(r"[A-Za-zʻʼ‘’'`´]+")
 

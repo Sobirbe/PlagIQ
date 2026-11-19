@@ -2258,6 +2258,14 @@ async def my_checks(request: Request):
                         headers={"Cache-Control": "no-store"})
 
 
+@app.get("/api/estimate")
+async def check_estimate(mode: str = "academic", ai: bool = False):
+    """Roughly how many minutes a check of this kind takes (metrics.estimate): shown while it runs."""
+    if mode not in ("reference", "academic", "corpus", "ai"):
+        raise ApiError(400, "invalid_mode", "Unknown check type.")
+    return await run_in_threadpool(metrics.estimate, mode, ai)
+
+
 @app.get("/api/reports")
 def my_reports(request: Request):
     """Checks of the last REPORT_HOURS for this browser session and, when signed in, this account."""

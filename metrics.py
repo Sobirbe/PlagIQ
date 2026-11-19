@@ -89,6 +89,27 @@ def _percentile(values, share):
     return values[min(len(values) - 1, max(0, math.ceil(share * len(values)) - 1))]
 
 
+# Minutes shown while a check runs, until there are enough recorded checks of that kind to go by.
+DEFAULT_MINUTES = {"reference": 1, "corpus": 3, "academic": 5, "ai": 2}
+
+
+def estimate(mode, ai=False, now=None, days=14, min_checks=5):
+    """How long a check of this kind usually takes, in whole minutes, rounded up: the time 9 in 10 of the
+    finished checks of the last `days` took (with the AI detector: those that ran it), or DEFAULT_MINUTES (plus
+    a minute for the AI detector) while fewer than `min_checks` are recorded. Between 1 and 30 minutes."""
+    now = now or time.time()
+    try:
+        with _lock, closing(_connect()) as db:
+            rows = db.execute("SELECT seconds, ai FROM checks WHERE time >= ? AND mode = ? AND error IS NULL "
+                              "AND seconds IS NOT NULL", (now - days * 86400, mode)).fetchall()
+    except sqlite3.Error:
+        rows = []
+    secs = [s for s, a in rows if (a == "done") == bool(ai) or mode == "ai"]
+    if len(secs) >= min_checks:
+        return {"minutes": min(30, max(1, math.ceil(_percentile(secs, 0.9) / 60))), "checks": len(secs)}
+    return {"minutes": DEFAULT_MINUTES.get(mode, 5) + (1 if ai and mode != "ai" else 0), "checks": len(secs)}
+
+
 def summary(hours, now=None):
     """Figures for the last `hours`."""
     now = now or time.time()
