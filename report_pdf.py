@@ -1,9 +1,9 @@
 """PDF report: a certificate of the check (certificate.py) followed by the scope-limited evidence.
 Never an originality certificate.
 
-Rendered from the in-memory report cache: source excerpts from the authorized corpus and, for the
-appendix, the manuscript with its matches highlighted. The manuscript is kept in memory only for the
-life of the report (15 minutes) and only for its owner's browser session; it is never written to disk.
+Rendered from the stored report (reports_store.py): source excerpts from the authorized corpus and, for the
+appendix, the manuscript with its matches highlighted. The manuscript is kept, compressed, only with the report
+and only for its owner, until the report is deleted; it is never added to the library.
 """
 import html
 import io
@@ -618,15 +618,15 @@ VIEW_T = {
                "several sources can contain the same words, so shares may add up to more than the total.",
                doc_title="Appendix: your document with matches highlighted",
                doc_note="Highlighted words lie inside a verified match of at least seven consecutive words. The colour and the "
-               "number show the source (as numbered in the list above and in section 4). This text is printed in your PDF only: "
-               "PlagIQ keeps it in memory for the life of the report (15 minutes) and never stores it.",
+               "number show the source (as numbered in the list above and in section 4). PlagIQ keeps this text, compressed on "
+               "its private server, only with your report until the report is deleted; it is never added to the library.",
                legend_q="quotation", legend_b="bibliography", legend_x="match not counted (excluded by your options)",
                none="No matched passages in this document.", more="further sources share this colour",
                where="Where the matches are", where_note="The {n} longest matched passages of {m}, in document order, with a "
                "few words of context. The position is how far into the document the passage starts. The full report lists every "
                "match, all evidence and your whole document with matches highlighted.", position="Position",
                passage="Passage (matched words highlighted)", searched="Searched", short_note="Short report. Download the "
-               "full report from the results page while it is available (15 minutes).", no_matches="No matched passages were found in the searched scope."),
+               "full report from the results page or “My checks” while the report is kept.", no_matches="No matched passages were found in the searched scope."),
     "ru": dict(overview="Обзор", counted="Совпадения (учтены)", excluded="Совпадения, исключённые (цитаты, список литературы)",
                original="Оригинальность: совпадений в проверенном охвате не найдено", ocr="Страниц-сканов, прочитанных OCR (распознавание текста): {n}. Ошибки распознавания могут скрыть совпадение: заимствование может быть занижено, но не завышено.", bar_note="Три части в сумме дают 100% слов документа. "
                "Оригинальность относится только к проверенному охвату и не является сертификатом оригинальности.",
@@ -635,15 +635,15 @@ VIEW_T = {
                "встречаться в нескольких источниках, поэтому сумма долей может превышать итог.",
                doc_title="Приложение: ваш документ с выделенными совпадениями",
                doc_note="Выделены слова, входящие в подтверждённое совпадение не короче семи слов подряд. Цвет и номер указывают "
-               "источник (как в списке выше и в разделе 4). Этот текст есть только в вашем PDF: PlagIQ держит его в памяти, пока "
-               "существует отчёт (15 минут), и никогда не сохраняет.",
+               "источник (как в списке выше и в разделе 4). PlagIQ хранит этот текст в сжатом виде на своём закрытом сервере "
+               "только вместе с вашим отчётом, пока отчёт не удалён; в библиотеку он не добавляется.",
                legend_q="цитата", legend_b="список литературы", legend_x="совпадение не учтено (исключено вашими настройками)",
                none="В документе нет совпадающих фрагментов.", more="остальные источники отмечены этим цветом",
                where="Где найдены совпадения", where_note="{n} самых длинных совпадающих фрагментов из {m} в порядке документа, "
                "с несколькими словами контекста. Позиция — насколько далеко от начала документа начинается фрагмент. Полный отчёт "
                "содержит все совпадения, все доказательства и весь документ с выделенными совпадениями.", position="Позиция",
                passage="Фрагмент (совпавшие слова выделены)", searched="Проверено", short_note="Краткий отчёт. Полный отчёт можно "
-               "скачать на странице результата, пока он доступен (15 минут).", no_matches="В проверенном охвате совпадений не найдено."),
+               "скачать на странице результата или в «Мои проверки», пока отчёт хранится.", no_matches="В проверенном охвате совпадений не найдено."),
     "uz": dict(overview="Umumiy ko‘rinish", counted="Moslik (hisobga olingan)", excluded="Moslik, chiqarib tashlangan (iqtiboslar, adabiyotlar)",
                original="Originallik: tekshirilgan doirada moslik topilmadi", ocr="OCR (matnni tanib olish) orqali o‘qilgan skanerlangan sahifalar: {n}. Tanib olish xatolari moslikni yashirishi mumkin: o‘zlashtirish kamroq ko‘rsatilishi mumkin, lekin ko‘proq emas.", bar_note="Uch qism birga hujjat so‘zlarining 100% ini tashkil etadi. "
                "Originallik faqat tekshirilgan doiraga tegishli; bu originallik sertifikati emas.",
@@ -652,15 +652,15 @@ VIEW_T = {
                "manbada bo‘lishi mumkin, shuning uchun ulushlar yig‘indisi umumiy natijadan katta bo‘lishi mumkin.",
                doc_title="Ilova: mosliklar belgilangan hujjatingiz",
                doc_note="Kamida yetti ketma-ket so‘zli tasdiqlangan moslik ichidagi so‘zlar belgilangan. Rang va raqam manbani "
-               "ko‘rsatadi (yuqoridagi ro‘yxat va 4-bo‘limdagi raqam). Bu matn faqat sizning PDF faylingizda: PlagIQ uni hisobot "
-               "mavjud bo‘lgan 15 daqiqa xotirada saqlaydi va hech qachon diskka yozmaydi.",
+               "ko‘rsatadi (yuqoridagi ro‘yxat va 4-bo‘limdagi raqam). PlagIQ bu matnni siqilgan holda o‘z yopiq serverida "
+               "faqat hisobotingiz bilan birga, hisobot o‘chirilguncha saqlaydi; u kutubxonaga hech qachon qo‘shilmaydi.",
                legend_q="iqtibos", legend_b="adabiyotlar ro‘yxati", legend_x="moslik hisobga olinmagan (sozlamalaringiz bo‘yicha)",
                none="Hujjatda mos parchalar yo‘q.", more="qolgan manbalar shu rangda",
                where="Mosliklar qayerda", where_note="{m} ta mos parchadan eng uzun {n} tasi, hujjatdagi tartibda, bir necha so‘z "
                "kontekst bilan. Joylashuv — parcha hujjat boshidan qancha uzoqda boshlanishi. To‘liq hisobotda barcha mosliklar, "
                "barcha dalillar va mosliklar belgilangan butun hujjat bor.", position="Joylashuv",
                passage="Parcha (mos so‘zlar belgilangan)", searched="Tekshirilgan doira", short_note="Qisqa hisobot. To‘liq "
-               "hisobotni natija sahifasidan yuklab oling (15 daqiqa davomida mavjud).", no_matches="Tekshirilgan doirada mos parchalar topilmadi."),
+               "hisobotni natija sahifasidan yoki «Mening tekshiruvlarim»dan, hisobot saqlanayotgan paytda yuklab oling.", no_matches="Tekshirilgan doirada mos parchalar topilmadi."),
 }
 
 
