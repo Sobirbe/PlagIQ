@@ -171,6 +171,7 @@ def test_proxy_headers_ignored_by_default():
 
 
 def test_rejects_when_scan_slots_full(monkeypatch):
+    monkeypatch.setenv('QUEUE_MAX', '0')                  # no waiting line: refused at once (the line: test_check_queue.py)
     monkeypatch.setattr(web, 'active_scans', 99)
     response = post()
     assert response.status_code == 503 and response.json()['code'] == 'server_busy'
