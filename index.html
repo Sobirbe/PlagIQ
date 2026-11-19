@@ -371,7 +371,7 @@ drop.addEventListener("drop",e=>{const f=e.dataTransfer.files[0];if(f){let dt=ne
 function precheck(){let files=[submission.files[0]];if(!files[0])return "choose";let ref=$("reference").files[0];if(ref&&!$("reference-fields").hidden)files.push(ref);for(let f of files){if(!TYPES.test(f.name))return "unsupported_type";if(f.size>MAX_FILE)return "file_too_large";if(f.size===0)return "empty_file"}if(!$("academic-note").hidden&&!$("consent").checked)return "consent_required";if(!$("ai-consent-opt").hidden&&!$("ai-note").hidden&&!$("ai_consent").checked)return "ai_consent_required";if(authConfig.required&&!me){let mode=(modeInputs.find(i=>i.checked)||{}).value,words=quoteState&&quoteState.kind==="ok"?quoteState.data.words:0;if(!authConfig.anon_max_words||mode==="ai"||$("archive").checked||(!$("ai-consent-opt").hidden&&$("ai_check")&&$("ai_check").checked))return "login_required";if(words>authConfig.anon_max_words)return "login_required_long"}if(!$("archive-note").hidden&&$("archive").checked&&!$("archive_consent").checked)return "archive_consent_required";return null}
 $("form").addEventListener("submit",async e=>{e.preventDefault();let btn=$("submit"),bad=precheck();if(bad){setStatus({kind:"error",code:bad});return}
 btn.disabled=true;btn.setAttribute("aria-busy","true");$("result").setAttribute("aria-busy","true");setStatus({kind:"loading"});$("result").style.display="none";
-let token=newProgressToken(),body=new FormData(e.target);body.append("progress",token);startProgress(token);
+let token=newProgressToken(),body=new FormData(e.target);body.append("progress",token);body.append("ui_lang",current);startProgress(token);
 try{let res;try{res=await fetch("/api/check",{method:"POST",body})}catch(_){throw {code:"network"}}
 let data={};try{data=await res.json()}catch(_){}
 if(!res.ok)throw {code:data.code||(res.status===413?"request_too_large":res.status===429?"rate_limited":"request_failed"),detail:typeof data.detail==="string"?data.detail:"",status:data.status};
@@ -410,12 +410,13 @@ const PG={"en": {"upload": "Uploading the file", "read": "Reading the file", "oc
 let progressTimer=null,progressState=null,progressAnnounced="";
 /* "Ready in about N min" while a check runs (N from /api/estimate: recent checks of the same kind). Closing the
 page is offered only when signed in: the check keeps running on the server and is listed under the account. */
-const WT={"en":{eta:"Your results will be ready in about {n} min.",close:"You can close this page: the check keeps running, and the result will appear under “My checks”."},
-"uz":{eta:"Natijangiz taxminan {n} daqiqada tayyor bo‘ladi.",close:"Sahifani yopishingiz mumkin: tekshiruv davom etadi, natija «Mening tekshiruvlarim» bo‘limida chiqadi."},
-"ru":{eta:"Результат будет готов примерно через {n} мин.",close:"Страницу можно закрыть: проверка продолжится, а результат появится в разделе «Мои проверки»."}};
+const WT={"en":{eta:"Your results will be ready in about {n} min.",close:"You can close this page: the check keeps running, and the result will appear under “My checks”.",notify:"You can close this page: the check keeps running. When it is ready, we will let you know by {c}, and the result will appear under “My checks”.",mail:"e-mail"},
+"uz":{eta:"Natijangiz taxminan {n} daqiqada tayyor bo‘ladi.",close:"Sahifani yopishingiz mumkin: tekshiruv davom etadi, natija «Mening tekshiruvlarim» bo‘limida chiqadi.",notify:"Sahifani yopishingiz mumkin: tekshiruv davom etadi. Natija tayyor bo‘lgach, sizga {c} orqali xabar beramiz; u «Mening tekshiruvlarim» bo‘limida chiqadi.",mail:"elektron pochta"},
+"ru":{eta:"Результат будет готов примерно через {n} мин.",close:"Страницу можно закрыть: проверка продолжится, а результат появится в разделе «Мои проверки».",notify:"Страницу можно закрыть: проверка продолжится. Когда результат будет готов, мы сообщим вам через {c}, а результат появится в разделе «Мои проверки».",mail:"электронную почту"}};
 let waitMinutes=null;
 function renderWait(){let box=$("wait-note");if(!progressState||!waitMinutes){box.hidden=true;return}let w=(o=>o[current]||(current==="uzc"?uzcDeep(o.uz):o.en))(WT);
-box.replaceChildren(el("b",{textContent:w.eta.replace("{n}",waitMinutes)}),...(me?[" "+w.close]:[]));box.hidden=false}
+let m=window.meMethods||{},via=m.telegram?"Telegram":m.email&&(authConfig.email_recovery||authConfig.email_dev)?w.mail:"";
+box.replaceChildren(el("b",{textContent:w.eta.replace("{n}",waitMinutes)}),...(me?[" "+(via?w.notify.replace("{c}",via):w.close)]:[]));box.hidden=false}
 async function loadWait(){waitMinutes=null;let mode=(modeInputs.find(i=>i.checked)||{}).value||"academic",ai=mode!=="ai"&&$("ai_check").checked;
 try{let r=await fetch("/api/estimate?mode="+encodeURIComponent(mode)+"&ai="+ai,{cache:"no-store"});if(r.ok)waitMinutes=(await r.json()).minutes||null}catch(_){}renderWait()}
 function newProgressToken(){let a=new Uint8Array(16);crypto.getRandomValues(a);return [...a].map(b=>b.toString(16).padStart(2,"0")).join("")}

@@ -56,6 +56,7 @@ import sandbox
 import uzcyr
 import templates
 import metrics
+import notify
 
 # The whole request is capped by SecurityMiddleware, so keep uploaded parts in
 # memory instead of letting Starlette spill files over 1 MB to a temp file on disk.
@@ -1243,7 +1244,7 @@ async def check(request:Request, submission:UploadFile=File(...),
                 progress_token:str=Form("",alias="progress",max_length=40),
                 expected_price:int|None=Form(None,ge=0,le=10_000_000),
                 doc_author:str=Form("",max_length=200),doc_title:str=Form("",max_length=400),
-                doc_type:str=Form("",max_length=20)):
+                doc_type:str=Form("",max_length=20),ui_lang:str=Form("",max_length=5)):
     global active_scans
     purge_reports()
     user = auth.read(request.cookies.get(auth.COOKIE))
@@ -1267,16 +1268,20 @@ async def check(request:Request, submission:UploadFile=File(...),
         await run_in_threadpool(reports_store.start, job, session, user["id"] if user else None,
                                 clean_filename(submission.filename, "Document"), mode)
         if user and auth.required():
-            return await _run_entitled_check(request, user, submission, reference, reference_text, language, mode,
-                                             options, web_search, ai_check, deposit, job, session, started, expected_price)
-        return await _run_check(request, user, anonymous, submission, reference, reference_text, language, mode,
-                                options, web_search, ai_check, deposit, job, session, started)
+            response = await _run_entitled_check(request, user, submission, reference, reference_text, language, mode,
+                                                 options, web_search, ai_check, deposit, job, session, started, expected_price)
+        else:
+            response = await _run_check(request, user, anonymous, submission, reference, reference_text, language, mode,
+                                        options, web_search, ai_check, deposit, job, session, started)
+        await _notify_if_left(request, user, progress_token, submission.filename, True, ui_lang)
+        return response
     except ApiError as exc:
         status = checkstatus.error_status(exc.code, exc.status_code)
         if status == "rejected":
             await run_in_threadpool(reports_store.delete, job)   # not a check (sign-in, balance, limits)
         else:
             await run_in_threadpool(reports_store.fail, job, exc.code)
+            await _notify_if_left(request, user, progress_token, submission.filename, False, ui_lang)
             await run_in_threadpool(metrics.record_failure, mode, status, exc.code, time.monotonic() - started)
             progress.finish(failed=True)
             if not request.cookies.get("plagiq_session"):        # so the failed check shows under "My checks"
@@ -1293,6 +1298,16 @@ async def check(request:Request, submission:UploadFile=File(...),
     finally:
         active_scans -= 1
         progress.finish()
+
+async def _notify_if_left(request, user, token, filename, ok, ui_lang):
+    """"Your check is ready" by Telegram or e-mail when the page was closed before the check ended (notify.py)."""
+    try:
+        disconnected = await request.is_disconnected()
+    except Exception:
+        disconnected = False
+    notify.after_check(user, token, disconnected, clean_filename(filename, "Document"), ok,
+                       ui_lang if ui_lang in ("uz", "uzc", "ru", "en") else "uz", _origin(request))
+
 
 # ------------------------------------------------------------- one document, one payment (TEST mode only)
 
