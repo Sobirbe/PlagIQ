@@ -65,6 +65,9 @@ def crosslang_detail(library):
     state = c.get("state", "")
     if state == "error":
         return "error: " + str(c.get("error", ""))[:200]
+    if state == "paused":
+        return (f"paused, engine volume almost full: {c.get('indexed', 0):,} of {c.get('total', 0):,} library texts "
+                "indexed; texts not yet indexed are left out of translated / paraphrased matching")
     if state in ("indexing", "ready"):
         return f"{state}: {c.get('indexed', 0):,} of {c.get('total', 0):,} library texts indexed"
     return {"downloading": "downloading the model (1.9 GB, once)", "shrinking": "storing the model in 16 bits (once; 1.9 GB -> 0.9 GB)", "loading": "loading the model"}.get(state, state or "starting")

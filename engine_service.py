@@ -170,15 +170,33 @@ def crosslang_loop():
             try:
                 with closing(connect()) as db:
                     done = crosslang.convert_some(db)      # rows in the earlier float16 format first: frees space
-                    done += crosslang.index_some(db, encoder, limit=3)
+                    paused = crosslang_low_disk()
+                    if not paused:
+                        done += crosslang.index_some(db, encoder, limit=3)
                     status = crosslang.index_status(db)
-                CROSSLANG_STATE.update(state="ready" if status["indexed"] >= status["total"] else "indexing", error="")
+                CROSSLANG_STATE.update(state="ready" if status["indexed"] >= status["total"] else
+                                       "paused" if paused else "indexing", error="")
             except Exception as exc:
                 CROSSLANG_STATE.update(error=f"{type(exc).__name__}: {str(exc)[:200]}")
                 log.warning("crosslang indexing failed: %s", CROSSLANG_STATE["error"])
             finally:
                 lock.release()
         import_stop.wait(0.2 if done else 30)
+
+
+def crosslang_low_disk(db_path=None):
+    """Indexing for translated / paraphrased reuse writes into the library file: it stops while the engine volume has
+    less than CROSSLANG_MIN_FREE_PERCENT (5) of its size free, at least 150 MB, so the volume never fills up (imports
+    stop earlier, at 10 %; the remaining room is kept for authors' archive deposits and the database's own work).
+    Checks are not affected; texts not yet indexed are only left out of translated / paraphrased matching."""
+    free, total = staging.disk(db_path or os.environ.get("CORPUS_DB", "corpus.sqlite3"))
+    if free is None or not total:
+        return False
+    try:
+        share = min(max(float(os.environ.get("CROSSLANG_MIN_FREE_PERCENT", "5")), 1), 50) / 100
+    except ValueError:
+        share = 0.05
+    return free < max(150 * 1024 * 1024, total * share)
 
 
 def paraphrase_enabled():
