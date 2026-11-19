@@ -33,6 +33,31 @@ log = logging.getLogger("plagiq.import")
 import_stop = threading.Event()
 
 
+def library_room(db_path=None):
+    """How many more library texts CORPUS_MAX_SOURCES allows (authors' and universities' deposits not counted)."""
+    try:
+        with closing(connect(db_path)) as db:
+            marks = ",".join("?" * len(corpus.DEPOSITS))
+            count = db.execute(f"SELECT COUNT(*) FROM sources WHERE json_extract(metadata, '$.rights_basis') NOT IN "
+                               f"({marks})", corpus.DEPOSITS).fetchone()[0]           # as corpus._check_capacity counts
+    except sqlite3.Error:
+        return 10**9                                    # cannot tell: let the importers find out themselves
+    return corpus.max_sources() - count
+
+
+def library_full_note(db_path=None):
+    """When the library is at CORPUS_MAX_SOURCES: delete downloaded files waiting to be added (they could not be
+    added and only took disk space; they are fetched again once there is room) and return the note for /admin.
+    None while there is room."""
+    room = library_room(db_path)
+    if room > 0:
+        return None
+    freed = staging.purge_leftovers(import_job.staging_root())
+    return (f"Library full: {corpus.max_sources() - room:,} of {corpus.max_sources():,} texts (CORPUS_MAX_SOURCES). "
+            "Nothing is downloaded until the limit is raised or texts are removed (e.g. Wikipedia pruned)"
+            + (f"; {freed // (1024 * 1024)} MB of downloaded files that could not be added were deleted." if freed else "."))
+
+
 def import_loop():
     """Background OpenAlex import when AUTO_IMPORT is set. Runs, then sleeps AUTO_IMPORT_HOURS."""
     while not import_stop.is_set():
@@ -48,11 +73,19 @@ def import_loop():
             import_stop.wait(min(hours, 6) * 3600)
             continue
         import_job.write_status(import_job.staging_root(), "disk", {"error": None})
+        full = library_full_note()
+        import_job.write_status(import_job.staging_root(), "limit", {"error": full})
+        if full:                                        # nothing could be added: do not download (it only fills the disk)
+            log.warning("imports skipped: %s", full)
+            import_stop.wait(hours * 3600)
+            continue
         for language in langs:
             if import_stop.is_set():
                 return
+            if library_room() <= 0:
+                break
             try:
-                status = import_job.run(language, batch, cost)
+                status = import_job.run(language, min(batch, library_room()), cost)
                 log.warning("import %s: %s imported, %s failed, corpus %s sources, error=%s", language,
                             status["imported"], status["failed"], status["corpus_sources"], status["error"])
             except Exception as exc:                     # never let the import stop the engine
@@ -64,7 +97,9 @@ def import_loop():
             if import_stop.is_set():
                 return
             try:
-                status = import_job.run_zenodo(language, zen_batch, zen_cost)
+                if library_room() <= 0:
+                    break
+                status = import_job.run_zenodo(language, min(zen_batch, library_room()), zen_cost)
                 log.warning("import zenodo-%s: %s imported, %s failed, error=%s", language, status["imported"],
                             status["failed"], status["error"])
             except Exception as exc:
@@ -72,9 +107,9 @@ def import_loop():
                 import_job.write_status(import_job.staging_root(), f"zenodo-{language}",
                                         {"language": language, "error": type(exc).__name__ + ": " + str(exc)[:200]})
         relabel, rl_batch, rl_cost = import_job.uz_from_ru_settings()
-        if relabel and not import_stop.is_set():
+        if relabel and not import_stop.is_set() and library_room() > 0:
             try:
-                status = import_job.run_uz_from_ru(rl_batch, rl_cost)
+                status = import_job.run_uz_from_ru(min(rl_batch, library_room()), rl_cost)
                 log.warning("import uz-from-ru: %s imported (%s relabelled to uz), %s failed, error=%s", status["imported"],
                             status.get("relabelled"), status["failed"], status["error"])
             except Exception as exc:
@@ -94,18 +129,18 @@ def import_loop():
                 import_job.write_status(import_job.staging_root(), f"wikipedia-{language}",
                                         {"language": language, "error": type(exc).__name__ + ": " + str(exc)[:200]})
         enabled, cl_batch, cl_set, cl_from = cyberleninka.settings()
-        if enabled and not import_stop.is_set():
+        if enabled and not import_stop.is_set() and library_room() > 0:
             try:
-                status = cyberleninka.run(cl_batch, cl_set, cl_from)
+                status = cyberleninka.run(min(cl_batch, library_room()), cl_set, cl_from)
                 log.warning("cyberleninka: %s imported, %s staged, error=%s", status["imported"], status["staged"], status["error"])
             except Exception as exc:
                 log.warning("cyberleninka failed: %s: %s", type(exc).__name__, str(exc)[:300])
                 import_job.write_status(import_job.staging_root(), "cyberleninka",
                                         {"error": type(exc).__name__ + ": " + str(exc)[:200]})
         uz_enabled, uz_batch = uz_journals.settings()
-        if uz_enabled and not import_stop.is_set():
+        if uz_enabled and not import_stop.is_set() and library_room() > 0:
             try:
-                status = uz_journals.run(uz_batch)
+                status = uz_journals.run(min(uz_batch, library_room()))
                 log.warning("uz journals: %s imported from %s journals, error=%s", status.get("imported"),
                             status.get("journals"), status["error"])
             except Exception as exc:
