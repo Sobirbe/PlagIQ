@@ -119,3 +119,23 @@ def test_five_minute_round(sent, monkeypatch):
     assert any("Website volume is almost full" in t for t in sent) and not any("not answering" in t for t in sent)
     asyncio.run(alerts.watch_round())
     assert any("not answering: no reply within 10 s" in t for t in sent)
+
+
+def test_library_full_and_room_again(sent, monkeypatch):
+    import asyncio
+    import engine_client
+    note = "Library full: 5,000 of 5,000 texts (CORPUS_MAX_SOURCES). Nothing is downloaded until the limit is raised."
+    lib = {"disk": {"free_bytes": 2 * 2**30, "total_bytes": 4 * 2**30}, "imports": {"limit": {"error": note}}}
+    monkeypatch.setattr(engine_client, "configured", lambda: True)
+    async def ok():
+        return ""
+    async def library():
+        return lib
+    monkeypatch.setattr(engine_client, "probe", ok)
+    monkeypatch.setattr(engine_client, "library", library)
+    monkeypatch.setattr(metrics, "storage", lambda: {"free": None, "total": None})
+    asyncio.run(alerts.watch_round())
+    assert sent == ["⚠️ PlagIQ: the library is full, so no new texts are imported. " + note]
+    lib["imports"]["limit"]["error"] = None
+    asyncio.run(alerts.watch_round())
+    assert sent[-1] == "✅ PlagIQ: the library has room again; imports continue."

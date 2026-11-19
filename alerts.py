@@ -4,7 +4,8 @@
     failed_internal; a file the user's computer could not give us text for does not count), and again when checks
     work again;
   * the private engine not answering on two checks in a row, 5 minutes apart, and again when it answers;
-  * little room left: the website's volume or the engine's volume has less than ALERT_FREE_SHARE (10 %) free.
+  * little room left: the website's volume or the engine's volume has less than ALERT_FREE_SHARE (10 %) free;
+  * the library is at CORPUS_MAX_SOURCES, so imports stopped (the engine's "limit" import note).
 
 Sent by the Telegram bot to every OWNER_TELEGRAM_IDS (the owner must have pressed Start in the bot once), or, when
 that is not possible, by e-mail to ALERT_EMAIL. The same problem is repeated at most every ALERT_REPEAT_HOURS (6)
@@ -140,6 +141,15 @@ def disk(name, free, total, now=None):
         clear(key, f"{name} volume has room again ({free // 2**20:,} MB free).")
 
 
+def library_limit(note):
+    """The engine's import note when the library is at CORPUS_MAX_SOURCES (engine_service.library_full_note): new
+    texts stop coming in until the limit is raised or texts are removed."""
+    if note:
+        raise_alert("library", f"the library is full, so no new texts are imported. {note}")
+    else:
+        clear("library", "the library has room again; imports continue.")
+
+
 async def watch_round():
     """One round of the 5-minute watch (engine and volumes); never raises."""
     if not enabled():
@@ -155,6 +165,8 @@ async def watch_round():
                 lib = await engine_client.library()
                 d = (lib or {}).get("disk") or {}
                 disk("Engine", d.get("free_bytes"), d.get("total_bytes"))
+                if lib is not None:
+                    library_limit(((lib.get("imports") or {}).get("limit") or {}).get("error"))
         store = await run_in_threadpool(metrics.storage)
         disk("Website", store.get("free"), store.get("total"))
     except Exception as exc:
