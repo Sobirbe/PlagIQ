@@ -108,7 +108,7 @@ with tempfile.TemporaryDirectory() as tmp:
                 page.wait_for_function("() => !document.querySelector('#mychecks').hidden && document.querySelector('#mychecks-body').textContent.includes('Free check')")
                 row = page.locator("#mychecks-body tr").first.inner_text()
                 assert "Free check" in row and "400" in row and "On screen only" in row and "Free" in row, row
-                assert "kept for 7 days" in page.locator("#mychecks-retention").inner_text()
+                assert "kept until deleted" in page.locator("#mychecks-retention").inner_text()
                 assert "Free check: used" in page.locator("#mychecks-state").inner_text()
                 # the server refuses the PDF of a free check even when asked directly
                 rid = page.evaluate("lastResult.report_id")

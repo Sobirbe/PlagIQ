@@ -25,18 +25,18 @@ TEXTS = {
            "ok": "«{f}» hujjatining tekshiruvi yakunlandi. Natijani «Mening tekshiruvlarim» bo‘limida ko‘ring:",
            "fail": "«{f}» hujjatining tekshiruvi yakunlanmadi. Sababi «Mening tekshiruvlarim» bo‘limida ko‘rsatilgan; "
                    "qayta urinib ko‘rishingiz mumkin:",
-           "keep": "Hisobot {h} saqlanadi, so‘ng avtomatik o‘chiriladi.", "button": "Natijani ochish",
+           "keep": "Hisobot hisobingizda {h} saqlanadi.", "button": "Natijani ochish",
            "why": "Bu xat tekshiruv tugaganda sahifa yopiq bo‘lgani uchun yuborildi."},
     "ru": {"subject_ok": "PlagIQ: проверка «{f}» готова", "subject_fail": "PlagIQ: проверка «{f}» не завершилась",
            "ok": "Проверка документа «{f}» завершена. Результат — в разделе «Мои проверки»:",
            "fail": "Проверка документа «{f}» не завершилась. Причина указана в разделе «Мои проверки»; "
                    "можно попробовать ещё раз:",
-           "keep": "Отчёт хранится {h}, затем удаляется автоматически.", "button": "Открыть результат",
+           "keep": "Отчёт хранится в аккаунте {h}.", "button": "Открыть результат",
            "why": "Это сообщение отправлено, потому что страница была закрыта, когда проверка закончилась."},
     "en": {"subject_ok": "PlagIQ: your check of “{f}” is ready", "subject_fail": "PlagIQ: the check of “{f}” did not finish",
            "ok": "The check of “{f}” has finished. See the result under “My checks”:",
            "fail": "The check of “{f}” did not finish. The reason is shown under “My checks”; you can try again:",
-           "keep": "The report is kept for {h}, then deleted automatically.", "button": "Open the result",
+           "keep": "The report is kept in your account {h}.", "button": "Open the result",
            "why": "You received this because the page was closed when the check ended."},
 }
 

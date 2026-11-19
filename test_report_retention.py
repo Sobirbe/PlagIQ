@@ -1,53 +1,68 @@
-"""Reports of a signed-in account are kept ACCOUNT_REPORT_DAYS (7) days, others REPORT_HOURS (24); the page, the
-privacy page and the "ready" message state the periods from the settings (Russian number forms included)."""
+"""Without an account reports are kept REPORT_HOURS (24); a signed-in account's until deleted (or ACCOUNT_REPORT_DAYS),
+at most the newest ACCOUNT_REPORT_LIMIT (50) per account, and the oldest (over a week) go while the disk is low. The
+page, the privacy page, the PDF and the "ready" message state the periods from the settings."""
+import shutil
 import time
+from collections import namedtuple
 
 from fastapi.testclient import TestClient
 
 import app as web
 import notify
+import report_pdf
 import reports_store
 
 
 def test_periods_and_number_forms(monkeypatch):
-    assert reports_store.ttl() == 24 * 3600 and reports_store.ttl(True) == 7 * 86400
-    assert [reports_store.period(l, True) for l in ("uz", "ru", "en")] == ["7 kun", "7 дней", "7 days"]
-    assert reports_store.period("ru") == "24 часа"
+    assert reports_store.ttl() == 24 * 3600 and reports_store.ttl(True) == reports_store.FOREVER
+    assert [reports_store.period(l, True) for l in ("uz", "ru", "en")] == ["o‘chirilguncha", "до удаления", "until deleted"]
+    assert reports_store.period("ru") == "24 часа" and reports_store.period("en") == "for 24 hours"
     monkeypatch.setenv("ACCOUNT_REPORT_DAYS", "1")
-    assert reports_store.period("ru", True) == "1 день" and reports_store.period("en", True) == "1 day"
+    assert reports_store.period("ru", True) == "1 день" and reports_store.period("en", True) == "for 1 day"
     monkeypatch.setenv("ACCOUNT_REPORT_DAYS", "3")
-    assert reports_store.period("ru", True) == "3 дня"
+    assert reports_store.period("ru", True) == "3 дня" and reports_store.ttl(True) == 3 * 86400
     monkeypatch.setenv("REPORT_HOURS", "48")
     assert reports_store.period("ru") == "48 часов"
-    monkeypatch.setenv("ACCOUNT_REPORT_DAYS", "0")                  # off: the same period for everyone
-    assert reports_store.ttl(True) == 48 * 3600 and reports_store.fill("__KEEP_EN__|__KEEPAFTER_UZ__") == "48 hours|48 soatdan keyin"
+    assert reports_store.fill("__KEEP_EN__|__HOURS_EN__") == "in your account for 3 days (48 hours without signing in)|48 hours"
 
 
-def test_new_rows_get_the_period_of_their_owner(tmp_path, monkeypatch):
+def rows(tmp_path, monkeypatch):
     monkeypatch.setenv("REPORTS_DB", str(tmp_path / "r.db"))
-    reports_store.start("a" * 32, "session", 42, "a.txt", "academic")
-    reports_store.start("b" * 32, "session", None, "b.txt", "academic")
+    monkeypatch.setenv("ACCOUNT_REPORT_LIMIT", "10")
+    usage = namedtuple("usage", "total used free")
+    monkeypatch.setattr(shutil, "disk_usage", lambda p: usage(1000, 500, 500))   # plenty of room
+
+
+def test_kept_until_deleted_newest_per_account_and_space(tmp_path, monkeypatch):
+    rows(tmp_path, monkeypatch)
+    for i in range(12):
+        reports_store.start(f"{i:032x}", "s", 42, "a.txt", "academic")
+        reports_store.finish(f"{i:032x}", {"status": "completed_no_matches", "total_tokens": 10})
+        time.sleep(0.002)
+    reports_store.start("f" * 32, "s", None, "b.txt", "academic")
     now = time.time()
-    assert reports_store.get("a" * 32)["expires"] > now + 6 * 86400
-    assert now + 23 * 3600 < reports_store.get("b" * 32)["expires"] < now + 25 * 3600
+    assert reports_store.get(f"{0:032x}")["expires"] > now + 50 * 365 * 86400
+    assert now + 23 * 3600 < reports_store.get("f" * 32)["expires"] < now + 25 * 3600
+    assert reports_store.purge() == 2                                   # the 2 oldest of 12 (limit 10)
+    assert reports_store.get(f"{0:032x}") is None and reports_store.get(f"{2:032x}")
+    assert reports_store.purge(now + 365 * 86400) == 1                  # a year on: only the one without an account
+    usage = namedtuple("usage", "total used free")
+    monkeypatch.setattr(shutil, "disk_usage", lambda p: usage(1000, 900, 100))   # 10 % free
+    assert reports_store.purge(now + 6 * 86400) == 0                   # under a week old: kept
+    assert reports_store.purge(now + 8 * 86400) == 10                  # older than a week: deleted while low
 
 
-def test_pages_and_message_state_the_periods():
+def test_pages_pdf_and_message_state_the_periods():
     client = TestClient(web.app)
     page = client.get("/").text
     assert "__KEEP" not in page and "__HOURS" not in page
-    assert "Hisobotlar hisobingizda 7 kun (tizimga kirmasdan — 24 soat) saqlanadi" in page
-    assert "Отчёты удаляются через 7 дней" in page and "Reports deleted after 7 days" in page
+    assert "Hisobotlar hisobingizda o‘chirilguncha (tizimga kirmasdan — 24 soat) saqlanadi" in page
+    assert "Отчёты хранятся до удаления" in page and "Reports kept until deleted" in page
     assert "My checks (last 24 hours)" in page
     privacy = client.get("/privacy").text
-    assert "__KEEP" not in privacy and "в аккаунте 7 дней (без входа — 24 часа)" in privacy
-    assert "deleted automatically after 7 days (24 hours if you are not signed in)" in privacy
-    assert "Hisobot 7 kun saqlanadi" in notify.message("a.pdf", True, "uz", "https://x.uz")[1]
-    assert "Ҳисобот 7 кун сақланади" in notify.message("a.pdf", True, "uzc", "https://x.uz")[1]
-    assert "Отчёт хранится 7 дней" in notify.message("a.pdf", True, "ru", "https://x.uz")[1]
-
-
-def test_pdf_time_left_in_days():
-    import report_pdf
+    assert "__KEEP" not in privacy and "в аккаунте до удаления (без входа — 24 часа)" in privacy
+    assert "An account keeps its newest 50 reports" in privacy
+    assert "Hisobot hisobingizda o‘chirilguncha saqlanadi." in notify.message("a.pdf", True, "uz", "https://x.uz")[1]
+    assert "Ҳисобот ҳисобингизда ўчирилгунча сақланади." in notify.message("a.pdf", True, "uzc", "https://x.uz")[1]
+    assert "Отчёт хранится в аккаунте до удаления." in notify.message("a.pdf", True, "ru", "https://x.uz")[1]
     assert report_pdf._duration(7 * 1440 - 1, "en") == "6 d 23 h"
-    assert report_pdf._duration(3 * 1440, "uz") == "3 kun" and report_pdf._duration(1439, "ru") == "23 ч 59 мин"

@@ -2158,6 +2158,8 @@ def report(identifier:str, request:Request, lang:str="en", full:int=0):
     entry = owned(identifier, request)
     no_exports(entry["result"])
     remaining = max(0, int((entry["expires"] - time.monotonic()) // 60))
+    if remaining > 3650 * 1440:                 # an account's report, kept until deleted
+        remaining = None
     base = os.getenv("PUBLIC_ORIGIN", "").strip() or str(request.base_url)
     lang = lang if lang in ("uz", "uzc", "ru", "en") else "en"
     link = verify.link(entry["result"], identifier, base)

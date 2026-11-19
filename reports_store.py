@@ -1,5 +1,8 @@
-"""Checks and their reports, kept for REPORT_HOURS (default 24) and then deleted; a signed-in account's reports for
-ACCOUNT_REPORT_DAYS (default 7; 0 = REPORT_HOURS as well).
+"""Checks and their reports. Without an account they are kept for REPORT_HOURS (default 24) and then deleted. A
+signed-in account's reports are kept until the user deletes them or the account (ACCOUNT_REPORT_DAYS unset or 0), or
+for ACCOUNT_REPORT_DAYS days; so they never fill the disk, only the newest ACCOUNT_REPORT_LIMIT (50, all that "My
+checks" shows) per account are kept, and while the volume has less than REPORTS_MIN_FREE_PERCENT (15) free the
+oldest account reports (over a week old) are deleted.
 
 A check is recorded when it starts ("running") and updated when it ends: "done" with its report, or "failed"
 with an error code. So a user can close the browser during a long check, come back, and find it under
@@ -32,19 +35,40 @@ def hours():
         return 24
 
 
+FOREVER = 100 * 365 * 86400          # "until deleted": far beyond any real use
+
+
 def account_days():
-    """Days a signed-in account's reports are kept (ACCOUNT_REPORT_DAYS, 0-30; 0 = the same as REPORT_HOURS)."""
+    """Days a signed-in account's reports are kept: ACCOUNT_REPORT_DAYS (1-3650); unset or 0 = until deleted."""
     try:
-        return min(max(int(os.environ.get("ACCOUNT_REPORT_DAYS", "7")), 0), 30)
+        return min(max(int(os.environ.get("ACCOUNT_REPORT_DAYS", "0")), 0), 3650)
     except ValueError:
-        return 7
+        return 0
 
 
 def ttl(signed_in=False):
-    """Seconds a report is kept: longer for a signed-in account (it can be reopened from any device)."""
-    if signed_in and account_days():
-        return max(account_days() * 86400, hours() * 3600)
+    """Seconds a report is kept: for a signed-in account until deleted (or ACCOUNT_REPORT_DAYS)."""
+    if signed_in:
+        return max(account_days() * 86400, hours() * 3600) if account_days() else FOREVER
     return hours() * 3600
+
+
+def account_limit():
+    try:
+        return min(max(int(os.environ.get("ACCOUNT_REPORT_LIMIT", "50")), 10), 1000)
+    except ValueError:
+        return 50
+
+
+def low_disk():
+    """True while the reports' volume has less than REPORTS_MIN_FREE_PERCENT (15) of its size free."""
+    import shutil
+    try:
+        usage = shutil.disk_usage(Path(_path()).resolve().parent)
+        share = min(max(float(os.environ.get("REPORTS_MIN_FREE_PERCENT", "15")), 1), 50) / 100
+    except (OSError, ValueError):
+        return False
+    return usage.free < usage.total * share
 
 
 def _ru(n, one, few, many):
@@ -56,31 +80,30 @@ def _ru(n, one, few, many):
 
 
 def period(lang, signed_in=False):
-    """"24 hours" / "7 days" in the language (uz, ru, en), with the Russian number forms."""
+    """How long a report is kept: "24 hours" / "7 days" / "until deleted", in uz, ru or en (Russian number forms)."""
+    if signed_in and not account_days():
+        return {"uz": "o‘chirilguncha", "ru": "до удаления", "en": "until deleted"}[lang]
     days = account_days() if signed_in else 0
     if days:
         return {"uz": f"{days} kun", "ru": _ru(days, "день", "дня", "дней"),
-                "en": f"{days} day" + ("" if days == 1 else "s")}[lang]
+                "en": f"for {days} day" + ("" if days == 1 else "s")}[lang]
     h = hours()
-    return {"uz": f"{h} soat", "ru": _ru(h, "час", "часа", "часов"), "en": f"{h} hour" + ("" if h == 1 else "s")}[lang]
+    return {"uz": f"{h} soat", "ru": _ru(h, "час", "часа", "часов"),
+            "en": f"for {h} hour" + ("" if h == 1 else "s")}[lang]
 
 
 def fill(page):
     """Put the retention periods into the page texts (index.html, privacy.html), so they always match the settings:
-    __KEEP_xx__ both periods, __KEEPACC_xx__ the account's, __HOURS_xx__ without an account, __KEEPAFTER_xx__ "after"."""
-    longer = bool(account_days())
+    __KEEP_xx__ the account's period and the one without an account, __KEEPACC_xx__ the account's only,
+    __HOURS_xx__ the hours without an account (no "for")."""
     for lang in ("uz", "ru", "en"):
         acc, h = period(lang, True), period(lang)
-        both = {"en": f"{acc} in your account ({h} without signing in)",
+        both = {"en": f"in your account {acc} ({h[4:]} without signing in)",
                 "uz": f"hisobingizda {acc} (tizimga kirmasdan — {h})",
-                "ru": f"в аккаунте {acc} (без входа — {h})"}[lang] if longer else h
-        after = {"en": f"after {acc} ({h} if you are not signed in)",
-                 "uz": f"{acc}dan keyin (tizimga kirmagan bo‘lsangiz, {h}dan keyin)",
-                 "ru": f"через {acc} (без входа — через {h})"}[lang] if longer else \
-            {"en": f"after {h}", "uz": f"{h}dan keyin", "ru": f"через {h}"}[lang]
+                "ru": f"в аккаунте {acc} (без входа — {h})"}[lang]
         key = lang.upper()
-        page = (page.replace(f"__KEEPACC_{key}__", acc).replace(f"__KEEPAFTER_{key}__", after)
-                .replace(f"__KEEP_{key}__", both).replace(f"__HOURS_{key}__", h))
+        page = (page.replace(f"__KEEPACC_{key}__", acc).replace(f"__KEEP_{key}__", both)
+                .replace(f"__HOURS_{key}__", h[4:] if lang == "en" else h))
     return page
 
 
@@ -173,10 +196,21 @@ def forget_user(user_id):
 
 
 def purge(now=None):
-    """Delete expired reports and give the space back. Returns how many were deleted."""
+    """Delete expired reports, account reports beyond the newest ACCOUNT_REPORT_LIMIT per account, and while the volume
+    is low on space the oldest account reports over a week old (100 at a time); give the space back. Returns how many."""
+    now = now or time.time()
     with _lock, closing(_connect()) as db:
         with db:
-            removed = db.execute("DELETE FROM reports WHERE expires<=?", (now or time.time(),)).rowcount
+            removed = db.execute("DELETE FROM reports WHERE expires<=?", (now,)).rowcount
+            removed += db.execute(
+                "DELETE FROM reports WHERE user IS NOT NULL AND id IN (SELECT id FROM (SELECT id, ROW_NUMBER() OVER "
+                "(PARTITION BY user ORDER BY created DESC) AS n FROM reports WHERE user IS NOT NULL) WHERE n > ?)",
+                (account_limit(),)).rowcount
+        if low_disk():
+            with db:
+                removed += db.execute("DELETE FROM reports WHERE id IN (SELECT id FROM reports WHERE user IS NOT NULL "
+                                      "AND state != 'running' AND created < ? ORDER BY created LIMIT 100)",
+                                      (now - 7 * 86400,)).rowcount
         if removed:
             db.execute("PRAGMA incremental_vacuum")
             db.execute("PRAGMA wal_checkpoint(TRUNCATE)")
