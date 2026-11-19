@@ -2,6 +2,7 @@ from urllib.parse import urlencode
 import asyncio
 from contextlib import asynccontextmanager
 import hashlib
+import math
 import os
 import re
 import time
@@ -127,6 +128,7 @@ WINDOW = 7
 RATE = {}
 RATE_LIMIT = 12
 active_scans = 0
+_waiting = []                                  # checks waiting for a slot, in arrival order (see _wait_for_slot)
 
 
 class ApiError(HTTPException):
@@ -1268,11 +1270,17 @@ async def check(request:Request, submission:UploadFile=File(...),
     options, ai_check, deposit = validate_check(user, language, mode, consent, exclude_quotes, exclude_bibliography,
                                                 min_words, ai_check, ai_consent, archive, archive_consent, archive_title,
                                                 archive_author, institution)
-    if active_scans >= scan_capacity():
+    queued = active_scans >= scan_capacity() or bool(_waiting)
+    if queued and len(_waiting) >= queue_max():
         raise ApiError(503, "server_busy", "PlagIQ is processing other documents. Try again in a minute.")
     rate_limit(request, user)
     submission.document_meta = document_meta(doc_author, doc_title, doc_type)
-    active_scans += 1                          # reserve the slot before any await, so overlapping requests cannot all pass
+    ticket = None
+    if queued:
+        ticket = object()                      # joins the line before any await, so the order is the arrival order
+        _waiting.append(ticket)
+    else:
+        active_scans += 1                      # reserve the slot before any await, so overlapping requests cannot all pass
     # The check is recorded before it runs: if the browser is closed, it still finishes and appears in "My checks".
     job = uuid.uuid4().hex
     session = request.cookies.get("plagiq_session") or secrets.token_urlsafe(32)
@@ -1281,6 +1289,10 @@ async def check(request:Request, submission:UploadFile=File(...),
     try:
         await run_in_threadpool(reports_store.start, job, session, user["id"] if user else None,
                                 clean_filename(submission.filename, "Document"), mode)
+        if ticket is not None:
+            await _wait_for_slot(ticket)
+            ticket = None
+            started = time.monotonic()         # the check's own time, without the wait (metrics, estimates)
         if user and auth.required():
             response = await _run_entitled_check(request, user, submission, reference, reference_text, language, mode,
                                                  options, web_search, ai_check, deposit, job, session, started, expected_price)
@@ -1310,8 +1322,46 @@ async def check(request:Request, submission:UploadFile=File(...),
         progress.finish(failed=True)
         raise
     finally:
-        active_scans -= 1
+        if ticket is not None:                 # gave up while waiting: it never held a slot
+            if ticket in _waiting:
+                _waiting.remove(ticket)
+        else:
+            active_scans -= 1
         progress.finish()
+
+
+def queue_max():
+    """How many checks may wait for a free slot (QUEUE_MAX, default 10; 0 = refuse at once when busy). Each waiting
+    check keeps its uploaded file in memory."""
+    try:
+        return max(0, min(int(os.getenv("QUEUE_MAX", "10")), 50))
+    except ValueError:
+        return 10
+
+
+def queue_wait_seconds():
+    try:
+        return max(60, min(int(os.getenv("QUEUE_WAIT_MINUTES", "20")), 120)) * 60
+    except ValueError:
+        return 1200
+
+
+async def _wait_for_slot(ticket):
+    """Wait in line (first come, first served) until a check slot is free; the page shows the place in the line.
+    After QUEUE_WAIT_MINUTES the check stops with server_busy (it is listed as failed under "My checks")."""
+    global active_scans
+    stop = time.monotonic() + queue_wait_seconds()
+    while True:
+        place = _waiting.index(ticket) + 1
+        if place == 1 and active_scans < scan_capacity():
+            _waiting.remove(ticket)
+            active_scans += 1
+            return
+        progress.step("queue", place)
+        if time.monotonic() > stop:
+            raise ApiError(503, "server_busy", "PlagIQ is processing other documents. Try again in a minute.")
+        await asyncio.sleep(0.5)
+
 
 async def _notify_if_left(request, user, token, filename, ok, ui_lang):
     """"Your check is ready" by Telegram or e-mail when the page was closed before the check ended (notify.py)."""
@@ -1448,7 +1498,7 @@ async def run_paid_checks(user_id=None, wait=False):
 async def _run_paid(row):
     global active_scans
     try:
-        if active_scans >= scan_capacity():
+        if active_scans >= scan_capacity() or _waiting:
             await run_in_threadpool(pending_checks.release, row["id"])     # busy: the next round runs it
             return
         active_scans += 1
@@ -2292,7 +2342,11 @@ async def check_estimate(mode: str = "academic", ai: bool = False):
     """Roughly how many minutes a check of this kind takes (metrics.estimate): shown while it runs."""
     if mode not in ("reference", "academic", "corpus", "ai"):
         raise ApiError(400, "invalid_mode", "Unknown check type.")
-    return await run_in_threadpool(metrics.estimate, mode, ai)
+    found = await run_in_threadpool(metrics.estimate, mode, ai)
+    if active_scans >= scan_capacity():        # a new check waits in line: add the rounds ahead of it
+        rounds = math.ceil((len(_waiting) + 1) / scan_capacity())
+        found = {**found, "minutes": min(120, found["minutes"] * (1 + rounds)), "queue": len(_waiting) + 1}
+    return found
 
 
 @app.get("/api/reports")
