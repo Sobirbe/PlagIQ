@@ -67,3 +67,25 @@ def test_markdown_is_escaped():
     import admin
     out = admin.markdown_html("# T\n\n| a | <b>x</b> |\n|---|---|\n| 1 | **2** |")
     assert "&lt;b&gt;x&lt;/b&gt;" in out and "<td><b>2</b></td>" in out and out.startswith("<h3>T</h3>")
+
+
+def test_details_show_duplicates_behind_false_marks(engine):  # noqa: F811
+    """A library text stored twice (an article and the journal issue that contains it): when one copy is set aside
+    as a held-out article, the other marks it. The details name both, so the owner sees it is a duplicate."""
+    rng = random.Random(2)
+    with corpus.connect() as db:
+        for i in range(12):
+            text = ". ".join(" ".join(rng.choice(WORDS) for _ in range(12)) for _ in range(40)) + "."
+            for copy in ("", " (journal issue)"):
+                corpus.ingest(db, {"title": f"Article {i}{copy}", "authors": "A", "year": 2024, "language": "uz",
+                                   "url": f"https://j.uz/{i}{copy and '/issue'}", "rights_basis": "open_license",
+                                   "permission_reference": "CC BY"}, text + (" Nashr soni 3." if copy else ""))
+    client = TestClient(engine_service.app)
+    client.post("/v1/evaluation", json={"per_language": 6}, headers={"Authorization": "Bearer " + KEY})
+    details = wait_done(client)["details"]
+    assert details["false"], details
+    pair = details["false"][0]
+    assert pair["holdout"].split(" (")[0] == pair["source"].split(" (")[0]          # the same work twice
+    import admin
+    html_out = admin.evaluation_details_html(engine_client._evaluation_details(details))
+    assert "Where the false marks come from" in html_out and "the library holds it twice" in html_out

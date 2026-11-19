@@ -479,7 +479,26 @@ async def evaluation(start=False, per_language=30):
             "total": _int(data.get("total", 0), 0, 10**6), "error": str(data.get("error") or "")[:300],
             "started": data.get("started") if isinstance(data.get("started"), (int, float)) else None,
             "finished": data.get("finished") if isinstance(data.get("finished"), (int, float)) else None,
-            "result": str(data.get("result") or "")[:200_000]}
+            "result": str(data.get("result") or "")[:200_000], "phase": str(data.get("phase") or "")[:20],
+            "details": _evaluation_details(data.get("details"))}
+
+
+def _evaluation_details(d):
+    """The engine's list of cases to look at, rebuilt from an allowlist (strings cut, numbers bounded)."""
+    if not isinstance(d, dict):
+        return None
+    def rows(items, keys):
+        out = []
+        for item in items if isinstance(items, list) else []:
+            if isinstance(item, dict):
+                out.append({k: (item[k][:160] if isinstance(item.get(k), str) else
+                                item[k] if isinstance(item.get(k), (int, float, bool)) else None) for k in keys})
+        return out[:30]
+    return {"missed": rows(d.get("missed"), ("language", "transform", "length", "source", "recall", "right_source",
+                                             "boilerplate_windows")),
+            "missed_total": _int(d.get("missed_total", 0), 0, 10**6),
+            "false": rows(d.get("false"), ("language", "holdout", "source", "words")),
+            "whole": rows(d.get("whole"), ("language", "title", "percent", "top"))}
 
 
 async def compact(confirm=False):
