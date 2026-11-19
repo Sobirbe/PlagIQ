@@ -418,7 +418,26 @@ def pilot_section(message=""):
             '<h3>Test e-mail</h3><p>Before turning on sign-in by e-mail code (EMAIL_SIGNIN=1), send a test message and '
             'confirm that it arrives (also check the spam folder).</p><form class="diag" method="post" '
             'action="/admin/test-email"><label>Address <input name="email" type="email" required maxlength="254"></label>'
-            '<button>Send test e-mail</button></form>')
+            '<button>Send test e-mail</button></form>' + alerts_section())
+
+
+def alerts_section():
+    """Where owner alerts go (alerts.py), the last ones sent, and a test button."""
+    import alerts
+    import auth
+    esc = html.escape
+    chats = alerts.owner_chats() if auth.telegram_enabled() else []
+    where = [f"Telegram to {len(chats)} owner account(s) (OWNER_TELEGRAM_IDS)"] if chats else []
+    if os.environ.get("ALERT_EMAIL", "").strip():
+        where.append("e-mail to ALERT_EMAIL" + (" if Telegram fails" if chats else ""))
+    route = ("; ".join(where) if where else "nowhere: set OWNER_TELEGRAM_IDS (with the Telegram bot) or ALERT_EMAIL")
+    last = "".join(f"<li>{esc(t)}</li>" for t in reversed(alerts.SENT[-5:])) or "<li>none since the last restart</li>"
+    return ("<h3>Owner alerts</h3><p>Status: " + ("on" if alerts.enabled() else "off (OWNER_ALERTS=0)") +
+            f". Sent to: {esc(route)}.</p><p>You get a message when 3 checks in a row fail, when the search engine "
+            "stops answering, and when a volume has less than 10 % free; and another one when it is fixed. For "
+            "Telegram, press Start in the bot once, then send a test alert.</p>"
+            f"<p>Last alerts:</p><ul>{last}</ul>"
+            '<form class="diag" method="post" action="/admin/test-alert"><button>Send a test alert</button></form>')
 
 
 def page(library, probe="", inventory=None, diagnostic="", pruning=None, pilot=None, notice="", compacting=None):

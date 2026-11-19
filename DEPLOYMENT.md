@@ -550,6 +550,14 @@ Use a transactional mail service or your domain's mailbox. A personal Gmail acco
 
 Website service → **Variables**: add `OWNER_TELEGRAM_IDS` = your Telegram user ID (get it from @userinfobot; separate several IDs with commas). Sign in with Telegram, then open `https://<your site>/admin`. Anyone else gets "Not found".
 
+**Owner alerts.** You get a message when 3 checks in a row fail, when the search engine stops answering (two checks 5 minutes apart), or when the website's or the engine's volume has less than 10 % free. You get another message when the problem is fixed. While a problem lasts, it is repeated at most every 6 hours.
+- **Where alerts go:** the Telegram bot sends them to every `OWNER_TELEGRAM_IDS`. Press **Start** in the bot once from that Telegram account.
+- **E-mail fallback:** optional `ALERT_EMAIL` = an address used when Telegram cannot deliver.
+- **Test it:** /admin → Owner alerts → **Send a test alert**.
+- **Tuning (optional):** `ALERT_FAILURES` (3), `ALERT_FREE_SHARE` (10), `ALERT_REPEAT_HOURS` (6).
+- **Switching off:** `OWNER_ALERTS=0`.
+- **Contents:** alerts contain error codes and counts only, never document text or user details.
+
 The dashboard shows:
 - **Setup checklist:** each feature as ✅ on, ❌ missing (with the exact setting and DEPLOYMENT section), or ➖ optional.
 - **Library:** counts by source, the engine's disk use (a red warning above two thirds full) and every automatic import's last run and problem.

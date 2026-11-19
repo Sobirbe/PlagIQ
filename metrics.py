@@ -76,10 +76,21 @@ def record_check(result, seconds, charged=None):
              "ocr_pages": ocr.get("pages"), "ocr_seconds": ocr.get("seconds"),
              "ai": ai.get("status"), "ai_words": int(result.get("total_tokens") or 0) if ai.get("status") == "done" else None,
              "edited_words": result.get("edited_tokens"), "charged": charged})
+    _tell_alerts(result.get("mode"), result.get("status"))
 
 
 def record_failure(mode, status, code, seconds):
     _insert({"time": time.time(), "mode": mode, "status": status, "error": code, "seconds": round(seconds, 2)})
+    _tell_alerts(mode, status, code)
+
+
+def _tell_alerts(mode, status, code=None):
+    """Owner alerts when checks keep failing (alerts.py); never fails the check."""
+    try:
+        import alerts
+        alerts.check_outcome(mode, status, code)
+    except Exception:                       # noqa: BLE001
+        pass
 
 
 def _percentile(values, share):
