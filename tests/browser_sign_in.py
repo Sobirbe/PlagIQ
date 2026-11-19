@@ -110,7 +110,20 @@ try:
             page.wait_for_selector('#account > details > summary.signin-open')
             sign_in_by_email(page, address)
             page.wait_for_function(f"() => ((document.querySelector('#account > details > summary')||{{}}).textContent||'').includes('student{width}')")
+            # 5. The "check is ready" message can be switched off in the account menu, and stays off after a reload.
+            page.locator('#account > details > summary').click()
+            row = page.locator('#account .menu .notify-row')
+            assert 'when a check ends after I have closed the page' in row.inner_text()
+            assert row.locator('input').is_checked()
+            assert 'null' not in page.locator('#account .menu').inner_text()          # append(null) printed "null"
+            row.locator('input').uncheck()
+            page.wait_for_function("() => window.meNotify === false")
+            page.reload()
+            page.wait_for_function(f"() => ((document.querySelector('#account > details > summary')||{{}}).textContent||'').includes('student{width}')")
+            page.locator('#account > details > summary').click()
+            assert not page.locator('#account .menu .notify-row input').is_checked()
             if SHOTS:
+                page.screenshot(path=str(SHOTS / f'account-menu-{width}.png'))
                 page.evaluate('scrollTo(0,0)')
                 page.screenshot(path=str(SHOTS / f'signed-in-{width}.png'))
             assert page.evaluate('document.documentElement.scrollWidth <= innerWidth'), (width, 'overflow')

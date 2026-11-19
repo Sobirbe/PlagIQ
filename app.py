@@ -574,7 +574,22 @@ async def me(request: Request):
             "methods": await run_in_threadpool(auth.methods, user) if user else {},
             "history": await run_in_threadpool(auth.history, user) if user else [],
             # Whether this account gets the Uzbek AI-writing indicator (preview: owners and pilot testers).
-            "uz_ai_indicator": await run_in_threadpool(uz_ai_for, user) if user else False}
+            "uz_ai_indicator": await run_in_threadpool(uz_ai_for, user) if user else False,
+            "notify": await run_in_threadpool(notify.wanted, user) if user else None}
+
+
+@app.post("/api/me/notify")
+async def me_notify(request: Request):
+    """Switch the "check is ready" Telegram / e-mail message on or off for the signed-in account."""
+    user = signed_in(request)
+    try:
+        data = await request.json()
+    except ValueError:
+        raise ApiError(400, "invalid_request", "Invalid request.")
+    if not isinstance(data, dict) or not isinstance(data.get("on"), bool):
+        raise ApiError(400, "invalid_request", "Invalid request.")
+    await run_in_threadpool(notify.set_wanted, user, data["on"])
+    return {"notify": data["on"]}
 
 
 def _origin(request):
