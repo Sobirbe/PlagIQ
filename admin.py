@@ -5,6 +5,7 @@ Only Telegram accounts listed in OWNER_TELEGRAM_IDS can open it. It shows no sec
 counts. Each missing item names the setting and the DEPLOYMENT.md section to follow.
 """
 import html
+import re
 import os
 
 import aidetect
@@ -443,7 +444,69 @@ def alerts_section():
             '<form class="diag" method="post" action="/admin/test-alert"><button>Send a test alert</button></form>')
 
 
-def page(library, probe="", inventory=None, diagnostic="", pruning=None, pilot=None, notice="", compacting=None):
+def markdown_html(text):
+    """The accuracy report (Markdown from evaluation/real_eval.py) as simple HTML: headings, paragraphs and tables;
+    everything escaped."""
+    esc, out, rows = html.escape, [], []
+
+    def inline(t):
+        t = esc(t)
+        t = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", t)
+        return re.sub(r"`(.+?)`", r"<code>\1</code>", t)
+
+    def flush():
+        if rows:
+            body = [r for r in rows if not re.fullmatch(r"\|?[\s:|-]+\|?", r)]
+            cells = [[c.strip() for c in r.strip("|").split("|")] for r in body]
+            out.append("<table>" + "".join("<tr>" + "".join(f"<{'th' if i == 0 else 'td'}>{inline(c)}</{'th' if i == 0 else 'td'}>"
+                                                          for c in row) + "</tr>" for i, row in enumerate(cells)) + "</table>")
+            rows.clear()
+    for line in text.splitlines():
+        if line.startswith("|"):
+            rows.append(line)
+            continue
+        flush()
+        if line.startswith("#"):
+            level = min(4, len(line) - len(line.lstrip("#")) + 2)
+            out.append(f"<h{level}>{inline(line.lstrip('#').strip())}</h{level}>")
+        elif line.startswith(">"):
+            out.append(f"<p><i>{inline(line.lstrip('> ').strip())}</i></p>")
+        elif line.strip():
+            out.append(f"<p>{inline(line)}</p>")
+    flush()
+    return "".join(out)
+
+
+def evaluation_section(ev):
+    """/admin: run the accuracy test on the live library and show the last result."""
+    esc = html.escape
+    ev = ev or {}
+    state = ev.get("state")
+    head = ("<p>Measures what PlagIQ finds in <b>its own library</b>: real passages from library texts are copied into "
+            "other real texts (set aside from the library during the test) the way students copy — unchanged, "
+            "Latin↔Cyrillic, lightly and heavily edited, reordered — and checked exactly as a real check is. Read-only; "
+            "takes several minutes; real checks keep priority. Paraphrase and translation are measured separately "
+            "(evaluation/PARAPHRASE.md, CROSSLANG.md).</p>")
+    if state == "running":
+        status = (f'<p class="warn">Running: {ev.get("done", 0):,} of {ev.get("total", 0) or "…"} cases checked. '
+                  "Reload this page to see progress.</p>")
+    elif state == "error":
+        status = f'<p class="warn">The last test stopped: {esc(ev.get("error", ""))}</p>'
+    elif state == "unavailable":
+        status = f'<p class="warn">{esc(ev.get("error", "The engine is not available."))}</p>'
+    else:
+        status = ""
+    form = ('' if state == "running" else
+            '<form class="diag" method="post" action="/admin/evaluation"><label>Cases per language and way of copying '
+            '<input name="per_language" type="number" min="5" max="60" value="30"></label>'
+            '<button>Run the accuracy test</button></form>')
+    result = ev.get("result") or ""
+    return (head + status + form + (markdown_html(result) if result else
+                                     ("" if state == "running" else "<p>No test has been run on the live library yet.</p>")))
+
+
+def page(library, probe="", inventory=None, diagnostic="", pruning=None, pilot=None, notice="", compacting=None,
+         evaluation=None):
     esc = html.escape
     mark = lambda ok: "✅" if ok else "➖" if ok is None else "❌"          # None = optional, not set
     rows = "".join(f'<tr><td>{mark(ok)}</td><th>{esc(a)}</th><td>{esc(d)}</td><td class="h">{"" if ok else esc(h)}</td></tr>'
@@ -510,6 +573,7 @@ def page(library, probe="", inventory=None, diagnostic="", pruning=None, pilot=N
             f'<section><h2>Library details</h2>{details(inventory) if library and library.get("available") else "<p>The engine is not connected.</p>"}</section>'
             f'<section id="source-check"><h2>Source check (DOI or title)</h2>{diagnostic or diagnostic_form()}</section>'
             f'<section id="compact"><h2>Library file size</h2>{compacting if compacting is not None else compact_form()}</section>'
+            f'<section id="accuracy"><h2>Accuracy on the live library</h2>{evaluation_section(evaluation)}</section>'
             f'<section id="wikipedia-share"><h2>Wikipedia share</h2>{pruning if pruning is not None else (prune_form(inventory) if inventory else "<p>The engine is not connected.</p>")}</section>'
             f'<section id="monitoring"><h2>Monitoring</h2>{monitoring()}</section>'
             f'<section id="pilot"><h2>Pilot testers and e-mail</h2>{pilot if pilot is not None else pilot_section()}</section>'

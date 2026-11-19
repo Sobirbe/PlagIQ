@@ -167,8 +167,11 @@ def passage_from(text, length, rng, tries=20):
 
 
 # ---------------------------------------------------------------- scoring
+SEARCH = corpus.search      # the engine replaces this to take its search lock for each search (live checks go first)
+
+
 def score(db, student, passage_span, language, source_id, ignore=frozenset()):
-    report = corpus.search(db, student, language, max_passages=50, ignore=ignore)
+    report = SEARCH(db, student, language, max_passages=50, ignore=ignore)
     q = corpus.lexical(student, language)
     marked = set()
     for start, end in report["unique_passages"]:
@@ -181,17 +184,24 @@ def score(db, student, passage_span, language, source_id, ignore=frozenset()):
             "right_source": any(s.get("sha256") == source_id for s in report["sources"])}
 
 
-def run(db_path, holdout, per_language, seed, holdout_per_language=25):
+def run(db_path, holdout, per_language, seed, holdout_per_language=25, progress=None):
+    """`progress(done, total)` is called after each case. Only the texts that are sampled are read (the live library
+    is too large to hold in memory)."""
     rng = random.Random(seed)
     with closing(corpus.connect(db_path)) as db:
-        rows = db.execute("SELECT id, metadata, text FROM sources").fetchall()
+        rows = db.execute("SELECT id, metadata FROM sources WHERE length(text) >= 1800").fetchall()
         library = defaultdict(list)
-        for identifier, raw, text in rows:
+        texts = {}
+
+        def text_of(identifier):
+            if identifier not in texts:
+                texts[identifier] = db.execute("SELECT text FROM sources WHERE id=?", (identifier,)).fetchone()[0]
+            return texts[identifier]
+        for identifier, raw in rows:
             meta = json.loads(raw)
             if meta.get("rights_basis") in corpus.DEPOSITS:
                 continue                                   # never sample students' unpublished work
-            if len(text.split()) >= 300:
-                library[meta["language"]].append((identifier, meta, text))
+            library[meta["language"]].append((identifier, meta))
         held, hidden = defaultdict(list), frozenset()
         if holdout:
             for language, title, text in holdout_texts(holdout):
@@ -202,20 +212,23 @@ def run(db_path, holdout, per_language, seed, holdout_per_language=25):
             for language, items in library.items():
                 rng.shuffle(items)
                 take = min(holdout_per_language, len(items) // 3)
-                for identifier, meta, text in items[:take]:
-                    held[language].append((meta.get("title", ""), text))
+                for identifier, meta in items[:take]:
+                    held[language].append((meta.get("title", ""), text_of(identifier)))
                     chosen.append(nums[identifier])
                 library[language] = items[take:]
             hidden = frozenset(chosen)
         results, cases = defaultdict(list), []
+        total = sum(per_language * (len(TRANSFORMS) - (language != "uz")) for language in corpus.LANGUAGES
+                    if library[language] and held[language])
         for language in corpus.LANGUAGES:
             if not library[language] or not held[language]:
                 continue
             filler_words = [w for _, t in held[language] for w in t.split()][:200000]
             for n in range(per_language):
-                identifier, meta, text = rng.choice(library[language])
+                identifier, meta = rng.choice(library[language])
+                text = text_of(identifier)
                 length = LENGTHS[n % len(LENGTHS)]
-                passage = passage_from(text, length, rng)
+                passage = passage_from(text, length, rng) if len(text.split()) >= 300 else None
                 if not passage:
                     continue
                 title, other = rng.choice(held[language])
@@ -232,10 +245,12 @@ def run(db_path, holdout, per_language, seed, holdout_per_language=25):
                     results[(language, name)].append(r)
                     cases.append({"language": language, "transform": name, "length": length,
                                   "source": meta.get("title", "")[:80], **r})
+                    if progress:
+                        progress(len(cases), total)
         whole = []
         for language, items in held.items():
             for title, text in items:
-                report = corpus.search(db, text, language, ignore=hidden)
+                report = SEARCH(db, text, language, ignore=hidden)
                 q = corpus.lexical(text, language)
                 matched = corpus.words_in_intervals(q, report["unique_passages"])
                 whole.append({"language": language, "title": title[:90], "percent": round(100 * matched / max(1, len(q)), 2),
