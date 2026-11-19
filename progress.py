@@ -92,6 +92,20 @@ def read(token):
         run = _runs.get(token)
         if run is None:
             return None
+        run["seen"] = now
         return {"done": run["done"], "failed": run.get("failed", False), "seconds": round(now - run["started"], 1),
                 "steps": [{"key": s["key"], "state": s["state"], "detail": s["detail"],
                            "seconds": s.get("seconds", round(now - s["at"], 1))} for s in run["steps"]]}
+
+
+def watching(token, seconds=15):
+    """Whether the page that started the check asked for its progress in the last `seconds` (it polls every
+    1.2 s while open and in view). None when the check has no progress token, so it cannot be told."""
+    if not token or not TOKEN.fullmatch(token):
+        return None
+    now = time.monotonic()
+    with _lock:
+        run = _runs.get(token)
+        if run is None:
+            return None
+        return now - run.get("seen", run["started"]) < seconds
