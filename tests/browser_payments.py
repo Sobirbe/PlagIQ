@@ -69,32 +69,18 @@ try:
             assert 'TEST MODE' in page.locator('#pilot-bar').inner_text()
             page.locator('#calc-words').fill('3000')
             assert 'Student · 15,000 UZS' in page.locator('#calc-out').inner_text(), page.locator('#calc-out').inner_text()
-            # A paid check with an empty balance is refused.
+            # A paid check with an empty balance is not started: the page asks to choose how to pay.
             page.locator('input[name=mode][value=reference]').check()
             page.locator('#submission').set_input_files({'name': 'essay.txt', 'mimeType': 'text/plain', 'buffer': LONG.encode()})
             page.locator('#reference_text').fill(EN)
-            page.locator('button[type=submit]').click()
-            page.wait_for_function('() => document.querySelector("#status").textContent.includes("balance is too low")')
-            # Top up 20,000 so'm with Payme: the browser goes to the sandbox checkout.
-            page.locator('#account > details > summary').click()
-            menu = page.locator('#account .menu')
-            assert 'sandbox payments only' in menu.inner_text() and 'Balance: 0' in menu.inner_text()
-            if SHOTS:
-                page.evaluate('scrollTo(0,0)')
-                page.screenshot(path=str(SHOTS / f'balance-menu-{width}.png'))
-            # Uzum Bank has no payment link: the menu shows how to pay in the app with the order number.
-            menu.locator('button', has_text='Pay with Uzum Bank').click()
-            page.wait_for_selector('#account .menu .pay p[role=status]')
-            steps = page.locator('#account .menu .pay p[role=status]').inner_text()
-            assert 'Uzum Bank app' in steps and '“PlagIQ test”' in steps and 'order number' in steps, steps
-            if SHOTS:
-                page.locator('#account .menu').screenshot(path=str(SHOTS / f'uzum-steps-{width}.png'))
-            menu.locator('input[type=number]').fill('20000')
-            context.route('https://test.paycom.uz/**', lambda route: route.fulfill(status=200, content_type='text/html',
-                                                                                  body='<h1>Payme sandbox stub</h1>'))
-            with page.expect_navigation(url='https://test.paycom.uz/**'):
-                menu.locator('button', has_text='Pay with Payme').click()
-            decoded = base64.b64decode(page.url[len('https://test.paycom.uz/'):]).decode()
+            page.locator('button[type=submit]').click()           # at once, before the price has arrived: it waits for it
+            page.wait_for_function('() => document.querySelector("#status").textContent.includes("Choose how to pay above")')
+            assert 'price' not in page.locator('#status').inner_text().lower()      # not "the price has changed"
+            # The page has no manual top-up any more (one document, one payment, see browser_check_payment.py); the balance
+            # holds refunds and leftovers. Put 20,000 so'm on it through the order endpoint, as Payme orders are created.
+            order = page.evaluate("""async () => (await fetch('/api/payments/order', {method: 'POST', headers:
+                {'Content-Type': 'application/json'}, body: JSON.stringify({provider: 'payme', amount_uzs: 20000})})).json()""")
+            decoded = base64.b64decode(order['pay_url'][len('https://test.paycom.uz/'):]).decode()
             order_id = decoded.split('ac.order_id=')[1].split(';')[0]
             assert 'a=2000000' in decoded and f'c={BASE}/?paid={order_id}' in decoded
             # Payme's server confirms the payment.
@@ -105,15 +91,22 @@ try:
             assert payme('PerformTransaction', {"id": tx})['result']['state'] == 2
             # The user comes back.
             page.goto(f'{BASE}/?paid={order_id}')
-            page.wait_for_function('() => document.querySelector("#login-note").textContent.includes("Payment received")')
-            assert '20,000' in page.locator('#login-note').inner_text()
-            assert '?paid=' not in page.url
-            page.wait_for_function('() => document.querySelector("#account > details > summary").textContent.includes("20,000")')
+            # (the return note belonged to the removed top-up; the per-check payment code handles ?paid= now)
+            # polled (not wait_for_function): the page tidies the ?paid= address after the return, which can cut a wait short
+            for _ in range(120):
+                if '20,000' in page.locator('#account > details > summary').inner_text():
+                    break
+                page.wait_for_timeout(250)
+            else:
+                raise AssertionError('balance not shown: ' + page.locator('#account > details > summary').inner_text())
             page.locator('input[name=mode][value=reference]').check()
             page.locator('#submission').set_input_files({'name': 'essay.txt', 'mimeType': 'text/plain', 'buffer': LONG.encode()})
             page.locator('#reference_text').fill(EN)
+            asked = []
+            page.once('dialog', lambda d: (asked.append(d.message), d.accept()))        # "Pay 15,000 UZS for this check?"
             page.locator('button[type=submit]').click()
             page.wait_for_selector('#result', state='visible')
+            assert asked and '15,000' in asked[0], asked
             page.wait_for_function('() => document.querySelector("#plan-note").textContent.includes("Charged")')
             assert 'Charged 15,000' in page.locator('#plan-note').inner_text()
             page.wait_for_function('() => document.querySelector("#account > details > summary").textContent.includes("5,000")')

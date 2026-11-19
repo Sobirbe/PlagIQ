@@ -78,7 +78,7 @@ try:
             page.locator('#submission').set_input_files({'name': 'essay.txt', 'mimeType': 'text/plain', 'buffer': EN.encode()})
             page.locator('#reference_text').fill(EN)
             page.locator('#submit').click()
-            assert 'Sign in to run a check' in page.locator('#status').inner_text(), page.locator('#status').inner_text()
+            page.wait_for_function("() => document.querySelector('#status').textContent.includes('Sign in to run a check')")
             assert page.locator('#result').is_hidden()
             # 2. Sign in with e-mail and the one-time code (a new address creates the account).
             address = f'student{width}@example.uz'
