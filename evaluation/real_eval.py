@@ -179,9 +179,18 @@ def score(db, student, passage_span, language, source_id, ignore=frozenset()):
     inside = [i for i, (_, s, e) in enumerate(q) if s >= passage_span[0] and e <= passage_span[1]]
     outside = [i for i in range(len(q)) if i not in set(inside)]
     hit = sum(1 for i in inside if i in marked)
+    inside_set, false_by = set(inside), {}
+    for src in report["sources"]:                       # which source marked words outside the copied passage
+        words = {i for start, end in src.get("intervals") or [] for i, (_, s, e) in enumerate(q)
+                 if s >= start and e <= end and i not in inside_set}
+        if words:
+            false_by[src.get("title") or ""] = len(words)
+    top = max(false_by.items(), key=lambda kv: kv[1]) if false_by else ("", 0)
     return {"recall": hit / len(inside) if inside else 0.0,
             "false": sum(1 for i in outside if i in marked), "outside": len(outside),
-            "right_source": any(s.get("sha256") == source_id for s in report["sources"])}
+            "right_source": any(s.get("sha256") == source_id for s in report["sources"]),
+            "false_source": top[0][:120], "false_source_words": top[1],
+            "boilerplate_windows": report.get("boilerplate_windows", 0)}
 
 
 def run(db_path, holdout, per_language, seed, holdout_per_language=25, progress=None):
@@ -244,7 +253,7 @@ def run(db_path, holdout, per_language, seed, holdout_per_language=25, progress=
                     r = score(db, student, span, language, identifier, hidden)
                     results[(language, name)].append(r)
                     cases.append({"language": language, "transform": name, "length": length,
-                                  "source": meta.get("title", "")[:80], **r})
+                                  "source": meta.get("title", "")[:80], "holdout": title[:80], **r})
                     if progress:
                         progress(len(cases), total)
         whole = []

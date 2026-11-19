@@ -488,8 +488,10 @@ def evaluation_section(ev):
             "takes several minutes; real checks keep priority. Paraphrase and translation are measured separately "
             "(evaluation/PARAPHRASE.md, CROSSLANG.md).</p>")
     if state == "running":
-        status = (f'<p class="warn">Running: {ev.get("done", 0):,} of {ev.get("total", 0) or "…"} cases checked. '
-                  "Reload this page to see progress.</p>")
+        step = {"whole articles": "all cases checked; now checking the whole held-out articles",
+                "writing": "writing the result"}.get(ev.get("phase"),
+                                                     f'{ev.get("done", 0):,} of {ev.get("total", 0) or "…"} cases checked')
+        status = f'<p class="warn">Running: {esc(step)}. Reload this page to see progress.</p>'
     elif state == "error":
         status = f'<p class="warn">The last test stopped: {esc(ev.get("error", ""))}</p>'
     elif state == "unavailable":
@@ -502,7 +504,39 @@ def evaluation_section(ev):
             '<button>Run the accuracy test</button></form>')
     result = ev.get("result") or ""
     return (head + status + form + (markdown_html(result) if result else
-                                     ("" if state == "running" else "<p>No test has been run on the live library yet.</p>")))
+                                     ("" if state == "running" else "<p>No test has been run on the live library yet.</p>"))
+            + evaluation_details_html(ev.get("details")))
+
+
+def evaluation_details_html(d):
+    """The cases behind the table: missed unchanged copies, and the library texts behind false marks next to the
+    held-out article (the same work twice = a duplicate in the library, not a false match)."""
+    if not d:
+        return ""
+    esc = html.escape
+    pct = lambda v: f"{100 * v:.0f}%" if isinstance(v, (int, float)) else "—"
+    out = ["<h3>Cases to look at</h3>"]
+    missed = d.get("missed") or []
+    out.append(f"<p><b>Unchanged or reformatted copies mostly missed: {d.get('missed_total', 0)}.</b> "
+               "“Shared phrases” counts the passage's 7-word sequences found in so many library texts that they are "
+               "treated as boilerplate (not counted); many of them suggest the passage itself is repeated across the "
+               "library (journal headers, duplicates).</p>")
+    if missed:
+        out.append("<table><tr><th>Lang.</th><th>Library text copied</th><th>Words</th><th>Recall</th>"
+                   "<th>Right source listed</th><th>Shared phrases</th></tr>" + "".join(
+                       f"<tr><td>{esc(str(m.get('language') or ''))}</td><td>{esc(m.get('source') or '')}</td>"
+                       f"<td>{m.get('length') or ''}</td><td>{pct(m.get('recall'))}</td>"
+                       f"<td>{'yes' if m.get('right_source') else 'no'}</td><td>{m.get('boilerplate_windows') or 0}</td></tr>"
+                       for m in missed) + "</table>")
+    false = d.get("false") or []
+    if false:
+        out.append("<p><b>Where the false marks come from</b> (the text marked in the held-out article, which was hidden "
+                   "from the search). If both columns name the same work, the library holds it twice.</p>"
+                   "<table><tr><th>Lang.</th><th>Held-out article</th><th>Library text that matched it</th><th>Words</th></tr>"
+                   + "".join(f"<tr><td>{esc(str(f.get('language') or ''))}</td><td>{esc(f.get('holdout') or '')}</td>"
+                             f"<td>{esc(f.get('source') or '')}</td><td>{f.get('words') or 0}</td></tr>" for f in false)
+                   + "</table>")
+    return "".join(out)
 
 
 def page(library, probe="", inventory=None, diagnostic="", pruning=None, pilot=None, notice="", compacting=None,
