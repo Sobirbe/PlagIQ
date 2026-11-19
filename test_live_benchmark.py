@@ -69,9 +69,9 @@ def test_markdown_is_escaped():
     assert "&lt;b&gt;x&lt;/b&gt;" in out and "<td><b>2</b></td>" in out and out.startswith("<h3>T</h3>")
 
 
-def test_details_show_duplicates_behind_false_marks(engine):  # noqa: F811
+def test_copies_of_held_out_articles_are_hidden_too(engine):  # noqa: F811
     """A library text stored twice (an article and the journal issue that contains it): when one copy is set aside
-    as a held-out article, the other marks it. The details name both, so the owner sees it is a duplicate."""
+    as a held-out article, the other used to mark it and count as false marks. Its copies are now hidden with it."""
     rng = random.Random(2)
     with corpus.connect() as db:
         for i in range(12):
@@ -82,10 +82,7 @@ def test_details_show_duplicates_behind_false_marks(engine):  # noqa: F811
                                    "permission_reference": "CC BY"}, text + (" Nashr soni 3." if copy else ""))
     client = TestClient(engine_service.app)
     client.post("/v1/evaluation", json={"per_language": 6}, headers={"Authorization": "Bearer " + KEY})
-    details = wait_done(client)["details"]
-    assert details["false"], details
-    pair = details["false"][0]
-    assert pair["holdout"].split(" (")[0] == pair["source"].split(" (")[0]          # the same work twice
-    import admin
-    html_out = admin.evaluation_details_html(engine_client._evaluation_details(details))
-    assert "Where the false marks come from" in html_out and "the library holds it twice" in html_out
+    data = wait_done(client)
+    assert "were hidden as well, so they do not count as false marks" in data["result"]
+    same_work = [f for f in data["details"]["false"] if f["holdout"].split(" (")[0] == f["source"].split(" (")[0]]
+    assert same_work == [], same_work              # the copy of a held-out article is hidden with it

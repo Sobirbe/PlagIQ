@@ -501,6 +501,43 @@ def _evaluation_details(d):
             "whole": rows(d.get("whole"), ("language", "title", "percent", "top"))}
 
 
+async def duplicates(action=None):
+    """Owner-only: texts stored twice in the library (engine /v1/duplicates). action None reads the state and the
+    last list, "find" starts a search, "remove" deletes the newer record of each same-text pair."""
+    if not configured():
+        return {"state": "unavailable", "error": "The engine is not configured."}
+    try:
+        async with _owner_client(timeout=600.0 if action == "remove" else 20.0) as client:
+            response = await (client.post("/v1/duplicates", json={"action": action}) if action else client.get("/v1/duplicates"))
+    except httpx.HTTPError as exc:
+        return {"state": "unavailable", "error": "The engine did not answer (" + type(exc).__name__ + ")."}
+    if response.status_code in (409, 429):
+        try:
+            detail = response.json().get("detail", "")
+        except ValueError:
+            detail = ""
+        return {**(await duplicates()), "notice": str(detail)[:200] or "The engine is busy."}
+    if response.status_code != 200:
+        return {"state": "unavailable", "error": f"The engine answered {response.status_code}."}
+    try:
+        d = response.json()
+    except ValueError:
+        return {"state": "unavailable", "error": "Unexpected answer from the engine."}
+    def side(x):
+        x = x if isinstance(x, dict) else {}
+        return {"title": str(x.get("title") or "")[:160], "url": str(x.get("url") or "")[:300],
+                "language": str(x.get("language") or "")[:3], "chars": _int(x.get("chars", 0), 0, 10**9)}
+    pairs = [{"kind": "same" if p.get("kind") == "same" else "inside",
+              "share": float(p["share"]) if isinstance(p.get("share"), (int, float)) else 0.0,
+              "keep": side(p.get("keep")), "extra": side(p.get("extra"))}
+             for p in (d.get("pairs") or [])[:200] if isinstance(p, dict)]
+    return {"state": str(d.get("state", ""))[:20], "done": _int(d.get("done", 0), 0, 10**7),
+            "total": _int(d.get("total", 0), 0, 10**7), "error": str(d.get("error") or "")[:300],
+            "removed": d.get("removed") if isinstance(d.get("removed"), int) else None,
+            "found": d.get("found") if isinstance(d.get("found"), (int, float)) else None,
+            "same": _int(d.get("same", 0), 0, 10**7), "inside": _int(d.get("inside", 0), 0, 10**7), "pairs": pairs}
+
+
 async def compact(confirm=False):
     """Owner-only: report (or, with confirm, do) the compacting of the engine's library file. Raises EngineError."""
     if not configured():

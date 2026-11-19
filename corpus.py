@@ -989,6 +989,95 @@ def diagnose(db, num, passage=''):
 PRUNABLE = ('wikipedia',)        # only general-reference collections; never journals, theses or deposits
 
 
+# ------------------------------------------------------------- duplicates (the same text stored twice)
+
+DUPLICATE_SHARE = 0.8          # this share of a text's sampled 7-word sequences in another text: it is contained there
+
+
+def copies_of(db, num, min_share=DUPLICATE_SHARE, samples=60):
+    """Library texts that contain most of text `num`: {other num: share of its sampled 7-word sequences found there}.
+    A sample of its sequences is looked up (indexed by fingerprint); sequences in many texts (boilerplate) are
+    skipped. Used to find duplicates and to hide copies of a held-out text in evaluation/real_eval.py."""
+    row = db.execute('SELECT id, metadata, text FROM sources WHERE num=?', (num,)).fetchone()
+    if not row:
+        return {}
+    identifier, raw, text = row
+    prints = [f for f, _ in windows(_source_lexical(identifier, json.loads(raw)['language'], text))]
+    if len(prints) < 20:
+        return {}
+    step = max(1, len(prints) // samples)
+    counts, used = {}, 0
+    for f in prints[::step]:
+        holders = {n for (n,) in db.execute('SELECT DISTINCT source FROM windows WHERE fingerprint=? LIMIT 30', (f,))}
+        holders.discard(num)
+        if len(holders) >= 20:
+            continue                                     # boilerplate: says nothing about this text
+        used += 1
+        for other in holders:
+            counts[other] = counts.get(other, 0) + 1
+    if used < 10:
+        return {}
+    return {other: round(c / used, 3) for other, c in counts.items() if c / used >= min_share}
+
+
+def find_duplicates(db, progress=None, lookup=None):
+    """Pairs of library texts where one contains most of the other (authors' deposits are left out).
+    kind "same": each contains the other (the same text stored twice; the newer copy can go);
+    kind "inside": the smaller is part of the larger (e.g. an article and the journal issue with it; both stay)."""
+    rows = db.execute('SELECT num, id, metadata, length(text) FROM sources').fetchall()
+    info = {}
+    for num, identifier, raw, size in rows:
+        meta = json.loads(raw)
+        if meta.get('rights_basis') not in DEPOSITS:
+            info[num] = (identifier, meta, size)
+    contained = {}
+    for k, num in enumerate(sorted(info)):
+        for other, share in (lookup or copies_of)(db, num).items():
+            if other in info:
+                contained[(num, other)] = share
+        if progress:
+            progress(k + 1, len(info))
+    pairs, seen = [], set()
+    for (a, b), share in contained.items():
+        key = (min(a, b), max(a, b))
+        if key in seen:
+            continue
+        seen.add(key)
+        back = contained.get((b, a))
+        same = back is not None
+        if same:
+            keep, extra = key                            # the older record stays
+        else:
+            extra, keep = a, b                            # a is inside b
+        k_id, k_meta, k_size = info[keep]
+        e_id, e_meta, e_size = info[extra]
+        pairs.append({"kind": "same" if same else "inside", "share": max(share, back or 0),
+                      "keep": {"id": k_id, "title": (k_meta.get('title') or '')[:160], "url": k_meta.get('url') or '',
+                               "language": k_meta.get('language'), "chars": k_size},
+                      "extra": {"id": e_id, "title": (e_meta.get('title') or '')[:160], "url": e_meta.get('url') or '',
+                                "language": e_meta.get('language'), "chars": e_size}})
+    return sorted(pairs, key=lambda p: (p["kind"] != "same", -p["share"]))
+
+
+def remove_extra_copies(db, pairs, chunk=100):
+    """Delete the newer record of each pair of kind "same" (the same text stored twice); never a deposit, never a
+    text that is only part of another. In chunks with a WAL checkpoint after each, as prune_collection. Returns the
+    number removed."""
+    deposits = {i for (i,) in db.execute("SELECT id FROM sources WHERE json_extract(metadata, '$.rights_basis') IN "
+                                         f"({','.join('?' * len(DEPOSITS))})", DEPOSITS)}
+    ids = list(dict.fromkeys(p["extra"]["id"] for p in pairs if p.get("kind") == "same" and p["extra"]["id"] not in deposits))
+    nums = [n for (n,) in (db.execute('SELECT num FROM sources WHERE id=?', (i,)).fetchone() or (None,) for i in ids) if n]
+    for start in range(0, len(nums), chunk):
+        part = nums[start:start + chunk]
+        marks = ','.join('?' * len(part))
+        with db:
+            db.execute(f'DELETE FROM windows WHERE source IN ({marks})', part)
+            db.execute(f'DELETE FROM seeds WHERE source IN ({marks})', part)
+            db.execute(f'DELETE FROM sources WHERE num IN ({marks})', part)
+        db.execute('PRAGMA wal_checkpoint(TRUNCATE)')
+    return len(nums)
+
+
 def prune_collection(db, collection, keep_per_language, dry_run=True, chunk=100):
     """Remove texts of a general-reference collection (only Wikipedia), keeping the longest
     `keep_per_language` per language. Never touches journals, theses, CyberLeninka or deposits.
