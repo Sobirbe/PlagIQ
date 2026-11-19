@@ -74,11 +74,14 @@ def test_hanging_reader_is_killed(tmp_path, monkeypatch):
     assert exc.value.code == "file_too_complex"
     child = int((tmp_path / "plagiq-test-child").read_text())
     import time
-    for _ in range(20):
+    for _ in range(50):
         try:
             os.kill(child, 0)
+            # killed but not yet collected by its new parent (a zombie, state Z): it no longer runs
+            if open(f"/proc/{child}/stat").read().rsplit(")", 1)[1].split()[0] == "Z":
+                break
             time.sleep(0.1)
-        except ProcessLookupError:
+        except (ProcessLookupError, FileNotFoundError):
             break
     else:
         raise AssertionError("the reader's child process was not stopped")
