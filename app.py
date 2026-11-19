@@ -27,6 +27,7 @@ import uzai
 import auth
 import institutions
 import admin
+import alerts
 from fastapi.responses import FileResponse, StreamingResponse
 import pricing
 import payments
@@ -77,6 +78,8 @@ async def lifespan(app):
                 await run_paid_checks()                  # checks whose payment the provider has confirmed
             except sqlite3.Error as exc:
                 logging.getLogger("plagiq.check").error("paid checks not started: %s", type(exc).__name__)
+            if rounds % 10 == 0:                   # every 5 minutes: owner alerts (alerts.py)
+                await alerts.watch_round()
             if rounds % 10 == 0:                   # every 5 minutes: delete reports older than REPORT_HOURS
                 try:
                     await run_in_threadpool(reports_store.purge)
@@ -941,6 +944,17 @@ async def admin_test_email(request: Request, email: str = Form(..., max_length=2
                        "If it does not arrive within a few minutes (check spam too), tell the developer.")
         except mailer.MailError as exc:
             message = f"Test e-mail: sending FAILED — {exc}. " + mail_hint(str(exc))
+    return await _admin_page_with(admin.pilot_section(message), message)
+
+
+@app.post("/admin/test-alert", response_class=HTMLResponse)
+async def admin_test_alert(request: Request):
+    """Owner-only: send a test owner alert by the configured route (alerts.py)."""
+    owner(request)
+    ok = await run_in_threadpool(alerts._deliver, "🔔 PlagIQ: test alert from the owner dashboard. Alerts reach you here.")
+    message = ("Test alert sent." if ok else
+               "Test alert NOT delivered: press Start in the PlagIQ Telegram bot from the owner's Telegram account, or "
+               "set ALERT_EMAIL, then try again.")
     return await _admin_page_with(admin.pilot_section(message), message)
 
 
