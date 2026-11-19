@@ -456,6 +456,32 @@ async def diagnostic(doi="", title="", passage=""):
     return data
 
 
+async def evaluation(start=False, per_language=30):
+    """Owner-only: the accuracy test on the live library (engine /v1/evaluation): start it, or read its progress and
+    last result. Returns the engine's answer, or {"state": "unavailable", "error": ...}."""
+    if not configured():
+        return {"state": "unavailable", "error": "The engine is not configured."}
+    try:
+        async with _owner_client(timeout=20.0) as client:
+            response = await (client.post("/v1/evaluation", json={"per_language": int(per_language)}) if start
+                              else client.get("/v1/evaluation"))
+    except httpx.HTTPError as exc:
+        return {"state": "unavailable", "error": "The engine did not answer (" + type(exc).__name__ + ")."}
+    if response.status_code == 409:
+        return {**(await evaluation()), "notice": "A test is already running."}
+    if response.status_code != 200:
+        return {"state": "unavailable", "error": f"The engine answered {response.status_code}."}
+    try:
+        data = response.json()
+    except ValueError:
+        return {"state": "unavailable", "error": "Unexpected answer from the engine."}
+    return {"state": str(data.get("state", ""))[:20], "done": _int(data.get("done", 0), 0, 10**6),
+            "total": _int(data.get("total", 0), 0, 10**6), "error": str(data.get("error") or "")[:300],
+            "started": data.get("started") if isinstance(data.get("started"), (int, float)) else None,
+            "finished": data.get("finished") if isinstance(data.get("finished"), (int, float)) else None,
+            "result": str(data.get("result") or "")[:200_000]}
+
+
 async def compact(confirm=False):
     """Owner-only: report (or, with confirm, do) the compacting of the engine's library file. Raises EngineError."""
     if not configured():

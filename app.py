@@ -875,8 +875,22 @@ async def admin_page(request: Request):
     data = await engine_library() if corpus_configured() else None
     reason = await engine_client.probe() if corpus_configured() and data is None else ""
     inventory = await engine_client.inventory() if data is not None else None
-    return HTMLResponse(admin.page({"available": data is not None, **(data or {})}, reason, inventory),
-                        headers={"Cache-Control": "no-store"})
+    evaluation = await engine_client.evaluation() if data is not None else None
+    return HTMLResponse(admin.page({"available": data is not None, **(data or {})}, reason, inventory,
+                                   evaluation=evaluation), headers={"Cache-Control": "no-store"})
+
+
+@app.post("/admin/evaluation", response_class=HTMLResponse)
+async def admin_evaluation(request: Request, per_language: int = Form(30, ge=5, le=60)):
+    """Owner-only: start the accuracy test on the live library (engine /v1/evaluation)."""
+    owner(request)
+    started = await engine_client.evaluation(start=True, per_language=per_language)
+    data = await engine_library() if corpus_configured() else None
+    inventory = await engine_client.inventory() if data is not None else None
+    notice = started.get("notice") or ("Accuracy test started; reload /admin to follow it." if started.get("state") == "running"
+                                        else started.get("error") or "")
+    return HTMLResponse(admin.page({"available": data is not None, **(data or {})}, "", inventory, notice=notice,
+                                   evaluation=started), headers={"Cache-Control": "no-store"})
 
 
 async def _admin_page_with(pilot, notice=""):
