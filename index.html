@@ -779,7 +779,7 @@ let paid=(acc.orders||[]).filter(o=>o.state!=="pending");if(paid.length){let t=e
 return box};
 /* waiting for the provider, running, done: polled while something is in progress */
 let pendingRows=[],pendingTimer=null;
-async function loadPending(){if(!me||!payConfig.enabled){pendingRows=[];renderPending();return}try{let r=await fetch("/api/check/pending");if(r.ok){let j=await r.json();pendingRows=j.checks||[];window.pendingHours=j.keep_hours||6}else pendingRows=[]}catch(_){}
+async function loadPending(){if(!me||!payConfig.enabled){pendingRows=[];renderPending();return}try{let r=await fetch("/api/check/pending?lang="+encodeURIComponent(current));if(r.ok){let j=await r.json();pendingRows=j.checks||[];window.pendingHours=j.keep_hours||6}else pendingRows=[]}catch(_){}
 let before=window.pendingDone||{};renderPending();clearTimeout(pendingTimer);
 for(let p of pendingRows)if(p.state==="done"&&before[p.id]===false){loadPayments().then(()=>{renderAccount();renderQuote()});if(typeof loadHistory==="function")loadHistory();loadMyChecks()}
 window.pendingDone=Object.fromEntries(pendingRows.map(p=>[p.id,p.state==="done"]));

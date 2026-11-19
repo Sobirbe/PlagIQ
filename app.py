@@ -1466,13 +1466,14 @@ async def check_pay(request: Request, submission: UploadFile = File(...), refere
 
 
 @app.get("/api/check/pending")
-async def check_pending(request: Request):
+async def check_pending(request: Request, lang: str = ""):
     """The signed-in account's paid checks and their state: awaiting (payment not confirmed by the provider yet),
     running, done (with the report), failed (the payment stays on the balance) or expired. Asking also starts any
     check whose payment has just been confirmed."""
     user = auth.read(request.cookies.get(auth.COOKIE))
     if not user:
         raise ApiError(401, "login_required", "Sign in first.")
+    notify.page_seen(user["id"], lang)                 # the page is open: no "check is ready" message needed
     await run_paid_checks(user["id"])
     rows = await run_in_threadpool(pending_checks.listing, user["id"])
     out = []
@@ -1529,15 +1530,18 @@ async def _run_paid(row):
                                       params.get("ai_check", False), params.get("deposit"), job, row["session"], started,
                                       row["price"], original=row["text"])
             await run_in_threadpool(pending_checks.finish, row["id"], job)
+            notify.after_paid_check(user, row["filename"], True, os.getenv("PUBLIC_ORIGIN", ""))
         except ApiError as exc:
             status = checkstatus.error_status(exc.code, exc.status_code)
             await run_in_threadpool(reports_store.fail, job, exc.code)
             await run_in_threadpool(metrics.record_failure, mode, status, exc.code, time.monotonic() - started)
             await run_in_threadpool(pending_checks.finish, row["id"], None, exc.code)   # the payment stays on the balance
+            notify.after_paid_check(user, row["filename"], False, os.getenv("PUBLIC_ORIGIN", ""))
         except Exception:
             logging.getLogger("plagiq.check").exception("paid check failed")
             await run_in_threadpool(reports_store.fail, job, "internal_error")
             await run_in_threadpool(pending_checks.finish, row["id"], None, "internal_error")
+            notify.after_paid_check(user, row["filename"], False, os.getenv("PUBLIC_ORIGIN", ""))
         finally:
             active_scans -= 1
     finally:
