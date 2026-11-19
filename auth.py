@@ -269,6 +269,8 @@ def _connect():
     # Linked sign-in methods: the alias account (another Telegram ID or e-mail account) opens `account`.
     db.execute("CREATE TABLE IF NOT EXISTS account_links (alias INTEGER PRIMARY KEY, account INTEGER NOT NULL, "
                "created TEXT NOT NULL)")
+    # Accounts that switched off the "check is ready" message (notify.py); on unless listed.
+    db.execute("CREATE TABLE IF NOT EXISTS notify_off (user INTEGER PRIMARY KEY)")
     return db
 
 
@@ -322,6 +324,7 @@ def forget(user):
             db.execute("DELETE FROM checks WHERE user=?", (uid,))
             db.execute("DELETE FROM users WHERE id=?", (uid,))
             db.execute("DELETE FROM login_links WHERE user=?", (uid,))
+            db.execute("DELETE FROM notify_off WHERE user=?", (uid,))
             if uid < 0:
                 row = db.execute("SELECT email FROM email_accounts WHERE id=?", (-uid,)).fetchone()
                 db.execute("DELETE FROM email_accounts WHERE id=?", (-uid,))

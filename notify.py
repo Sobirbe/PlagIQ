@@ -96,6 +96,23 @@ def deliver(user, filename, ok, lang, origin, opener=None):
     return None
 
 
+def wanted(user):
+    """False when the account switched the message off in its menu (stored in the accounts database)."""
+    try:
+        with auth._lock, auth._connect() as db:
+            return db.execute("SELECT 1 FROM notify_off WHERE user=?", (user["id"],)).fetchone() is None
+    except Exception:                       # noqa: BLE001  (unknown: send, as before the setting existed)
+        return True
+
+
+def set_wanted(user, on):
+    with auth._lock, auth._connect() as db:
+        if on:
+            db.execute("DELETE FROM notify_off WHERE user=?", (user["id"],))
+        else:
+            db.execute("INSERT OR IGNORE INTO notify_off (user) VALUES (?)", (user["id"],))
+
+
 def after_check(user, token, disconnected, filename, ok, lang, origin):
     """Called when a check ends: sends the message in the background if the owner's page was not watching.
     Returns True when a message is being sent."""
@@ -104,7 +121,7 @@ def after_check(user, token, disconnected, filename, ok, lang, origin):
     watching = progress.watching(token)
     if watching is None:
         watching = not disconnected
-    if watching:
+    if watching or not wanted(user):
         return False
     _start(deliver, user, filename, ok, lang, origin)
     return True
@@ -126,7 +143,7 @@ def after_paid_check(user, filename, ok, origin, seconds=20):
     if not (enabled() and user):
         return False
     seen, lang = _PAGE_SEEN.get(user["id"], (None, "uz"))
-    if seen is not None and time.monotonic() - seen < seconds:
+    if seen is not None and time.monotonic() - seen < seconds or not wanted(user):
         return False
     _start(deliver, user, filename, ok, lang, origin)
     return True
