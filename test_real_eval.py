@@ -27,3 +27,21 @@ def test_runs_and_finds_unchanged_copies(tmp_path):
     assert real_eval.uz_cyrillic_to_latin(real_eval.uz_latin_to_cyrillic("O‘zbekiston maktab")) == "O‘zbekiston maktab"
     text = real_eval.markdown(results, cases, whole, size, held, 3, 1.0)
     assert "| uz | copied unchanged | 6 |" in text
+
+
+def test_template_passages_are_not_used_as_copies(tmp_path):
+    """A passage repeated in many library texts (a journal's licence note) is ignored by PlagIQ on purpose; the test
+    used to count it as a missed copy. It is now replaced by another passage and reported."""
+    rng = random.Random(4)
+    db = corpus.connect(str(tmp_path / "c.db"))
+    template = ("Ushbu maqola Creative Commons Attribution 4.0 xalqaro litsenziyasi asosida nashr etilgan va "
+                "mualliflik huquqi mualliflarda qoladi hamda jurnal tahririyati unga javob bermaydi. ") * 3
+    for i in range(30):
+        text = ". ".join(" ".join(rng.choice(WORDS) for _ in range(12)) for _ in range(40)) + ". " + template
+        corpus.ingest(db, {"title": f"T{i}", "authors": "A", "year": 2024, "language": "uz", "url": f"https://j.uz/{i}",
+                           "rights_basis": "open_license", "permission_reference": "CC BY"}, text)
+    assert real_eval.template_text(db, template, "uz")
+    assert not real_eval.template_text(db, " ".join(rng.choice(WORDS) for _ in range(60)), "uz")
+    results, cases, whole, size, held = real_eval.run(str(tmp_path / "c.db"), None, 6, 3, holdout_per_language=4)
+    text = real_eval.markdown(results, cases, whole, size, held, 3, 1.0)
+    assert "_template" not in text.split("Library texts sampled:")[1].split(".")[0]
