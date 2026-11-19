@@ -494,9 +494,12 @@ EDITED_T = {
 
 
 def _duration(minutes, lang):
-    """'23 h 59 min' / '23 soat 59 daqiqa' / '23 ч 59 мин'."""
+    """'23 h 59 min' / '23 soat 59 daqiqa' / '23 ч 59 мин'; from 48 hours on '6 d 23 h' / '6 kun 23 soat' / '6 дн. 23 ч'."""
     h, m = divmod(max(0, int(minutes)), 60)
-    unit = {"uz": ("soat", "daqiqa"), "uzc": ("соат", "дақиқа"), "ru": ("ч", "мин")}.get(lang, ("h", "min"))
+    unit = {"uz": ("soat", "daqiqa", "kun"), "uzc": ("соат", "дақиқа", "кун"), "ru": ("ч", "мин", "дн.")}.get(lang, ("h", "min", "d"))
+    if h >= 48:
+        d, h = divmod(h, 24)
+        return f"{d} {unit[2]}" + (f" {h} {unit[0]}" if h else "")
     return (f"{h} {unit[0]} " if h else "") + f"{m} {unit[1]}"
 
 

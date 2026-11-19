@@ -80,7 +80,7 @@ def test_session_cookie_cannot_be_forged(login):
     cookie = auth.issue(user)
     assert auth.read(cookie) == user
     payload, sig = cookie.split(".")
-    assert auth.read(payload + "." + sig[:-2] + "AA") is None
+    assert auth.read(payload + "." + sig[:-2] + ("BB" if sig.endswith("AA") else "AA")) is None   # always a change
     assert auth.read(cookie, now=time.time() + 40 * 86400) is None                          # expired
 
 

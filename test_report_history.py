@@ -66,13 +66,14 @@ def test_failed_checks_are_listed_and_rejected_requests_are_not(login):
     assert [(r["state"], r["error"], r["filename"]) for r in rows] == [("failed", "no_text", "scan.pdf")]
 
 
-def test_deleted_after_24_hours_and_on_request(login):
+def test_account_reports_kept_7_days_and_deleted_on_request(login):
     pilot_tester(login)
     first = check(login).json()["report_id"]
     second = check(login).json()["report_id"]
     assert login.delete(f"/api/report/{first}").json() == {"deleted": True}
     assert [r["id"] for r in login.get("/api/reports").json()["reports"]] == [second]
-    assert reports_store.purge(time.time() + 24 * 3600 + 1) == 1
+    assert reports_store.purge(time.time() + 24 * 3600 + 1) == 0                   # signed in: kept longer
+    assert reports_store.purge(time.time() + 7 * 86400 + 1) == 1
     assert login.get("/api/reports").json()["reports"] == []
     with sqlite3.connect(reports_store._path()) as db:
         assert db.execute("PRAGMA auto_vacuum").fetchone()[0] == 2                   # incremental: space is given back

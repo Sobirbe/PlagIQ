@@ -1197,7 +1197,8 @@ async def price_quote(request: Request, submission: UploadFile = File(...), mode
 
 @app.get("/", response_class=HTMLResponse)
 def home():
-    return HTMLResponse(Path(__file__).with_name("index.html").read_text("utf-8"), headers={"Cache-Control":"no-store, max-age=0"})
+    return HTMLResponse(reports_store.fill(Path(__file__).with_name("index.html").read_text("utf-8")),
+                        headers={"Cache-Control":"no-store, max-age=0"})
 
 
 def validate_check(user, language, mode, consent, exclude_quotes, exclude_bibliography, min_words, ai_check, ai_consent,
@@ -2332,7 +2333,7 @@ async def my_checks(request: Request):
     return JSONResponse({"trial": summary["trial"], "trial_max_words": summary["trial_max_words"],
                          "pilot_checks_left": sum(g["remaining"] for g in summary["grants"]),
                          "payments_enabled": payments.enabled(), "checks": rows,
-                         "retention": {"report_hours": reports_store.hours(), "recheck_days": pricing.recheck_days(),
+                         "retention": {"report_hours": reports_store.hours(), "account_days": reports_store.account_days(), "recheck_days": pricing.recheck_days(),
                                        "recheck_limit": pricing.recheck_limit()}},
                         headers={"Cache-Control": "no-store"})
 
