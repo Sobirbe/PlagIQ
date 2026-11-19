@@ -1,4 +1,5 @@
-""""Your check is ready": a short message when a check ends while its page is no longer open.
+""""Your check is ready": a short message when a check ends while its page is no longer open (also for a check the
+server runs after its payment is confirmed, when the page stopped asking for its status).
 
 The page polls the check's progress every 1.2 s; when it has not asked for 15 s by the time the check ends (the tab
 was closed, the phone screen went off, the browser was quit), the signed-in owner gets one message with a link to
@@ -11,6 +12,7 @@ document and no link to the report itself (the report opens only when signed in)
 import logging
 import os
 import threading
+import time
 
 import auth
 import mailer
@@ -103,6 +105,28 @@ def after_check(user, token, disconnected, filename, ok, lang, origin):
     if watching is None:
         watching = not disconnected
     if watching:
+        return False
+    _start(deliver, user, filename, ok, lang, origin)
+    return True
+
+
+_PAGE_SEEN = {}          # account id -> (time, page language): the page last asked for its paid checks' status
+
+
+def page_seen(user_id, lang):
+    """The page polls /api/check/pending every 5 s while a paid check waits or runs."""
+    _PAGE_SEEN[user_id] = (time.monotonic(), lang if lang in ("uz", "uzc", "ru", "en") else "uz")
+    if len(_PAGE_SEEN) > 10000:
+        _PAGE_SEEN.clear()
+
+
+def after_paid_check(user, filename, ok, origin, seconds=20):
+    """A check run by the server after its payment was confirmed has ended: send the message unless the account's
+    page asked for its status in the last `seconds`. In the page's last language (Uzbek if it never asked)."""
+    if not (enabled() and user):
+        return False
+    seen, lang = _PAGE_SEEN.get(user["id"], (None, "uz"))
+    if seen is not None and time.monotonic() - seen < seconds:
         return False
     _start(deliver, user, filename, ok, lang, origin)
     return True
