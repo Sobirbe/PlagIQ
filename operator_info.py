@@ -58,7 +58,8 @@ def privacy_html():
             out.append(part)
             continue
         out.append(_fill(part, lang))
-    return "".join(out).replace("{{DRAFT_NOTICE}}", "" if not missing() else DRAFT)
+    import reports_store
+    return reports_store.fill("".join(out).replace("{{DRAFT_NOTICE}}", "" if not missing() else DRAFT))
 
 
 def _fill(text, lang):
