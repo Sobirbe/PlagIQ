@@ -66,3 +66,16 @@ def test_pages_pdf_and_message_state_the_periods():
     assert "Ҳисобот ҳисобингизда ўчирилгунча сақланади." in notify.message("a.pdf", True, "uzc", "https://x.uz")[1]
     assert "Отчёт хранится в аккаунте до удаления." in notify.message("a.pdf", True, "ru", "https://x.uz")[1]
     assert report_pdf._duration(7 * 1440 - 1, "en") == "6 d 23 h"
+
+
+def test_pdf_says_where_the_text_is_kept():
+    """The appendix said the text was "kept in memory for 15 minutes and never stored", left from before reports were
+    stored; it is kept, compressed, with the report until the report is deleted (as the privacy page says)."""
+    import pymupdf
+    result = {"mode": "reference", "language": "uz", "percent": 10.0, "total_tokens": 20, "status": "completed_matches",
+              "sources": [], "_text": "Bu hujjatning matni shu yerda.", "_marks": [], "checked_at": "2026-11-19T06:00:00Z"}
+    for lang, want in (("en", "until the report is deleted"), ("uz", "hisobot o‘chirilguncha saqlaydi"),
+                       ("ru", "пока отчёт не удалён")):
+        text = " ".join("".join(p.get_text() for p in pymupdf.open(stream=report_pdf.build_pdf(result, "a" * 12, lang))).split())
+        assert want in text, lang
+        assert "never stores" not in text and "diskka yozmaydi" not in text and "никогда не сохраняет" not in text

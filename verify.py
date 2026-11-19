@@ -4,7 +4,7 @@ The QR code holds a link with the report's key facts and an HMAC-SHA256
 signature made with VERIFY_SECRET (set on the website service, at least 32
 characters). The /verify page recomputes the signature: if any fact was changed
 the link is reported as not valid. Nothing is stored, so links keep working
-after the report itself is deleted (15 minutes) and after restarts. The link
+after the report itself is deleted and after restarts. The link
 contains no file name and no manuscript text: only the date, the first 16
 characters of the document's SHA-256, the mode, the result, word count,
 sources compared and the language.
