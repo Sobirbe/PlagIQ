@@ -616,6 +616,72 @@ def evaluation_status():
             "details": evaluation_details()}
 
 
+# ------------------------------------------------------------- duplicates (owner, /admin)
+
+DUPLICATES = {"state": "never", "done": 0, "total": 0, "error": "", "removed": None}
+
+
+def duplicates_path():
+    return evaluation_path().with_name("duplicates.json")
+
+
+def _find_duplicates():
+    """corpus.find_duplicates on the live library, read-only; each text's lookup takes the search lock, so real
+    checks wait at most for one lookup."""
+    def locked_lookup(db, num):
+        with lock:
+            return corpus.copies_of(db, num)
+    try:
+        with closing(connect()) as db:
+            pairs = corpus.find_duplicates(db, lambda done, total: DUPLICATES.update(done=done, total=total),
+                                           lookup=locked_lookup)
+        duplicates_path().write_text(json.dumps({"found": time.time(), "pairs": pairs}, ensure_ascii=False), "utf-8")
+        DUPLICATES.update(state="done", error="")
+    except Exception as exc:
+        log.warning("duplicate search failed: %s: %s", type(exc).__name__, str(exc)[:300])
+        DUPLICATES.update(state="error", error=f"{type(exc).__name__}: {str(exc)[:200]}")
+
+
+class DuplicateAction(BaseModel):
+    action: str = Field(pattern="^(find|remove)$")
+
+
+@app.post('/v1/duplicates', dependencies=[Depends(authorize)])
+def duplicates_action(item: DuplicateAction):
+    """Owner-only. find: look for texts stored twice (background, read-only). remove: delete the newer record of
+    each "same text" pair found by the last search; texts that are only part of another are kept."""
+    if DUPLICATES["state"] == "running":
+        raise HTTPException(409, 'A duplicate search is already running')
+    if item.action == "find":
+        DUPLICATES.update(state="running", done=0, total=0, error="", removed=None)
+        threading.Thread(target=_find_duplicates, daemon=True).start()
+        return duplicates_status()
+    path = duplicates_path()
+    if not path.exists():
+        raise HTTPException(409, 'Search for duplicates first')
+    data = json.loads(path.read_text("utf-8"))
+    if not lock.acquire(timeout=queue_seconds()):
+        raise HTTPException(429, 'Engine busy')
+    try:
+        with closing(connect()) as db:
+            removed = corpus.remove_extra_copies(db, data.get("pairs") or [])
+    finally:
+        lock.release()
+    data["pairs"] = [p for p in data.get("pairs") or [] if p.get("kind") != "same"]
+    path.write_text(json.dumps(data, ensure_ascii=False), "utf-8")
+    DUPLICATES.update(removed=removed)
+    return duplicates_status()
+
+
+@app.get('/v1/duplicates', dependencies=[Depends(authorize)])
+def duplicates_status():
+    path = duplicates_path()
+    data = json.loads(path.read_text("utf-8")) if path.exists() else {}
+    pairs = data.get("pairs") or []
+    return {**DUPLICATES, "found": data.get("found"), "same": sum(p.get("kind") == "same" for p in pairs),
+            "inside": sum(p.get("kind") == "inside" for p in pairs), "pairs": pairs[:200]}
+
+
 class Compact(BaseModel):
     confirm: bool = False
 

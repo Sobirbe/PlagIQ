@@ -891,8 +891,32 @@ async def admin_page(request: Request):
     reason = await engine_client.probe() if corpus_configured() and data is None else ""
     inventory = await engine_client.inventory() if data is not None else None
     evaluation = await engine_client.evaluation() if data is not None else None
+    duplicates = await engine_client.duplicates() if data is not None else None
     return HTMLResponse(admin.page({"available": data is not None, **(data or {})}, reason, inventory,
-                                   evaluation=evaluation), headers={"Cache-Control": "no-store"})
+                                   evaluation=evaluation, duplicates=duplicates), headers={"Cache-Control": "no-store"})
+
+
+@app.post("/admin/duplicates", response_class=HTMLResponse)
+async def admin_duplicates(request: Request, action: str = Form(..., max_length=10),
+                           confirm_text: str = Form("", max_length=40)):
+    """Owner-only: search the library for texts stored twice, or (with the typed confirmation) remove the newer copy
+    of each same-text pair."""
+    owner(request)
+    notice = ""
+    if action == "remove" and confirm_text.strip().upper() != admin.DUPLICATE_WORDS:
+        result = await engine_client.duplicates()
+        notice = f"Type {admin.DUPLICATE_WORDS} to remove. Nothing was changed."
+    elif action in ("find", "remove"):
+        result = await engine_client.duplicates(action)
+        notice = result.get("notice") or ("Searching for duplicates; reload /admin to follow it." if action == "find"
+                                           else f"{result.get('removed') or 0:,} extra copies removed.")
+    else:
+        raise ApiError(400, "invalid_request", "Invalid request.")
+    data = await engine_library() if corpus_configured() else None
+    inventory = await engine_client.inventory() if data is not None else None
+    evaluation = await engine_client.evaluation() if data is not None else None
+    return HTMLResponse(admin.page({"available": data is not None, **(data or {})}, "", inventory, notice=notice,
+                                   evaluation=evaluation, duplicates=result), headers={"Cache-Control": "no-store"})
 
 
 @app.post("/admin/evaluation", response_class=HTMLResponse)

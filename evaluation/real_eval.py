@@ -219,7 +219,7 @@ def run(db_path, holdout, per_language, seed, holdout_per_language=25, progress=
             if meta.get("rights_basis") in corpus.DEPOSITS:
                 continue                                   # never sample students' unpublished work
             library[meta["language"]].append((identifier, meta))
-        held, hidden = defaultdict(list), frozenset()
+        held, hidden, hidden_copies = defaultdict(list), frozenset(), 0
         if holdout:
             for language, title, text in holdout_texts(holdout):
                 held[language].append((title, text))
@@ -233,7 +233,13 @@ def run(db_path, holdout, per_language, seed, holdout_per_language=25, progress=
                     held[language].append((meta.get("title", ""), text_of(identifier)))
                     chosen.append(nums[identifier])
                 library[language] = items[take:]
-            hidden = frozenset(chosen)
+            # A held-out article stored a second time (e.g. inside a journal issue) would still be found: hide its
+            # copies too, so false marks count only text that is really not in the library.
+            copies = {other for num in chosen for other in corpus.copies_of(db, num)}
+            for language in library:
+                library[language] = [it for it in library[language] if nums[it[0]] not in copies]
+            hidden = frozenset(chosen) | frozenset(copies)
+            hidden_copies = len(copies - set(chosen))
         results, cases, skipped_template = defaultdict(list), [], defaultdict(int)
         total = sum(per_language * (len(TRANSFORMS) - (language != "uz")) for language in corpus.LANGUAGES
                     if library[language] and held[language])
@@ -279,6 +285,7 @@ def run(db_path, holdout, per_language, seed, holdout_per_language=25, progress=
                               "top": (report["sources"][0]["title"][:80] if report["sources"] else "")})
         size = {lang: len(v) for lang, v in library.items()}
     size["_template_skipped"] = dict(skipped_template)
+    size["_hidden_copies"] = hidden_copies
     return results, cases, whole, size, {k: len(v) for k, v in held.items()}
 
 
@@ -294,7 +301,10 @@ def markdown(results, cases, whole, size, held, seed, seconds):
              + (" Passages that were mostly journal template text (licence notes, headers: 7-word sequences found in so "
                 "many library texts that PlagIQ ignores them on purpose) were replaced by other passages: "
                 + ", ".join(f"{k} {v}" for k, v in sorted(size.get("_template_skipped", {}).items())) + "."
-                if size.get("_template_skipped") else ""), "",
+                if size.get("_template_skipped") else "")
+             + (f" {size['_hidden_copies']} other library texts containing a held-out article (the same work stored "
+                "twice, e.g. an article and the journal issue with it) were hidden as well, so they do not count as "
+                "false marks." if size.get("_hidden_copies") else ""), "",
              "| Language | How it was copied | Cases | Recall | Found | Right source | False marks /1,000 |",
              "|---|---|---|---|---|---|---|"]
     for (language, name), rs in sorted(results.items(), key=lambda kv: (kv[0][0], TRANSFORMS.index(kv[0][1]))):

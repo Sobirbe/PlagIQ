@@ -223,6 +223,7 @@ def details(inv):
 
 
 CONFIRM_WORDS = "DELETE WIKIPEDIA"
+DUPLICATE_WORDS = "DELETE COPIES"
 
 
 def compact_form(result=None, error=""):
@@ -477,6 +478,42 @@ def markdown_html(text):
     return "".join(out)
 
 
+def duplicates_section(d):
+    """/admin: texts stored twice in the library."""
+    esc = html.escape
+    d = d or {}
+    state = d.get("state")
+    out = ["<p>Finds library texts stored twice: <b>the same text</b> under two records (the newer one can be removed: "
+           "it adds nothing, takes a library slot and is listed twice in reports), and <b>a text inside another</b>, "
+           "such as an article and the journal issue that contains it (both are real publications and stay). "
+           "Read-only until you remove; authors' deposits are never touched; real checks keep priority.</p>"]
+    if state == "running":
+        out.append(f'<p class="warn">Searching: {d.get("done", 0):,} of {d.get("total", 0) or "…"} texts. '
+                   "Reload this page to see progress.</p>")
+    elif state in ("error", "unavailable"):
+        out.append(f'<p class="warn">{esc(d.get("error", ""))}</p>')
+    if d.get("removed") is not None:
+        out.append(f'<p class="notice">{d["removed"]:,} extra copies removed.</p>')
+    if state != "running":
+        out.append('<form class="diag" method="post" action="/admin/duplicates"><input type="hidden" name="action" '
+                   'value="find"><button>Search for duplicates</button></form>')
+    pairs = d.get("pairs") or []
+    if d.get("found"):
+        out.append(f"<p><b>Last search:</b> {d.get('same', 0):,} texts stored twice, {d.get('inside', 0):,} texts "
+                   "contained in another.</p>")
+        if d.get("same"):
+            out.append('<form class="diag" method="post" action="/admin/duplicates"><input type="hidden" name="action" '
+                       f'value="remove"><label>Type {DUPLICATE_WORDS} to remove the {d["same"]:,} newer copies '
+                       f'<input name="confirm_text" autocomplete="off"></label><button>Remove the extra copies</button></form>')
+        if pairs:
+            label = {"same": "same text", "inside": "inside the other"}
+            out.append("<table><tr><th>Kind</th><th>Kept</th><th>Extra copy / part</th><th>Shared</th></tr>" + "".join(
+                f"<tr><td>{label[p['kind']]}</td><td>{esc(p['keep']['title'])}<br><small>{esc(p['keep']['url'])}</small></td>"
+                f"<td>{esc(p['extra']['title'])}<br><small>{esc(p['extra']['url'])}</small></td><td>{100 * p['share']:.0f}%</td></tr>"
+                for p in pairs[:100]) + "</table>")
+    return "".join(out)
+
+
 def evaluation_section(ev):
     """/admin: run the accuracy test on the live library and show the last result."""
     esc = html.escape
@@ -540,7 +577,7 @@ def evaluation_details_html(d):
 
 
 def page(library, probe="", inventory=None, diagnostic="", pruning=None, pilot=None, notice="", compacting=None,
-         evaluation=None):
+         evaluation=None, duplicates=None):
     esc = html.escape
     mark = lambda ok: "✅" if ok else "➖" if ok is None else "❌"          # None = optional, not set
     rows = "".join(f'<tr><td>{mark(ok)}</td><th>{esc(a)}</th><td>{esc(d)}</td><td class="h">{"" if ok else esc(h)}</td></tr>'
@@ -608,6 +645,7 @@ def page(library, probe="", inventory=None, diagnostic="", pruning=None, pilot=N
             f'<section id="source-check"><h2>Source check (DOI or title)</h2>{diagnostic or diagnostic_form()}</section>'
             f'<section id="compact"><h2>Library file size</h2>{compacting if compacting is not None else compact_form()}</section>'
             f'<section id="accuracy"><h2>Accuracy on the live library</h2>{evaluation_section(evaluation)}</section>'
+            f'<section id="duplicates"><h2>Texts stored twice</h2>{duplicates_section(duplicates)}</section>'
             f'<section id="wikipedia-share"><h2>Wikipedia share</h2>{pruning if pruning is not None else (prune_form(inventory) if inventory else "<p>The engine is not connected.</p>")}</section>'
             f'<section id="monitoring"><h2>Monitoring</h2>{monitoring()}</section>'
             f'<section id="pilot"><h2>Pilot testers and e-mail</h2>{pilot if pilot is not None else pilot_section()}</section>'
