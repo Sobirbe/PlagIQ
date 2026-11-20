@@ -68,7 +68,7 @@ def page_tables():
 
 def test_page_and_server_transliterate_identically(page_tables):
     tables, js_cases, state, errors = page_tables
-    assert not errors and state[0] == "uz-Cyrl" and state[1].startswith("Текширишни")
+    assert not errors and state[0] == "uz-Cyrl" and state[1].startswith("Текширувни")
     assert js_cases == list(CASES.values())
     for name, t in tables.items():
         assert t["uzc"] == uzcyr.deep(t["uz"]), name
