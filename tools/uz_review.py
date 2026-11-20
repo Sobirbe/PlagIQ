@@ -171,13 +171,19 @@ def apply(path):
         if not correction or not str(correction).strip() or str(correction).strip() == str(original).strip():
             continue
         correction = str(correction).strip()
+        if correction.startswith("="):                 # a spreadsheet formula (e.g. =E31, the row's own text): no text
+            problems.append(f"#{number} {key}: a formula ({correction[:20]}), not text — skipped")
+            continue
         if sorted(PLACEHOLDER.findall(correction)) != sorted(PLACEHOLDER.findall(original)):
             problems.append(f"#{number} {key}: the {{placeholders}} differ — not applied")
             continue
         text = sources.setdefault(file, (ROOT / file).read_text("utf-8"))
         for old, new in zip(_literal_forms(original, file), _literal_forms(correction, file)):
-            if old in text:
-                sources[file] = text.replace(old, new)
+            # only where the text stands complete (between quotes, or between tags): the same words inside a
+            # longer text are a different text that the reviewer did not see in that place
+            whole = re.compile(r"(?<=[\"'>])(\s*)" + re.escape(old) + r"(\s*)(?=[\"'<])")
+            if whole.search(text):
+                sources[file] = text = whole.sub(lambda m: m.group(1) + new + m.group(2), text)
                 done += 1
                 break
         else:
