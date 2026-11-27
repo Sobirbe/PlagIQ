@@ -210,7 +210,8 @@ def compare(text, source, language):
 def compare_sources(text, sources, language):
     """Union of verified matches across returned abstracts (metadata-only records are not compared)."""
     q, evidence, covered, intervals = corpus.compare_texts(
-        text, [s.get("fulltext") or s.get("abstract", "") for s in sources], language)
+        text, [s.get("fulltext") or s.get("abstract", "") for s in sources], language,
+        journals=[corpus.journal_key(s.get("url", ""), s.get("doi", "")) for s in sources])
     result, intervals = _measure(q, covered, intervals)
     import discovery as finder
     entries = [_source_entry(e, title=s.get("title", "Untitled"), url=s.get("url", ""), year=s.get("year"),
@@ -1865,6 +1866,15 @@ async def analyse(submission, reference, reference_text, language, mode, options
                   owner="", archive=None, original=None, uz_ai=False):
     if original is None:
         original = await read_file(submission)
+    journal_pages = None
+    if mode in ("academic", "corpus"):
+        # A journal's reprint: only the article is checked; the journal's own pages (cover, editorial board, contents,
+        # imprint, running headers) are not the author's text and match every other article of the journal.
+        from discovery import article_body
+        article = await run_in_threadpool(article_body, original)
+        if article != original:
+            journal_pages = {"words": max(0, len(original.split()) - len(article.split()))}
+            original = article
     # The menu defaults to Uzbek; when the text clearly is another language, use that
     # (search filter and normalization depend on it) and say so in the result.
     chosen = language
@@ -1921,8 +1931,9 @@ async def analyse(submission, reference, reference_text, language, mode, options
         web = {"enabled": False, "reason": "not_set_up" if not websearch.settings()[0] else "not_chosen"}
         if web_search and websearch.settings()[0]:
             # Separate consent: the same excerpts are sent to the search providers; pages are compared once and discarded.
-            from discovery import spread_excerpts
-            excerpts = spread_excerpts(original, websearch.excerpt_count(pricing.count_words(original)), pdf_title)
+            from discovery import article_body, spread_excerpts
+            excerpts = spread_excerpts(article_body(original), websearch.excerpt_count(pricing.count_words(original)),
+                                       pdf_title)
             progress.step("web")
             web_sources, web = await run_in_threadpool(websearch.run, excerpts, language)
             known = {s.get("url") for s in discovery["sources"]}
@@ -1992,6 +2003,8 @@ async def analyse(submission, reference, reference_text, language, mode, options
                 result[key] = own_translated(summary[key], owner, original)
     if detected and detected != chosen:
         result["language_note"] = {"selected": chosen, "detected": detected}
+    if journal_pages and isinstance(result, dict):
+        result["journal_pages"] = journal_pages
     intervals = result.pop("intervals", [])
     exact_intervals = result.pop("exact_intervals", intervals)
     options = dict(options or {})

@@ -399,8 +399,47 @@ def edited_runs(q, s, blocked=frozenset()):
 # must count once when deciding what is boilerplate: otherwise a passage copied from a widely mirrored paper
 # is in "3 different texts" and is dropped, and verbatim copying scores 0%.
 SAME_WORK_MIN = 20          # shared seven-word windows (about 26 words) ...
-SAME_WORK_SHARE = 0.5       # ... that are at least half of the shorter text
+SAME_WORK_SHARE = 0.8       # ... that are most of the shorter text (a journal's front pages alone are not)
 SAME_WORK_CHECK_MAX = 12    # a sequence in more texts than this is boilerplate without further checks
+
+
+# Repositories and aggregators hold unrelated works under one DOI prefix or website: not "a journal".
+GENERIC_DOI_PREFIXES = frozenset({"10.5281", "10.6084", "10.17605", "10.48550", "10.31219", "10.2139", "10.20944",
+                                  "10.21203", "10.13140", "10.5061"})
+GENERIC_HOSTS = frozenset({"zenodo.org", "doi.org", "dx.doi.org", "openalex.org", "figshare.com", "osf.io", "arxiv.org",
+                           "cyberleninka.ru", "researchgate.net", "academia.edu", "inlibrary.uz", "wikipedia.org",
+                           "scholar.archive.org", "semanticscholar.org", "core.ac.uk", "ssrn.com", "elibrary.ru",
+                           "europepmc.org", "ncbi.nlm.nih.gov", "google.com"})
+
+
+def journal_key(url="", doi=""):
+    """Which journal a text comes from, for recognising the journal's own pages: the DOI prefix (10.68372) or the
+    website, except repositories and aggregators (Zenodo, CyberLeninka …), whose works are unrelated. None if unknown."""
+    for value in (doi or "", url or ""):
+        m = re.search(r"\b(10\.\d{4,9})/", value)
+        if m and m.group(1) not in GENERIC_DOI_PREFIXES:
+            return m.group(1)
+    host = (urlsplit(url or "").hostname or "").lower().removeprefix("www.")
+    if host and not any(host == g or host.endswith("." + g) for g in GENERIC_HOSTS):
+        return host
+    return None
+
+
+TEMPLATE_EDGE = 0.25        # the journal's own pages: in the first or last quarter of an article,
+TEMPLATE_FRONT_WORDS = 1500  # or its first 1,500 words (cover, editorial board, contents),
+TEMPLATE_BACK_WORDS = 800    # or its last 800 words (imprint) ...
+TEMPLATE_REPEATS = 3        # ... or repeated on many of its pages (running headers)
+
+
+def journal_template(positions, lengths):
+    """True when a shared seven-word sequence sits where a journal puts its own pages in every holder: at its start or
+    end (TEMPLATE_*), or repeated (running headers). `positions[k]`: token indexes of the sequence in holder k."""
+    for k, where in positions.items():
+        n = max(1, lengths[k])
+        front, back = max(TEMPLATE_EDGE * n, TEMPLATE_FRONT_WORDS), n - max(TEMPLATE_EDGE * n, TEMPLATE_BACK_WORDS)
+        if len(where) < TEMPLATE_REPEATS and not all(j < front or j > back for j in where):
+            return False
+    return True
 
 
 def same_work(a, b):
@@ -427,11 +466,13 @@ def _source_fingerprints(identifier, language, text):
     return frozenset(f for f, _ in windows(_source_lexical(identifier, language, text)))
 
 
-def compare_texts(text, sources, language):
+def compare_texts(text, sources, language, journals=None):
     """In-memory comparison against user-supplied texts (reference, abstracts).
 
     `sources` is a list of source texts. Returns the manuscript tokens, one
     evidence entry (or None) per source, and the union of covered tokens.
+    `journals` (optional, one journal_key per source): a sequence shared with two or more different articles of the
+    same journal, where a journal puts its own pages (journal_template), is the journal's text, not a match.
     """
     q = lexical(text, language)
     by_fp = {}
@@ -441,23 +482,32 @@ def compare_texts(text, sources, language):
     source_windows = [windows(s) for s in lexed]
     limit = boilerplate_sources()
     common = set()
-    if limit and len(sources) >= limit:
-        holders = {}
+    same_journal = journals is not None and len(journals) == len(sources)
+    if limit and (len(sources) >= limit or (same_journal and len(sources) >= 2)):
+        holders, where = {}, {}
         for k, ws in enumerate(source_windows):
-            for f in {f for f, _ in ws if f in by_fp}:
-                holders.setdefault(f, []).append(k)
+            for f, j in ws:
+                if f in by_fp:
+                    where.setdefault(f, {}).setdefault(k, []).append(j)
+        for f, by_source in where.items():
+            holders[f] = sorted(by_source)
         sets = {}
-        for f, members in holders.items():
-            if len(members) < limit:
-                continue
-            if len(members) > SAME_WORK_CHECK_MAX:
-                common.add(f)
-                continue
+
+        def work_sets(members):
             for k in members:
                 if k not in sets:
                     sets[k] = frozenset(g for g, _ in source_windows[k])
-            if distinct_works(members, sets) >= limit:
-                common.add(f)
+            return sets
+        for f, members in holders.items():
+            if len(members) >= limit:
+                if len(members) > SAME_WORK_CHECK_MAX or distinct_works(members, work_sets(members)) >= limit:
+                    common.add(f)
+                    continue
+            if (same_journal and len(members) >= 2 and journals[members[0]] is not None
+                    and all(journals[k] == journals[members[0]] for k in members)
+                    and journal_template(where[f], {k: len(lexed[k]) for k in members})
+                    and distinct_works(members, work_sets(members)) >= 2):
+                common.add(f)                           # the journal's own pages, shared by its articles
     blocked = {k for f in common for i in by_fp[f] for k in range(i, i + WINDOW)}
     blocked |= _shared_edits(q, [(k, s) for k, s in enumerate(lexed) if s], blocked, limit,
                              lambda k: frozenset(g for g, _ in source_windows[k]))
@@ -506,11 +556,16 @@ def search(db, text, language, max_passages=5, exclude=(), ignore=()):
     limit = boilerplate_sources()
     sets = {}
 
+    journal_of, length_of = {}, {}
+
     def work_sets(nums):
         for num in nums:
             if num not in sets:
                 identifier, raw, source_text = db.execute('SELECT id, metadata, text FROM sources WHERE num=?', (num,)).fetchone()
-                sets[num] = _source_fingerprints(identifier, json.loads(raw)['language'], source_text)
+                meta = json.loads(raw)
+                sets[num] = _source_fingerprints(identifier, meta['language'], source_text)
+                journal_of.setdefault(num, journal_key(meta.get('url', ''), meta.get('doi', '')))
+                length_of[num] = len(_source_lexical(identifier, meta['language'], source_text))
         return sets
 
     for f, i in windows(q):
@@ -520,6 +575,20 @@ def search(db, text, language, max_passages=5, exclude=(), ignore=()):
             if limit and len(holders) >= limit and (len(holders) > SAME_WORK_CHECK_MAX or
                                                     distinct_works(holders, work_sets(holders)) >= limit):
                 common.add(f)                           # in `limit` different works, not copies of one
+            elif limit and 2 <= len(holders) <= SAME_WORK_CHECK_MAX:
+                for num in holders:                     # the journal from the record alone (cheap) ...
+                    if num not in journal_of:
+                        raw = db.execute('SELECT metadata FROM sources WHERE num=?', (num,)).fetchone()[0]
+                        meta = json.loads(raw)
+                        journal_of[num] = journal_key(meta.get('url', ''), meta.get('doi', ''))
+                key = journal_of.get(holders[0])
+                if key is not None and all(journal_of.get(n) == key for n in holders):
+                    work_sets(holders)                  # ... the texts only for articles of one journal
+                    where = {}
+                    for num, j in seen[f]:
+                        where.setdefault(num, []).append(j)
+                    if journal_template(where, length_of) and distinct_works(holders, sets) >= 2:
+                        common.add(f)                   # the journal's own pages, shared by its articles
         if f in common:
             continue                                    # boilerplate shared by many texts
         for num, j in seen[f]:

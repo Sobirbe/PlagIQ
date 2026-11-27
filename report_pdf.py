@@ -63,6 +63,7 @@ T = {
     searches="OpenAlex searches (excerpts of at most 14 words)",
     shown_records="Showing {n} of {m} discovered records, most matched words first.", truncated_records="The list is shortened; the percentage above uses all records.",
     lang_detected=" (detected from the text; selected: {s})",
+    journal_pages="Journal pages", journal_pages_v="Left out: this is a journal reprint, only the article was checked ({n} words of the journal’s own pages: cover, editorial board, contents, imprint, page headers)",
     lib_label="PlagIQ library", lib_v="{n} searched; {m} with matches", lib_err="Not searched this time ({e}); the result covers OpenAlex only", lib_scope=" The PlagIQ library (imported publications and the protected archive) was also searched.", off_label="Off-topic results", off_v="{n} compared, no matching words, not listed (their topic differs from the document)", ft_label="Full-text downloads", ft_line="{a} tried, {c} compared; not available: {r}",
     qr_caption="Scan to verify",
     verify="Online verification",
@@ -122,6 +123,7 @@ T = {
     searches="Запросов в OpenAlex (отрывки до 14 слов)",
     shown_records="Показано {n} из {m} найденных записей, сначала с наибольшим числом совпавших слов.", truncated_records="Список сокращён; процент выше рассчитан по всем записям.",
     lang_detected=" (определён по тексту; выбран: {s})",
+    journal_pages="Страницы журнала", journal_pages_v="Не учитывались: это оттиск из журнала, проверена только статья ({n} слов собственных страниц журнала: обложка, редколлегия, содержание, выходные данные, колонтитулы)",
     lib_label="Библиотека PlagIQ", lib_v="проверено: {n}; с совпадениями: {m}", lib_err="В этот раз не проверялась ({e}); результат охватывает только OpenAlex", lib_scope=" Также проверена библиотека PlagIQ (импортированные публикации и защищённый архив).", off_label="Результаты не по теме", off_v="сравнено {n}, совпадений нет, в список не включены (тема отличается от документа)", ft_label="Загрузка полных текстов", ft_line="попыток {a}, сравнено {c}; не удалось: {r}", reasons_tr={"too little text on page": "на странице слишком мало текста", "timed out": "истекло время", "blocked by robots.txt": "запрещено robots.txt", "refused by the website (403)": "сайт отказал (403)", "refused by the website (401)": "сайт отказал (401)", "not found (404)": "не найдено (404)", "not a PDF": "не PDF", "no PDF link on page": "на странице нет ссылки на PDF", "scanned PDF (no text)": "скан PDF (без текста)", "website not reachable": "сайт недоступен", "address refused": "адрес отклонён", "file too large": "файл слишком большой", "cost limit": "лимит расходов", "other error": "другая ошибка", "no open-access copy listed": "открытая копия не указана"},
     qr_caption="Сканируйте для проверки",
     verify="Онлайн-проверка",
@@ -181,6 +183,7 @@ T = {
     searches="OpenAlex so‘rovlari (14 so‘zgacha parchalar)",
     shown_records="Topilgan {m} ta yozuvdan {n} tasi ko‘rsatilgan, eng ko‘p mos so‘zlilari birinchi.", truncated_records="Ro‘yxat qisqartirilgan; yuqoridagi foiz barcha yozuvlar bo‘yicha hisoblangan.",
     lang_detected=" (matndan aniqlandi; tanlangan: {s})",
+    journal_pages="Jurnal sahifalari", journal_pages_v="Hisobga olinmadi: bu jurnaldan olingan nusxa, faqat maqola tekshirildi (jurnalning o‘z sahifalaridan {n} so‘z: muqova, tahrir hay’ati, mundarija, chiqish ma’lumotlari, sahifa sarlavhalari)",
     lib_label="PlagIQ kutubxonasi", lib_v="qidirildi: {n}; {m} tasida moslik bor", lib_err="Bu safar qidirilmadi ({e}); natija faqat OpenAlex bo‘yicha", lib_scope=" PlagIQ kutubxonasi (import qilingan nashrlar va himoyalangan arxiv) ham qidirildi.", off_label="Mavzuga aloqasiz natijalar", off_v="{n} tasi solishtirildi, mos so‘z yo‘q, ro‘yxatga kiritilmadi (mavzusi hujjatnikidan farq qiladi)", ft_label="To‘liq matnlarni yuklash", ft_line="{a} ta urinish, {c} tasi solishtirildi; olinmadi: {r}", reasons_tr={"too little text on page": "sahifada matn juda kam", "timed out": "vaqt tugadi", "blocked by robots.txt": "robots.txt taqiqlagan", "refused by the website (403)": "sayt rad etdi (403)", "refused by the website (401)": "sayt rad etdi (401)", "not found (404)": "topilmadi (404)", "not a PDF": "PDF emas", "no PDF link on page": "sahifada PDF havolasi yo‘q", "scanned PDF (no text)": "skanerlangan PDF (matnsiz)", "website not reachable": "saytga ulanib bo‘lmadi", "address refused": "manzil rad etildi", "file too large": "fayl juda katta", "cost limit": "xarajat chegarasi", "other error": "boshqa xato", "no open-access copy listed": "ochiq nusxa ko‘rsatilmagan"},
     qr_caption="Tekshirish uchun skanerlang",
     verify="Onlayn tekshirish",
@@ -869,6 +872,8 @@ def build_pdf(result, identifier, lang="en", minutes_left=15, verify_url=None):
         (t["document"], result.get("document", "")), (t["date"], timefmt.show(result.get("date", ""), lang, seconds=True)),
         (t["language"], str(result.get("language", "")).upper() + (t["lang_detected"].format(
             s=result["language_note"]["selected"].upper()) if result.get("language_note") else "")),
+        *([(t["journal_pages"], t["journal_pages_v"].format(n=f'{result["journal_pages"]["words"]:,}'.replace(",", " ")))]
+          if result.get("journal_pages") else []),
         (t["sha"], result.get("sha256", "")),
         (t["expiry"], t["expiry_kept"] if minutes_left is None else t["expiry_v"].format(m=_duration(minutes_left, lang))),
         (t["verify"], t["verify_v"].format(id=identifier[:12]) if verify_url else t["verify_none"])])]

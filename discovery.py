@@ -104,6 +104,60 @@ def _first_line_query(text, title=None):
     return " ".join(titles[0].split()[:QUERY_WORDS])[:220]
 
 
+def article_body(text):
+    """A journal reprint without the journal's own pages, for choosing search phrases.
+
+    Reprints of Uzbek journals often include the issue's cover, editorial board, contents and imprint pages, and
+    every page starts with the same running header (journal name, issue, ISSN, page number). Searching for those
+    finds other articles of the journal, never the article itself. The running header splits the text into pages;
+    the longest run of consecutive page numbers is the article (e.g. 143-150 between 1-4 and 240); the other pages
+    and the header lines are left out. Only for journals (an ISSN in the header or on the pages left out). Returns the
+    text unchanged when no such header is found or when the result would be implausible (the article must keep most
+    of the text)."""
+    lines = text.split("\n")
+    norm = lambda line: re.sub(r"\d+", "#", re.sub(r"\s+", " ", line).strip().lower())
+    counts = {}
+    for line in lines:
+        key = norm(line)
+        if len(key.split()) >= 3:
+            counts[key] = counts.get(key, 0) + 1
+    if not counts:
+        return text
+    head, repeats = max(counts.items(), key=lambda kv: kv[1])
+    if repeats < 4:
+        return text
+    starts = [i for i, line in enumerate(lines) if norm(line) == head]
+    pages = []
+    for k, start in enumerate(starts):
+        end = starts[k + 1] if k + 1 < len(starts) else len(lines)
+        number = next((int(line.strip()) for line in lines[start:start + 10] if re.fullmatch(r"\s*\d{1,4}\s*", line)), None)
+        pages.append((number, lines[start:end]))
+    best, run = [], []
+    for k, (number, _) in enumerate(pages):
+        if run and number is not None and pages[run[-1]][0] is not None and number == pages[run[-1]][0] + 1:
+            run.append(k)
+        else:
+            run = [k] if number is not None else []
+        if len(run) > len(best):
+            best = list(run)
+    if len(best) < 2 or len(best) == len(pages):
+        return text
+    left_out = "\n".join(line for k, (_, page) in enumerate(pages) if k not in best for line in page)
+    if "issn" not in head and "issn" not in left_out.lower():
+        return text                                     # only a journal's reprint (theses have no ISSN pages)
+    # lines repeated in the header area (first lines) of most pages: the rest of the running header
+    top = {}
+    for _, page in pages:
+        for key in {norm(line) for line in page[:10] if line.strip()}:
+            top[key] = top.get(key, 0) + 1
+    repeated = {key for key, n in top.items() if n >= max(4, len(pages) // 2)}
+    body = "\n".join(line for k in best for line in pages[k][1]
+                     if norm(line) not in repeated and not re.fullmatch(r"\s*\d{1,4}\s*", line))
+    if len(body.split()) < 0.5 * len(text.split()) or len(body.split()) < 200:
+        return text
+    return body
+
+
 def _distinctive(sentence):
     words = re.findall(r"[^\W\d_]{6,}", sentence.lower())
     return len(set(words))
@@ -342,6 +396,7 @@ def query_count(text):
 
 
 def discover(text, max_results=8, language=None, title=None):
+    text = article_body(text)                       # a reprint's journal pages give no useful search phrase
     count = query_count(text)
     found_chapters = 0
     if count <= MAX_QUERIES:
